@@ -26,7 +26,7 @@ const Login = () => {
               <FaUser className="input-icon" />
               <input
                 type="text"
-                placeholder="Correo electrónico"
+                placeholder="Usuario"
                 className="form-control"
               />
             </div>
