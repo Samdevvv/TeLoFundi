@@ -8,16 +8,14 @@ import "./estilos/homepage.css";
 import ForgetPsw from "./componentes/Forgetpswd";
 
 function App() {
-  const [menu, setMenu] = useState("login");
+  const [menu, setMenu] = useState("mainpage");
 
   return (
     <div>
-   {/* {menu === "login" && <Login setMenu={setMenu} />}
+    {menu === "login" && <Login setMenu={setMenu} />}
     {menu === "registro" && <Registro setMenu={setMenu} />}
-    {menu === "recuperar" && <ForgetPsw setMenu={setMenu} />}*/} 
-     {/*<HomePage/>*/} 
-    {/* <Login/> */}
-      <Mainpage/> 
+    {menu === "recuperar" && <ForgetPsw setMenu={setMenu} />}
+    {menu === "mainpage" && <Mainpage setMenu={setMenu} />} 
   </div>
   );
 }

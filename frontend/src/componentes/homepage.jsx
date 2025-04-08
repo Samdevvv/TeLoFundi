@@ -53,10 +53,10 @@ const users = [
     photo: chica3,
     description: "Me encanta el arte, la fotografía y la aventura. Busco alguien con quien compartir momentos únicos."
   },
-  
+
 ];
 
-const App = () => {
+const HomePage = (props) => {
   // Estado para controlar la visibilidad del modal de filtros
   const [showFiltersModal, setShowFiltersModal] = useState(false);
 
@@ -83,43 +83,47 @@ const App = () => {
             </ul>
           </nav>
           <div className="auth-buttons">
-            <button className="login">Iniciar Sesión</button>
-            <button className="signup">Registrarse</button>
+            <button className="login" onClick={() => props.setMenu("login")}>
+              Iniciar Sesión
+            </button>
+            <button className="signup" onClick={() => props.setMenu("registro")}>
+              ¡Regístrate!
+            </button>
           </div>
         </div>
       </header>
-      
+
       <main className="main-content">
         <div className="search-container">
           <div className="search-box">
-            <input 
-              type="text" 
-              placeholder="Buscar personas..." 
-              className="search-input" 
+            <input
+              type="text"
+              placeholder="Buscar personas..."
+              className="search-input"
               onClick={openFiltersModal}
               readOnly
             />
             <button className="search-button" onClick={openFiltersModal}>🔍</button>
           </div>
         </div>
-        
+
         {/* Modal de Filtros Mejorado */}
         {showFiltersModal && (
           <div className="modal-overlay" onClick={closeFiltersModal}>
             <div className="filters-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h3  className="Titulo-Busqueda">Búsqueda avanzada</h3>
+                <h3 className="Titulo-Busqueda">Búsqueda avanzada</h3>
                 <button className="close-modal" onClick={closeFiltersModal}>×</button>
               </div>
-              
+
               <div className="modal-search">
-                <input 
-                  type="text" 
-                  placeholder="Buscar..." 
-                  className="modal-search-input" 
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  className="modal-search-input"
                 />
               </div>
-              
+
               <div className="filters-container-modal">
                 <div className="filter-group">
                   <label>Edad</label>
@@ -129,7 +133,7 @@ const App = () => {
                     <input type="number" placeholder="Max" min="18" max="100" className="range-input" />
                   </div>
                 </div>
-                
+
                 <div className="filter-group">
                   <label>Ubicación</label>
                   <select className="filter-select">
@@ -141,7 +145,7 @@ const App = () => {
                     <option value="Chile">Chile</option>
                   </select>
                 </div>
-                
+
                 <div className="filter-group">
                   <label>Sexo</label>
                   <select className="filter-select">
@@ -151,7 +155,7 @@ const App = () => {
                     <option value="No binario">No binario</option>
                   </select>
                 </div>
-                
+
                 <div className="modal-footer">
                   <button className="apply-filters" onClick={closeFiltersModal}>
                     Aplicar Filtros
@@ -161,7 +165,7 @@ const App = () => {
             </div>
           </div>
         )}
-        
+
         <div className="cards-container">
           {users.map((user) => (
             <div key={user.id} className="user-card">
@@ -181,7 +185,7 @@ const App = () => {
           ))}
         </div>
       </main>
-      
+
       <footer className="footer">
         <div className="footer-content">
           © 2025 LoveConnect - Encuentra a tu persona especial
@@ -191,4 +195,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default HomePage;

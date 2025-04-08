@@ -10,7 +10,7 @@ import companionServiceImg from "../assets/compañia.jpg";
 import vipServiceImg from "../assets/vip.jpg";
 import massageServiceImg from "../assets/masaje.jpg";
 
-const Homepage = () => {
+const Homepage = (props) => {
   // Estado para controlar la visibilidad del modal de filtros
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   
@@ -95,8 +95,12 @@ const Homepage = () => {
             </ul>
           </nav>
           <div className="auth-buttons">
-            <button className="login">Iniciar Sesión</button>
-            <button className="signup">Registrarse</button>
+          <button className="login" onClick={() => props.setMenu("login")}>
+              Iniciar Sesión
+            </button>
+            <button className="signup" onClick={() => props.setMenu("registro")}>
+              ¡Regístrate!
+            </button>
           </div>
         </div>
       </header>
