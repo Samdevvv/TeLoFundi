@@ -1,57 +1,81 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import "../estilos/login.css";
+import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 
-import { FaUser, FaLock } from 'react-icons/fa'; // Iconos
+const Login = (props) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
+  const handleEmailChange = (e) => setEmail(e.target.value);
+  const handlePasswordChange = (e) => setPassword(e.target.value);
+  const handlePasswordKeyUp = (e) => setIsCapsLockOn(e.getModifierState('CapsLock'));
+  const handlePasswordBlur = () => setIsCapsLockOn(false);
+  const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
-const Login = () => {
-    return (
-      <div className="login-container">
-        {/* Sección izquierda con logo */}
-        <div className="login-left">
-          <div className="login-logo">
-            <h2>logo</h2>
+  return (
+    <div className="login-container">
+      <div className="login-right">
+        <form className="login-form">
+          <h2 className="login-title">Bienvenido de nuevo</h2>
+          <p className="login-subtitle">Ingresa tus datos para continuar</p>
+
+          <div className="input-box">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={handleEmailChange}
+              className={`form-control ${email ? 'filled' : ''}`}
+            />
+            <label>Correo Electrónico:</label>
+            <FaUser className="input-icon" />
           </div>
-        </div>
-  
-        {/* Sección derecha con el formulario */}
-        <div className="login-right">
-          <form className="login-form">
-            <h2 className="login-title">Bienvenido de nuevo</h2>
-            <p className="login-subtitle">Ingresa tus datos para continuar</p>
-  
-            {/* Input de usuario */}
-            <div className="input-group">
-              <FaUser className="input-icon" />
+
+          <div className="password-wrapper">
+            <div className="input-box password-box">
               <input
-                type="text"
-                placeholder="Usuario"
-                className="form-control"
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={handlePasswordChange}
+                onKeyUp={handlePasswordKeyUp}
+                onBlur={handlePasswordBlur}
+                className={`form-control ${password ? 'filled' : ''}`}
               />
-            </div>
-  
-            {/* Input de contraseña */}
-            <div className="input-group">
+              <label>Contraseña:</label>
               <FaLock className="input-icon" />
-              <input
-                type="password"
-                placeholder="Contraseña"
-                className="form-control"
-              />
+
+              {isCapsLockOn && (
+                <div className="caps-tooltip">Bloq Mayús activado</div>
+              )}
             </div>
-  
-            {/* Botón de login */}
-            <button className="login-button">Iniciar Sesión</button>
-  
-            {/* Pie de página */}
-            <div className="login-footer">
-              ¿No tienes cuenta? <a href="#">Regístrate</a>
-            </div>
-          </form>
-        </div>
+
+            <span className="toggle-password" onClick={togglePasswordVisibility}>
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </span>
+          </div>
+
+          <div className="forgot-password">
+            <button type="button" onClick={() => props.setMenu("recuperar")}>
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
+          <button className="login-button">Iniciar Sesión</button>
+
+          <div className="login-footer">
+            ¿Aún no tienes cuenta?
+            <button type="button" onClick={() => props.setMenu("registro")}>
+              ¡Regístrate!
+            </button>
+          </div>
+        </form>
       </div>
-    );
-  };
-  
-  export default Login;
+    </div>
+  );
+};
+ 
+export default Login;

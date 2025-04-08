@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import "../estilos/homepage.css";
+import "../estilos/Mainpage.css";
 
 // Importaciones de imágenes (reemplaza estas rutas con tus imágenes reales)
 import heroImage from "../assets/heroimage.webp";

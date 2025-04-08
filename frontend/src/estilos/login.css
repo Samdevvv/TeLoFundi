@@ -1,42 +1,30 @@
-/* Contenedor principal con fondo degradado blanco */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
 .login-container {
     width: 100vw;
     height: 100vh;
     display: flex;
+    justify-content: center;
+    align-items: center;
     background: linear-gradient(to right, #ffffff, #f3f3f3);
 }
 
-/* Sección izquierda (Media luna con logo) */
-.login-left {
-    width: 40%;
-    background: #f0f0f0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-top-left-radius: 30px;
-    border-bottom-left-radius: 30px;
-}
-
-/* Logo */
-.login-logo h2 {
-    color: #333;
-    font-size: 3rem;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-
-/* Sección derecha (Formulario) */
 .login-right {
-    width: 60%;
+    width: 100%;
+    padding: 0 2rem;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
-/* Rediseño del Formulario */
 .login-form {
     width: 100%;
-    max-width: 500px;
+    max-width: 1700px;
+    margin: 0 auto;
     padding: 3rem;
     background: #ffffff;
     border-radius: 30px;
@@ -45,13 +33,11 @@
     animation: fadeIn 0.8s ease-in-out;
 }
 
-/* Animación de entrada */
 @keyframes fadeIn {
     0% { transform: translateY(20px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
 }
 
-/* Título */
 .login-title {
     font-size: 2.5rem;
     font-weight: bold;
@@ -60,7 +46,6 @@
     text-align: center;
 }
 
-/* Subtítulo */
 .login-subtitle {
     font-size: 1.3rem;
     margin-bottom: 2rem;
@@ -69,7 +54,6 @@
     text-align: center;
 }
 
-/* Inputs */
 .input-group {
     display: flex;
     align-items: center;
@@ -79,41 +63,101 @@
     margin-bottom: 1.5rem;
     transition: all 0.3s ease-in-out;
     box-shadow: inset 0px 4px 6px rgb(251, 251, 251);
-    border: none; /* Quita el borde */
-    outline: none; /* Evita el contorno al hacer clic */
+    border: none;
+    outline: none;
 }
 
-/* Iconos */
 .input-icon {
     color: #666;
     font-size: 1.5rem;
     margin-right: 12px;
+    transition: color 0.3s;
 }
 
-/* Caja de texto */
 .form-control {
     width: 100%;
     background: transparent;
-    border: none;
+    border: none !important;
+    outline: none !important;
     font-size: 1.3rem;
     color: #333;
-    outline: none;
     padding: 12px 18px;
     border-radius: 30px;
+    box-shadow: none;
+    transition: all 0.3s ease-in-out;
 }
 
-/* Placeholder estilizado */
+.password-box {
+    position: relative;
+}
+
+.caps-tooltip {
+    position: absolute;
+    top: -30px;
+    right: 10px;
+    background-color: #ffeb3b;
+    color: #333;
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    white-space: nowrap;
+    animation: fadeIn 0.3s ease;
+    z-index: 10;
+}
+
+.forgot-password {
+    text-align: right;
+    margin-top: -10px;
+    margin-bottom: 20px;
+}
+
+.forgot-password button {
+    background: none;
+    border: none;
+    color: #2575fc;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+    font-size: 1rem;
+}
+
+.forgot-password button:hover {
+    text-decoration: underline;
+}
+
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.toggle-password {
+    margin-left: 10px;
+    font-size: 1.4rem;
+    color: #666;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.toggle-password:hover {
+    color: #2575fc;
+}
+
+.password-box {
+    flex: 1;
+    position: relative;
+}
+
 .form-control::placeholder {
     color: rgba(0, 0, 0, 0.6);
 }
 
-/* Focus en inputs */
 .form-control:focus {
     outline: none;
     box-shadow: 0 0 10px rgba(37, 117, 252, 0.7);
 }
 
-/* Botón */
 .login-button {
     background: linear-gradient(to right, #2575fc, #6a11cb);
     padding: 18px;
@@ -129,7 +173,6 @@
     animation: pulse 1.5s infinite ease-in-out;
 }
 
-/* Animación de botón */
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }
@@ -141,7 +184,6 @@
     box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Pie de página */
 .login-footer {
     margin-top: 1.5rem;
     font-size: 1.1rem;
@@ -149,27 +191,86 @@
     text-align: center;
 }
 
-.login-footer a {
+.login-footer a,
+.login-footer button {
     color: #2575fc;
     text-decoration: none;
     font-weight: bold;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding-left: 5px;
 }
 
-.login-footer a:hover {
+.login-footer a:hover,
+.login-footer button:hover {
     text-decoration: underline;
 }
-.form-control {
+
+.input-box {
+    position: relative;
     width: 100%;
-    background: transparent;
-    border: none !important;
-    outline: none !important;
-    font-size: 1.3rem;
-    color: #333;
-    padding: 12px 18px;
-    border-radius: 30px;
-    box-shadow: none;
-    transition: all 0.3s ease-in-out;
+    height: 60px;
+    margin: 25px 0;
 }
 
+.input-box input {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    border-bottom: 2px solid #ccc;
+    padding-left: 40px;
+    font-size: 1.3rem;
+    color: #333;
+    font-weight: 500;
+    transition: 0.3s ease-in-out;
+}
 
+.caps-warning {
+    display: block;
+    margin-top: 6px;
+    margin-left: 10px;
+    font-size: 0.9rem;
+    color: #e74c3c;
+    animation: fadeIn 0.3s ease-in-out;
+}
 
+.input-box label {
+    position: absolute;
+    top: 50%;
+    left: 40px;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: #888;
+    pointer-events: none;
+    transition: 0.3s ease-in-out;
+}
+
+.input-box input:focus ~ label,
+.input-box input.filled ~ label {
+    top: -12px;
+    left: 0;
+    font-size: 14px;
+    color: #2575fc;
+}
+
+.input-box .input-icon {
+    position: absolute;
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+    font-size: 1.4rem;
+    color: #666;
+    transition: color 0.3s;
+}
+
+.input-box input:focus ~ .input-icon,
+.input-box input.filled ~ .input-icon {
+    color: #2575fc;
+}
+
+.input-box input[type="password"] {
+    font-size: 1.5rem;
+}

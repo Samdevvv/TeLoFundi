@@ -1,19 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import Login from "./componentes/login";
-import HomePage from "./componentes/homepage";
+import Registro from "./componentes/registro";
 import Mainpage from "./componentes/MainPage";
+import HomePage from "./componentes/homepage";
 import "./estilos/login.css";
 import "./estilos/homepage.css";
-import "./estilos/Mainpage.css";
+import ForgetPsw from "./componentes/Forgetpswd";
 
 function App() {
+  const [menu, setMenu] = useState("login");
+
   return (
     <div>
-    {/*<HomePage/>*/} 
+   {/* {menu === "login" && <Login setMenu={setMenu} />}
+    {menu === "registro" && <Registro setMenu={setMenu} />}
+    {menu === "recuperar" && <ForgetPsw setMenu={setMenu} />}*/} 
+     {/*<HomePage/>*/} 
     {/* <Login/> */}
-    <Mainpage/>
-    </div>
+      <Mainpage/> 
+  </div>
   );
 }
+
 
 export default App;
