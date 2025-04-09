@@ -17,74 +17,72 @@ const Login = (props) => {
 
   return (
     <div className="login-container">
-      <div className="login-right">
-        <form className="login-form">
-          {/* Botón de volver */}
-          <button 
-            className="back-button" 
-            onClick={() => props.setMenu("mainpage")} // Redirige a la página principal
-            type="button"
-          >
-            <FaArrowLeft size={24} />
-          </button>
+      <form className="login-form">
+        {/* Botón de volver */}
+        <button 
+          className="back-button" 
+          onClick={() => props.setMenu("mainpage")}
+          type="button"
+        >
+          <FaArrowLeft size={20} />
+        </button>
 
-          <h2 className="login-title">Bienvenido de nuevo</h2>
-          <p className="login-subtitle">Ingresa tus datos para continuar</p>
+        <h2 className="login-title">Bienvenido de nuevo</h2>
+        <p className="login-subtitle">Ingresa tus datos para continuar</p>
 
-          <div className="input-box">
+        <div className="input-box">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={handleEmailChange}
+            className={`form-control ${email ? 'filled' : ''}`}
+          />
+          <label>Correo Electrónico:</label>
+          <FaUser className="input-icon" />
+        </div>
+
+        <div className="password-wrapper">
+          <div className="input-box password-box">
             <input
-              type="email"
+              type={showPassword ? "text" : "password"}
               required
-              value={email}
-              onChange={handleEmailChange}
-              className={`form-control ${email ? 'filled' : ''}`}
+              value={password}
+              onChange={handlePasswordChange}
+              onKeyUp={handlePasswordKeyUp}
+              onBlur={handlePasswordBlur}
+              className={`form-control ${password ? 'filled' : ''}`}
             />
-            <label>Correo Electrónico:</label>
-            <FaUser className="input-icon" />
+            <label>Contraseña:</label>
+            <FaLock className="input-icon" />
+
+            {isCapsLockOn && (
+              <div className="caps-tooltip">Bloq Mayús activado</div>
+            )}
           </div>
 
-          <div className="password-wrapper">
-            <div className="input-box password-box">
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={handlePasswordChange}
-                onKeyUp={handlePasswordKeyUp}
-                onBlur={handlePasswordBlur}
-                className={`form-control ${password ? 'filled' : ''}`}
-              />
-              <label>Contraseña:</label>
-              <FaLock className="input-icon" />
+          <span className="toggle-password" onClick={togglePasswordVisibility}>
+            {showPassword ? <FaEyeSlash /> : <FaEye />}
+          </span>
+        </div>
 
-              {isCapsLockOn && (
-                <div className="caps-tooltip">Bloq Mayús activado</div>
-              )}
-            </div>
+        <div className="forgot-password">
+          <button type="button" onClick={() => props.setMenu("recuperar")}>
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
 
-            <span className="toggle-password" onClick={togglePasswordVisibility}>
-              {showPassword ? <FaEyeSlash /> : <FaEye />}
-            </span>
-          </div>
+        <button className="login-button">Iniciar Sesión</button>
 
-          <div className="forgot-password">
-            <button type="button" onClick={() => props.setMenu("recuperar")}>
-              ¿Olvidaste tu contraseña?
-            </button>
-          </div>
-
-          <button className="login-button">Iniciar Sesión</button>
-
-          <div className="login-footer">
-            ¿Aún no tienes cuenta?
-            <button type="button" onClick={() => props.setMenu("registro")}>
-              ¡Regístrate!
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className="login-footer">
+          ¿Aún no tienes cuenta?
+          <button type="button" onClick={() => props.setMenu("registro")}>
+            ¡Regístrate!
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
- 
+
 export default Login;

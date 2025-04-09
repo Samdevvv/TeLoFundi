@@ -9,20 +9,46 @@ import maleServiceImg from "../assets/scort masculino.jpeg";
 import companionServiceImg from "../assets/compañia.jpg";
 import vipServiceImg from "../assets/vip.jpg";
 import massageServiceImg from "../assets/masaje.jpg";
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from 'react-icons/fa';
 
 const Homepage = (props) => {
   // Estado para controlar la visibilidad del modal de filtros
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  // Estado para controlar la visibilidad del modal de login
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // Función para mostrar el modal
+  // Estados para el login
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Función para mostrar el modal de filtros
   const openFiltersModal = () => {
     setShowFiltersModal(true);
   };
 
-  // Función para cerrar el modal
+  // Función para cerrar el modal de filtros
   const closeFiltersModal = () => {
     setShowFiltersModal(false);
   };
+  
+  // Función para mostrar el modal de login
+  const openLoginModal = () => {
+    setShowLoginModal(true);
+  };
+  
+  // Función para cerrar el modal de login
+  const closeLoginModal = () => {
+    setShowLoginModal(false);
+  };
+  
+  // Funciones para el manejo del formulario de login
+  const handleEmailChange = (e) => setEmail(e.target.value);
+  const handlePasswordChange = (e) => setPassword(e.target.value);
+  const handlePasswordKeyUp = (e) => setIsCapsLockOn(e.getModifierState('CapsLock'));
+  const handlePasswordBlur = () => setIsCapsLockOn(false);
+  const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
   // Datos de servicios
   const services = [
@@ -82,7 +108,7 @@ const Homepage = (props) => {
   };
 
   return (
-    <div className="page-container">
+    <div className={`page-container ${showLoginModal ? 'blur-background' : ''}`}>
       <header className="header">
         <div className="header-content">
           <span className="logo">❤️ LoveConnect</span>
@@ -95,7 +121,7 @@ const Homepage = (props) => {
             </ul>
           </nav>
           <div className="auth-buttons">
-          <button className="login" onClick={() => props.setMenu("login")}>
+            <button className="login" onClick={() => props.setMenu("login")}>
               Iniciar Sesión
             </button>
             <button className="signup" onClick={() => props.setMenu("registro")}>
@@ -266,6 +292,78 @@ const Homepage = (props) => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de Login */}
+      {showLoginModal && (
+        <div className="modal-overlay login-overlay" onClick={closeLoginModal}>
+          <div className="login-form-container" onClick={(e) => e.stopPropagation()}>
+            <form className="login-form">
+              {/* Botón de volver */}
+              <button
+                className="back-button"
+                onClick={closeLoginModal}
+                type="button"
+              >
+                <FaArrowLeft size={20} />
+              </button>
+              
+              <h2 className="login-title">Bienvenido de nuevo</h2>
+              <p className="login-subtitle">Ingresa tus datos para continuar</p>
+              
+              <div className="input-box">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={handleEmailChange}
+                  className={`form-control ${email ? 'filled' : ''}`}
+                />
+                <label>Correo Electrónico:</label>
+                <FaUser className="input-icon" />
+              </div>
+              
+              <div className="password-wrapper">
+                <div className="input-box password-box">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={handlePasswordChange}
+                    onKeyUp={handlePasswordKeyUp}
+                    onBlur={handlePasswordBlur}
+                    className={`form-control ${password ? 'filled' : ''}`}
+                  />
+                  <label>Contraseña:</label>
+                  <FaLock className="input-icon" />
+                  
+                  {isCapsLockOn && (
+                    <div className="caps-tooltip">Bloq Mayús activado</div>
+                  )}
+                </div>
+                
+                <span className="toggle-password" onClick={togglePasswordVisibility}>
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+              
+              <div className="forgot-password">
+                <button type="button" onClick={() => props.setMenu("recuperar")}>
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+              
+              <button className="login-button">Iniciar Sesión</button>
+              
+              <div className="login-footer">
+                ¿Aún no tienes cuenta?
+                <button type="button" onClick={() => props.setMenu("registro")}>
+                  ¡Regístrate!
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

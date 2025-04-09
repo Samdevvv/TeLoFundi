@@ -5,13 +5,18 @@ body {
 }
 
 .login-container {
-    position: relative;  /* Asegura que el contenedor tenga un contexto de posición */
-    width: 100vw;
-    height: 100vh;
+    position: absolute; /* Cambio importante: absoluto para flotar sobre la página */
+    top: 100px; /* o el valor que necesites */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999; /* Asegura que esté encima del contenido */
+    width: auto;
+    height: auto;
     display: flex;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(to right, #ffffff, #f3f3f3);
+    background: none; /* elimina el fondo */
+    pointer-events: auto;
 }
 
 .login-right {
@@ -23,15 +28,12 @@ body {
 }
 
 .login-form {
-    width: 100%;
-    max-width: 1700px;
-    margin: 0 auto;
-    padding: 3rem;
+    max-width: 500px; /* ya está bien definido */
     background: #ffffff;
     border-radius: 30px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
-    animation: fadeIn 0.8s ease-in-out;
+    padding: 2rem;
+    animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {

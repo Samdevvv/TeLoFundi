@@ -29,6 +29,38 @@
     padding: 0 20px;
   }
   
+  /* Agregar esto a tu archivo Mainpage.css */
+
+.blur-background {
+  filter: blur(5px);
+  pointer-events: none;
+  transition: filter 0.3s ease;
+}
+
+.login-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+}
+
+.login-form {
+  max-width: 500px;
+  background: #ffffff;
+  border-radius: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  padding: 2rem;
+  animation: fadeIn 0.3s ease-out;
+  position: relative;
+}
   /* Header Styles */
   .header {
     width: 100%;
@@ -881,6 +913,78 @@
     transition: all 0.3s;
   }
   
+  .blur-background {
+    filter: blur(5px);
+    transition: filter 0.3s ease;
+  }
+  
+  /* Overlay del modal */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .login-overlay {
+    backdrop-filter: blur(5px);
+  }
+  
+  /* Contenedor del formulario de login */
+  .login-form-container {
+    max-width: 500px;
+    width: 90%;
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  .login-form {
+    background: #ffffff;
+    border-radius: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    padding: 2rem;
+    position: relative;
+  }
+  
+  @keyframes fadeIn {
+    0% { 
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    100% { 
+      opacity: 1;
+      transform: translateY(0); 
+    }
+  }
+  
+  /* Estilos para el botón de volver */
+  .back-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: none;
+    border: none;
+    color: #2575fc;
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 100;
+  }
+  
+  .back-button:hover {
+    color: #6a11cb;
+  }
+  
+  /* Asegurarse que los inputs y botones dentro del modal tengan pointer-events */
+  .modal-overlay *,
+  .login-form * {
+    pointer-events: auto;
+  }
+
   .apply-filters:hover {
     box-shadow: 0 8px 20px rgba(255, 75, 125, 0.25);
   }

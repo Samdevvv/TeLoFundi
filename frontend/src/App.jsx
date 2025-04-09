@@ -12,13 +12,17 @@ function App() {
 
   return (
     <div>
-    {menu === "login" && <Login setMenu={setMenu} />}
-    {menu === "registro" && <Registro setMenu={setMenu} />}
-    {menu === "recuperar" && <ForgetPsw setMenu={setMenu} />}
-    {menu === "mainpage" && <Mainpage setMenu={setMenu} />} 
-  </div>
+      <Mainpage setMenu={setMenu} /> 
+      
+      {menu === "login" && <Login setMenu={setMenu} />}
+      {menu === "registro" && <Registro setMenu={setMenu} />}
+      {menu === "recuperar" && <ForgetPsw setMenu={setMenu} />}
+    </div>
   );
 }
 
-
 export default App;
+
+
+
+
