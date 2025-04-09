@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FaUser, FaLock } from 'react-icons/fa';
+import { FaUser, FaLock, FaChevronDown } from 'react-icons/fa';
 import PasswordStrengthBar from 'react-password-strength-bar';
 import "../estilos/registr.css";
 
@@ -7,6 +7,11 @@ const Registro = (props) => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [email, setEmail] = useState("");
+
+  const handleTipoCuentaClick = () => {
+    // Puedes mostrar un dropdown o cambiar un estado aquí
+    console.log("Seleccionar tipo de cuenta");
+  };
 
   return (
     <div className="login-container">
@@ -41,19 +46,7 @@ const Registro = (props) => {
             <FaLock className="input-icon" />
           </div>
 
-          {/* CONFIRM PASSWORD */}
-          <div className="input-box">
-            <input
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className={`form-control ${confirmPassword ? 'filled' : ''}`}
-            />
-            <label>Confirmar Contraseña:</label>
-            <FaLock className="input-icon" />
-          </div>
-
+          {/* PASSWORD STRENGTH */}
           <div style={{ marginTop: "-10px", marginBottom: "20px" }}>
             <PasswordStrengthBar
               password={password}
@@ -62,12 +55,11 @@ const Registro = (props) => {
             />
           </div>
 
-          {/* SELECTOR */}
-          <select className="form-control custom-select" defaultValue="">
-            <option value="" hidden>Seleccione su tipo de Usuario</option>
-            <option value="profesor">Un loco</option>
-            <option value="administrador">Administrador</option>
-          </select>
+          {/* NUEVO LABEL CON EFECTO Y ÍCONO */}
+          <div className="custom-label" onClick={handleTipoCuentaClick}>
+            <label htmlFor="tipoCuenta">Seleccione su tipo de cuenta:</label>
+            <FaChevronDown className="label-icon" />
+          </div>
 
           <button className="login-button">Regístrate</button>
 
