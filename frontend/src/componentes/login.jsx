@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import "../estilos/login.css";
-import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from 'react-icons/fa';
 
 const Login = (props) => {
   const [email, setEmail] = useState('');
@@ -19,6 +19,15 @@ const Login = (props) => {
     <div className="login-container">
       <div className="login-right">
         <form className="login-form">
+          {/* Botón de volver */}
+          <button 
+            className="back-button" 
+            onClick={() => props.setMenu("mainpage")} // Redirige a la página principal
+            type="button"
+          >
+            <FaArrowLeft size={24} />
+          </button>
+
           <h2 className="login-title">Bienvenido de nuevo</h2>
           <p className="login-subtitle">Ingresa tus datos para continuar</p>
 

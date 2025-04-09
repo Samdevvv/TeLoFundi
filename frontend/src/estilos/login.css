@@ -5,6 +5,7 @@ body {
 }
 
 .login-container {
+    position: relative;  /* Asegura que el contenedor tenga un contexto de posición */
     width: 100vw;
     height: 100vh;
     display: flex;
@@ -273,4 +274,16 @@ body {
 
 .input-box input[type="password"] {
     font-size: 1.5rem;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    color: #2575fc;
+    font-size: 1.5rem;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;  /* Asegura que el botón esté más cerca de la parte superior */
+    left: 20px;  /* Ajusta la distancia desde la izquierda si es necesario */
+    z-index: 100;  /* Asegura que el botón esté por encima de otros elementos */
 }
