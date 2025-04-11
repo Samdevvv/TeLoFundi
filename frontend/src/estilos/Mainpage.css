@@ -949,6 +949,52 @@ html, body {
     padding-top: 160px !important;
   }
 }
-.logo-image{
-  width: 111px;
- }
+.logo-container .logo-image,
+.header-content .logo-image,
+.footer-logo .footer-logo-image,
+img.logo-image,
+img.footer-logo-image {
+  min-height: 160px !important;
+  height: 160px !important;
+  width: auto !important;
+  max-width: none !important;
+  object-fit: contain !important;
+}
+
+/* Ajustes específicos para el header */
+.header-content {
+  padding: 5px 20px !important;
+}
+
+/* Ajustes para el footer */
+.footer-logo-image {
+  min-height: 150px !important;
+  height: 150px !important;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+  .logo-container .logo-image,
+  .header-content .logo-image,
+  img.logo-image {
+    min-height: 140px !important;
+    height: 140px !important;
+  }
+  
+  .hero-section {
+    padding-top: 160px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-container .logo-image,
+  .header-content .logo-image,
+  img.logo-image {
+    min-height: 120px !important;
+    height: 120px !important;
+  }
+  
+  .hero-section {
+    padding-top: 180px !important;
+  }
+}
