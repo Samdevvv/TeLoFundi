@@ -9,46 +9,21 @@ import maleServiceImg from "../assets/scort masculino.jpeg";
 import companionServiceImg from "../assets/compañia.jpg";
 import vipServiceImg from "../assets/vip.jpg";
 import massageServiceImg from "../assets/masaje.jpg";
-import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from 'react-icons/fa';
+import logoImage from "../assets/logo png.png";
 
-const Homepage = (props) => {
+const MainPage = () => {
   // Estado para controlar la visibilidad del modal de filtros
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  // Estado para controlar la visibilidad del modal de login
-  const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // Estados para el login
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  
-  // Función para mostrar el modal de filtros
+  // Función para mostrar el modal
   const openFiltersModal = () => {
     setShowFiltersModal(true);
   };
 
-  // Función para cerrar el modal de filtros
+  // Función para cerrar el modal
   const closeFiltersModal = () => {
     setShowFiltersModal(false);
   };
-  
-  // Función para mostrar el modal de login
-  const openLoginModal = () => {
-    setShowLoginModal(true);
-  };
-  
-  // Función para cerrar el modal de login
-  const closeLoginModal = () => {
-    setShowLoginModal(false);
-  };
-  
-  // Funciones para el manejo del formulario de login
-  const handleEmailChange = (e) => setEmail(e.target.value);
-  const handlePasswordChange = (e) => setPassword(e.target.value);
-  const handlePasswordKeyUp = (e) => setIsCapsLockOn(e.getModifierState('CapsLock'));
-  const handlePasswordBlur = () => setIsCapsLockOn(false);
-  const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
   // Datos de servicios
   const services = [
@@ -57,7 +32,6 @@ const Homepage = (props) => {
       title: 'Escorts Femeninas',
       description: 'Acompañantes femeninas de alta calidad para momentos especiales',
       image: femaleServiceImg,
-      price: 'Desde 150€',
       featured: true
     },
     {
@@ -65,7 +39,6 @@ const Homepage = (props) => {
       title: 'Trans y Travestis',
       description: 'Escorts trans y travestis para experiencias únicas',
       image: transServiceImg,
-      price: 'Desde 170€',
       featured: true
     },
     {
@@ -73,7 +46,6 @@ const Homepage = (props) => {
       title: 'Escorts Masculinos',
       description: 'Acompañantes masculinos para satisfacer tus deseos',
       image: maleServiceImg,
-      price: 'Desde 140€',
       featured: false
     },
     {
@@ -81,7 +53,6 @@ const Homepage = (props) => {
       title: 'Servicio VIP',
       description: 'Experiencias premium con nuestras/os mejores acompañantes',
       image: vipServiceImg,
-      price: 'Desde 300€',
       featured: true
     },
     {
@@ -89,7 +60,6 @@ const Homepage = (props) => {
       title: 'Servicio de Compañía',
       description: 'Compañía de calidad para eventos, cenas o viajes',
       image: companionServiceImg,
-      price: 'Desde 200€',
       featured: false
     },
     {
@@ -97,7 +67,6 @@ const Homepage = (props) => {
       title: 'Masajes Eróticos',
       description: 'Masajes relajantes y eróticos con final feliz',
       image: massageServiceImg,
-      price: 'Desde 120€',
       featured: false
     }
   ];
@@ -108,34 +77,32 @@ const Homepage = (props) => {
   };
 
   return (
-    <div className={`page-container ${showLoginModal ? 'blur-background' : ''}`}>
+    <div className="page-container">
       <header className="header">
         <div className="header-content">
-          <span className="logo">❤️ LoveConnect</span>
+          <div className="logo-container">
+            <img src={logoImage} alt="Telo Fundi" className="logo-image" />
+          </div>
           <nav className="nav">
             <ul>
               <li><a href="#" className="active">Inicio</a></li>
-              <li><a href="#">Servicios</a></li>
+              <li><a href="#">Explorar</a></li>
               <li><a href="#">VIP</a></li>
-              <li><a href="#">Contacto</a></li>
             </ul>
           </nav>
           <div className="auth-buttons">
-            <button className="login" onClick={() => props.setMenu("login")}>
-              Iniciar Sesión
-            </button>
-            <button className="signup" onClick={() => props.setMenu("registro")}>
-              ¡Regístrate!
-            </button>
+            <button className="login">Iniciar Sesión</button>
+            <button className="signup">Registrarse</button>
           </div>
         </div>
       </header>
       
-      {/* Hero Section */}
-      <section className="hero-section">
+      {/* Hero Section Mejorada */}
+      <section className="hero-section" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.6)), url(${heroImage})` }}>
+        <div className="hero-overlay"></div>
         <div className="hero-content">
-          <h1>Encuentra tu compañía ideal</h1>
-          <p>Escorts, masajes y servicios VIP en toda España</p>
+          <h1>Donde el fuego se sirve sin filtro.</h1>
+          <p>La mejor selección de escorts, masajes y servicios VIP en toda RD</p>
           <div className="search-container">
             <div className="search-box">
               <input 
@@ -145,7 +112,12 @@ const Homepage = (props) => {
                 onClick={openFiltersModal}
                 readOnly
               />
-              <button className="search-button" onClick={openFiltersModal}>🔍</button>
+              <button className="search-button" onClick={openFiltersModal}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -163,14 +135,12 @@ const Homepage = (props) => {
               <div key={service.id} className="service-card">
                 <div className="service-image-container">
                   <img src={service.image} alt={service.title} className="service-image" />
-                  <div className="service-price">{service.price}</div>
                 </div>
                 <div className="service-info">
                   <h3>{service.title}</h3>
                   <p className="service-description">{service.description}</p>
                   <div className="service-actions">
                     <button className="service-action view">Ver Anuncios</button>
-                    <button className="service-action info">Info</button>
                   </div>
                 </div>
               </div>
@@ -192,7 +162,6 @@ const Homepage = (props) => {
                   <img src={service.image} alt={service.title} />
                   <div className="service-tile-overlay">
                     <h3>{service.title}</h3>
-                    <p>{service.price}</p>
                     <button className="service-tile-btn">Ver Más</button>
                   </div>
                 </div>
@@ -240,7 +209,12 @@ const Homepage = (props) => {
           <div className="filters-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Búsqueda avanzada</h3>
-              <button className="close-modal" onClick={closeFiltersModal}>×</button>
+              <button className="close-modal" onClick={closeFiltersModal}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
             
             <div className="modal-search">
@@ -296,83 +270,11 @@ const Homepage = (props) => {
         </div>
       )}
       
-      {/* Modal de Login */}
-      {showLoginModal && (
-        <div className="modal-overlay login-overlay" onClick={closeLoginModal}>
-          <div className="login-form-container" onClick={(e) => e.stopPropagation()}>
-            <form className="login-form">
-              {/* Botón de volver */}
-              <button
-                className="back-button"
-                onClick={closeLoginModal}
-                type="button"
-              >
-                <FaArrowLeft size={20} />
-              </button>
-              
-              <h2 className="login-title">Bienvenido de nuevo</h2>
-              <p className="login-subtitle">Ingresa tus datos para continuar</p>
-              
-              <div className="input-box">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={handleEmailChange}
-                  className={`form-control ${email ? 'filled' : ''}`}
-                />
-                <label>Correo Electrónico:</label>
-                <FaUser className="input-icon" />
-              </div>
-              
-              <div className="password-wrapper">
-                <div className="input-box password-box">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={handlePasswordChange}
-                    onKeyUp={handlePasswordKeyUp}
-                    onBlur={handlePasswordBlur}
-                    className={`form-control ${password ? 'filled' : ''}`}
-                  />
-                  <label>Contraseña:</label>
-                  <FaLock className="input-icon" />
-                  
-                  {isCapsLockOn && (
-                    <div className="caps-tooltip">Bloq Mayús activado</div>
-                  )}
-                </div>
-                
-                <span className="toggle-password" onClick={togglePasswordVisibility}>
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </span>
-              </div>
-              
-              <div className="forgot-password">
-                <button type="button" onClick={() => props.setMenu("recuperar")}>
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-              
-              <button className="login-button">Iniciar Sesión</button>
-              
-              <div className="login-footer">
-                ¿Aún no tienes cuenta?
-                <button type="button" onClick={() => props.setMenu("registro")}>
-                  ¡Regístrate!
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      
       <footer className="footer">
         <div className="footer-content">
           <div className="footer-main">
             <div className="footer-logo">
-              <span className="logo">❤️ LoveConnect</span>
+              <img src={logoImage} alt="Telo Fundi" className="footer-logo-image" />
               <p>La mejor plataforma para encontrar compañía</p>
             </div>
             
@@ -411,7 +313,7 @@ const Homepage = (props) => {
           </div>
           
           <div className="footer-bottom">
-            <p>© 2025 LoveConnect - Todos los derechos reservados</p>
+            <p>© 2025 Telo Fundi - Todos los derechos reservados</p>
             <p className="disclaimer">Acceso solo para mayores de 18 años. Este sitio contiene material para adultos.</p>
           </div>
         </div>
@@ -420,4 +322,4 @@ const Homepage = (props) => {
   );
 };
 
-export default Homepage;
+export default MainPage;

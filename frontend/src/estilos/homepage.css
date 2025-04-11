@@ -1,3 +1,5 @@
+
+/* css homepage*/
 * {
   margin: 0;
   padding: 0;
@@ -6,7 +8,7 @@
 }
 
 html, body {
-  background-color: #f5f6fa;
+  background-color: #000000;
   min-height: 100vh;
   width: 100%;
   margin: 0;
@@ -25,7 +27,7 @@ html, body {
 /* HEADER STYLES */
 .header {
   width: 100%;
-  background: white;
+  background: rgb(0, 0, 0);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
@@ -681,4 +683,57 @@ html, body {
 position: relative;
 left: 140px;
 
+}
+
+
+/* Añadir estos estilos al final de ambos archivos CSS */
+
+/* Corrección para el header negro */
+.header {
+  background-color: #000000 !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Agrandar el logo en ambos componentes */
+.logo-image {
+  height: 80px !important;
+  width: auto !important;
+}
+
+.footer-logo-image {
+  height: 80px !important;
+  width: auto !important;
+}
+
+/* Eliminar el espacio en blanco entre header y hero */
+.hero-section {
+  margin-top: 0 !important;
+  padding-top: 80px !important;
+  background-color: #000000 !important;
+}
+
+html, body {
+  background-color: #000000 !important;
+}
+
+/* Asegurar que todos los elementos del header sean visibles */
+.nav ul li a {
+  color: #f0f0f0 !important;
+}
+
+/* Ajuste para color de fondo en mobile */
+@media (max-width: 768px) {
+  .hero-section {
+    padding-top: 140px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-section {
+    padding-top: 160px !important;
+  }
+}
+
+.logo-image{
+ width: 111px;
 }
