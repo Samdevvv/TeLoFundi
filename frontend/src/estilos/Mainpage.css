@@ -220,14 +220,14 @@ html, body {
   padding: 18px 25px;
   border: none;
   font-size: 16px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(128, 125, 125, 0.9);
   color: var(--text-dark);
   letter-spacing: 0.5px;
 }
 
 .search-button {
   padding: 0 25px;
-  background-color: #111; /* Fondo oscuro para el botón de búsqueda */
+  background-color: #ffffff; /* Fondo oscuro para el botón de búsqueda */
   border: none;
   color: white;
   cursor: pointer;
@@ -955,8 +955,8 @@ html, body {
 img.logo-image,
 img.footer-logo-image {
   min-height: 160px !important;
-  height: 160px !important;
-  width: auto !important;
+  height: 240px !important;
+  width:60px !important;
   max-width: none !important;
   object-fit: contain !important;
 }
@@ -997,4 +997,8 @@ img.footer-logo-image {
   .hero-section {
     padding-top: 180px !important;
   }
+}
+
+.modal-overlay{
+  background-color: #000000;
 }

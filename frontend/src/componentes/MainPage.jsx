@@ -251,15 +251,6 @@ const MainPage = () => {
                 </select>
               </div>
               
-              <div className="filter-group">
-                <label>Precio</label>
-                <div className="range-inputs">
-                  <input type="number" placeholder="Min €" min="50" max="1000" className="range-input" />
-                  <span>-</span>
-                  <input type="number" placeholder="Max €" min="50" max="1000" className="range-input" />
-                </div>
-              </div>
-              
               <div className="modal-footer">
                 <button className="apply-filters" onClick={closeFiltersModal}>
                   Aplicar Filtros

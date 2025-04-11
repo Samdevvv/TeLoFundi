@@ -740,10 +740,11 @@ html, body {
 img.logo-image,
 img.footer-logo-image {
   min-height: 160px !important;
-  height: 160px !important;
-  width: auto !important;
+  min-height: 140px !important;
+  width:200px !important;
   max-width: none !important;
   object-fit: contain !important;
+  
 }
 
 /* Ajustes específicos para el header */
@@ -781,5 +782,99 @@ img.footer-logo-image {
   
   .hero-section {
     padding-top: 180px !important;
+  }
+}
+
+/* Añadir este código al final de tu archivo CSS para ajustar el header */
+
+/* Header más pequeño pero logo grande */
+.header {
+  height: auto !important;
+  min-height: 80px !important;
+  background-color: #000000 !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+.header-content {
+  padding: 3px 20px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  position: relative !important;
+  height: auto !important;
+}
+
+/* Logo grande */
+.logo-container .logo-image,
+.header-content .logo-image,
+img.logo-image {
+  height: 210px !important;
+  width:260 !important;
+  max-width: none !important;
+  object-fit: contain !important;
+}
+
+/* Centrar el nav */
+.nav {
+  position: absolute !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.nav ul {
+  display: flex !important;
+  list-style: none !important;
+  gap: 30px !important;
+}
+
+.nav ul li a {
+  color: #f0f0f0 !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+/* Mantener logo del footer grande */
+.footer-logo-image {
+  height: 150px !important;
+  width: auto !important;
+}
+
+/* Ajustes para móvil */
+@media (max-width: 991px) {
+  .header-content {
+    flex-wrap: wrap !important;
+    padding: 10px 20px !important;
+    justify-content: center !important;
+  }
+  
+  .logo-container {
+    margin-bottom: 5px !important;
+  }
+  
+  .nav {
+    position: relative !important;
+    left: auto !important;
+    transform: none !important;
+    order: 3 !important;
+    width: 100% !important;
+    margin: 10px 0 !important;
+  }
+  
+  .nav ul {
+    justify-content: center !important;
+    width: 100% !important;
+  }
+  
+  .auth-buttons {
+    order: 2 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-container .logo-image,
+  .header-content .logo-image {
+    height: 90px !important;
   }
 }
