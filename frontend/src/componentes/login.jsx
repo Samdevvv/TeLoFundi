@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import "../estilos/login.css";
 import "../estilos/fireButton.css";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from 'react-icons/fa';
+import loginImage from '../assets/logo png.png'; // Reemplaza con la ruta de tu PNG
 
 const Login = (props) => {
   const [email, setEmail] = useState('');
@@ -16,24 +17,18 @@ const Login = (props) => {
   const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
   useEffect(() => {
-    // Crear partículas de fuego cuando el componente se monta
     const fireContainer = document.getElementById("fire-container");
     if (fireContainer) {
-      // Limpiamos el contenedor primero (en caso de remontaje)
       fireContainer.innerHTML = '';
-      // Creamos menos partículas (30 en lugar de 60)
       createParticles(fireContainer, 30, 30);
     }
   }, []);
 
-  // Función para crear partículas
   const createParticles = (container, num, leftSpacing) => {
     for (let i = 0; i < num; i += 1) {
       let particle = document.createElement("div");
-      // Configurar la posición para que aparezcan directamente debajo del botón
       particle.style.left = `calc((100%) * ${i / leftSpacing})`;
       particle.setAttribute("class", "particle");
-      // Animación con retraso aleatorio
       particle.style.animationDelay = 4 * Math.random() + "s";
       container.appendChild(particle);
     }
@@ -41,7 +36,6 @@ const Login = (props) => {
 
   return (
     <form className="login-form">
-      {/* Botón de volver */}
       <button
         className="back-button"
         onClick={() => props.setMenu("mainpage")}
@@ -50,7 +44,9 @@ const Login = (props) => {
         <FaArrowLeft size={20} />
       </button>
 
-      <h2 className="login-title">Inicia Sesion!</h2>
+      <div className="login-title">
+        <img src={loginImage} alt="Login" className="login-title-image" />
+      </div>
 
       <div className="input-box">
         <input
@@ -77,12 +73,10 @@ const Login = (props) => {
           />
           <label>Contraseña:</label>
           <FaLock className="input-icon" />
-
           {isCapsLockOn && (
             <div className="caps-tooltip">Bloq Mayús activado</div>
           )}
         </div>
-
         <span className="toggle-password" onClick={togglePasswordVisibility}>
           {showPassword ? <FaEyeSlash /> : <FaEye />}
         </span>
@@ -94,7 +88,6 @@ const Login = (props) => {
         </button>
       </div>
 
-      {/* Botón con efecto de fuego */}
       <div className="fire-button-container">
         <div id="fire-container"></div>
         <button
