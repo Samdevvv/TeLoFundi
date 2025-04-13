@@ -14,7 +14,7 @@ const Registro = (props) => {
   };
 
   return (
-    <div className="login-container">
+
       <div className="login-right">
         <form className="login-form">
           {/* Botón de flecha */}
@@ -104,7 +104,6 @@ const Registro = (props) => {
           </div>
         </form>
       </div>
-    </div>
   );
 };
 

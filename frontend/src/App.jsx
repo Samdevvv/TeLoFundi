@@ -14,9 +14,24 @@ function App() {
     <div>
       <Mainpage setMenu={setMenu} /> 
       
-      {menu === "login" && <Login setMenu={setMenu} />}
-      {menu === "registro" && <Registro setMenu={setMenu} />}
-      {menu === "recuperar" && <ForgetPsw setMenu={setMenu} />}
+      {menu === "login" && (
+  <div className="modal-overlay">
+    <Login setMenu={setMenu} />
+  </div>
+)}
+
+{menu === "registro" && (
+  <div className="modal-overlay">
+    <Registro setMenu={setMenu} />
+  </div>
+)}
+
+{menu === "recuperar" && (
+  <div className="modal-overlay">
+    <ForgetPsw setMenu={setMenu} />
+  </div>
+)}
+
     </div>
   );
 }

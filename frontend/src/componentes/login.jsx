@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import "../estilos/login.css";
+import "../estilos/fireButton.css";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from 'react-icons/fa';
 
 const Login = (props) => {
@@ -15,73 +15,104 @@ const Login = (props) => {
   const handlePasswordBlur = () => setIsCapsLockOn(false);
   const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
+  useEffect(() => {
+    // Crear partículas de fuego cuando el componente se monta
+    const fireContainer = document.getElementById("fire-container");
+    if (fireContainer) {
+      // Limpiamos el contenedor primero (en caso de remontaje)
+      fireContainer.innerHTML = '';
+      // Creamos menos partículas (30 en lugar de 60)
+      createParticles(fireContainer, 30, 30);
+    }
+  }, []);
+
+  // Función para crear partículas
+  const createParticles = (container, num, leftSpacing) => {
+    for (let i = 0; i < num; i += 1) {
+      let particle = document.createElement("div");
+      // Configurar la posición para que aparezcan directamente debajo del botón
+      particle.style.left = `calc((100%) * ${i / leftSpacing})`;
+      particle.setAttribute("class", "particle");
+      // Animación con retraso aleatorio
+      particle.style.animationDelay = 4 * Math.random() + "s";
+      container.appendChild(particle);
+    }
+  };
+
   return (
-    <div className="login-container">
-      <form className="login-form">
-        {/* Botón de volver */}
-        <button 
-          className="back-button" 
-          onClick={() => props.setMenu("mainpage")}
-          type="button"
-        >
-          <FaArrowLeft size={20} />
-        </button>
+    <form className="login-form">
+      {/* Botón de volver */}
+      <button
+        className="back-button"
+        onClick={() => props.setMenu("mainpage")}
+        type="button"
+      >
+        <FaArrowLeft size={20} />
+      </button>
 
-        <h2 className="login-title">Bienvenido de nuevo</h2>
-        <p className="login-subtitle">Ingresa tus datos para continuar</p>
+      <h2 className="login-title">Inicia Sesion!</h2>
 
-        <div className="input-box">
+      <div className="input-box">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={handleEmailChange}
+          className={`form-control ${email ? 'filled' : ''}`}
+        />
+        <label>Correo Electrónico:</label>
+        <FaUser className="input-icon" />
+      </div>
+
+      <div className="password-wrapper">
+        <div className="input-box password-box">
           <input
-            type="email"
+            type={showPassword ? "text" : "password"}
             required
-            value={email}
-            onChange={handleEmailChange}
-            className={`form-control ${email ? 'filled' : ''}`}
+            value={password}
+            onChange={handlePasswordChange}
+            onKeyUp={handlePasswordKeyUp}
+            onBlur={handlePasswordBlur}
+            className={`form-control ${password ? 'filled' : ''}`}
           />
-          <label>Correo Electrónico:</label>
-          <FaUser className="input-icon" />
+          <label>Contraseña:</label>
+          <FaLock className="input-icon" />
+
+          {isCapsLockOn && (
+            <div className="caps-tooltip">Bloq Mayús activado</div>
+          )}
         </div>
 
-        <div className="password-wrapper">
-          <div className="input-box password-box">
-            <input
-              type={showPassword ? "text" : "password"}
-              required
-              value={password}
-              onChange={handlePasswordChange}
-              onKeyUp={handlePasswordKeyUp}
-              onBlur={handlePasswordBlur}
-              className={`form-control ${password ? 'filled' : ''}`}
-            />
-            <label>Contraseña:</label>
-            <FaLock className="input-icon" />
+        <span className="toggle-password" onClick={togglePasswordVisibility}>
+          {showPassword ? <FaEyeSlash /> : <FaEye />}
+        </span>
+      </div>
 
-            {isCapsLockOn && (
-              <div className="caps-tooltip">Bloq Mayús activado</div>
-            )}
-          </div>
+      <div className="forgot-password">
+        <button type="button" onClick={() => props.setMenu("recuperar")}>
+          ¿Olvidaste tu contraseña?
+        </button>
+      </div>
 
-          <span className="toggle-password" onClick={togglePasswordVisibility}>
-            {showPassword ? <FaEyeSlash /> : <FaEye />}
-          </span>
-        </div>
+      {/* Botón con efecto de fuego */}
+      <div className="fire-button-container">
+        <div id="fire-container"></div>
+        <button
+          type="button"
+          id="confirm"
+          className="fire-button"
+        >
+          Iniciar Sesión
+        </button>
+      </div>
 
-        <div className="forgot-password">
-          <button type="button" onClick={() => props.setMenu("recuperar")}>
-            ¿Olvidaste tu contraseña?
-          </button>
-        </div>
-
-        <button className="login-button">Iniciar Sesión</button>
-
-        <div className="login-footer">
-          ¿Aún no tienes cuenta?
-          <button type="button" onClick={() => props.setMenu("registro")}>
-            ¡Regístrate!
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="login-footer">
+        ¿Aún no tienes cuenta?
+        <button type="button" onClick={() => props.setMenu("registro")}>
+          ¡Regístrate!
+        </button>
+      </div>
+    </form>
   );
 };
 

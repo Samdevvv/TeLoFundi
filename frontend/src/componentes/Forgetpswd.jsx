@@ -6,8 +6,7 @@ const ForgetPsw = (props) => {
   const [email, setEmail] = useState("");
 
   return (
-    <div className="login-container">
-      <div className="login-right">
+    <div className="">
         <div className="form-container">
           <div className="logo-container">Olvidé mi contraseña</div>
 
@@ -43,7 +42,6 @@ const ForgetPsw = (props) => {
           </p>
         </div>
       </div>
-    </div>
   );
 };
 

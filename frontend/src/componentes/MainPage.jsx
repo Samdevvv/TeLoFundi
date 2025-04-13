@@ -11,10 +11,10 @@ import vipServiceImg from "../assets/vip.jpg";
 import massageServiceImg from "../assets/masaje.jpg";
 import logoImage from "../assets/logo png.png";
 
-const MainPage = () => {
+const MainPage = (props) => {
   // Estado para controlar la visibilidad del modal de filtros
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  
+
   // Función para mostrar el modal
   const openFiltersModal = () => {
     setShowFiltersModal(true);
@@ -91,12 +91,16 @@ const MainPage = () => {
             </ul>
           </nav>
           <div className="auth-buttons">
-            <button className="login">Iniciar Sesión</button>
-            <button className="signup">Registrarse</button>
+            <button className="login" onClick={() => props.setMenu("login")}>
+              Iniciar Sesión
+            </button>
+            <button className="signup" onClick={() => props.setMenu("registro")}>
+              ¡Regístrate!
+            </button>
           </div>
         </div>
       </header>
-      
+
       {/* Hero Section Mejorada */}
       <section className="hero-section" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.6)), url(${heroImage})` }}>
         <div className="hero-overlay"></div>
@@ -105,10 +109,10 @@ const MainPage = () => {
           <p>La mejor selección de escorts, masajes y servicios VIP en toda RD</p>
           <div className="search-container">
             <div className="search-box">
-              <input 
-                type="text" 
-                placeholder="Buscar por ubicación o servicios..." 
-                className="search-input" 
+              <input
+                type="text"
+                placeholder="Buscar por ubicación o servicios..."
+                className="search-input"
                 onClick={openFiltersModal}
                 readOnly
               />
@@ -122,7 +126,7 @@ const MainPage = () => {
           </div>
         </div>
       </section>
-      
+
       {/* Servicios Destacados */}
       <section className="featured-services-section">
         <div className="container">
@@ -148,7 +152,7 @@ const MainPage = () => {
           </div>
         </div>
       </section>
-      
+
       {/* Todos los Servicios */}
       <section className="all-services-section">
         <div className="container">
@@ -170,7 +174,7 @@ const MainPage = () => {
           </div>
         </div>
       </section>
-      
+
       {/* Sección de Banner Promocional */}
       <section className="promo-banner">
         <div className="container">
@@ -181,7 +185,7 @@ const MainPage = () => {
           </div>
         </div>
       </section>
-      
+
       {/* Sección de Servicios Populares */}
       <section className="popular-services">
         <div className="container">
@@ -202,7 +206,7 @@ const MainPage = () => {
           </div>
         </div>
       </section>
-      
+
       {/* Modal de Filtros */}
       {showFiltersModal && (
         <div className="modal-overlay" onClick={closeFiltersModal}>
@@ -216,15 +220,15 @@ const MainPage = () => {
                 </svg>
               </button>
             </div>
-            
+
             <div className="modal-search">
-              <input 
-                type="text" 
-                placeholder="Buscar por tipo de servicio..." 
-                className="modal-search-input" 
+              <input
+                type="text"
+                placeholder="Buscar por tipo de servicio..."
+                className="modal-search-input"
               />
             </div>
-            
+
             <div className="filters-container-modal">
               <div className="filter-group">
                 <label>Categoría de Servicio</label>
@@ -238,7 +242,7 @@ const MainPage = () => {
                   <option value="massage">Masajes Eróticos</option>
                 </select>
               </div>
-              
+
               <div className="filter-group">
                 <label>Ubicación</label>
                 <select className="filter-select">
@@ -250,7 +254,7 @@ const MainPage = () => {
                   <option value="Bilbao">Bilbao</option>
                 </select>
               </div>
-              
+
               <div className="modal-footer">
                 <button className="apply-filters" onClick={closeFiltersModal}>
                   Aplicar Filtros
@@ -260,7 +264,7 @@ const MainPage = () => {
           </div>
         </div>
       )}
-      
+
       <footer className="footer">
         <div className="footer-content">
           <div className="footer-main">
@@ -268,7 +272,7 @@ const MainPage = () => {
               <img src={logoImage} alt="Telo Fundi" className="footer-logo-image" />
               <p>La mejor plataforma para encontrar compañía</p>
             </div>
-            
+
             <div className="footer-links">
               <div className="footer-links-column">
                 <h4>Categorías</h4>
@@ -280,7 +284,7 @@ const MainPage = () => {
                   <li><a href="#">Masajes</a></li>
                 </ul>
               </div>
-              
+
               <div className="footer-links-column">
                 <h4>Para Anunciantes</h4>
                 <ul>
@@ -290,7 +294,7 @@ const MainPage = () => {
                   <li><a href="#">Estadísticas</a></li>
                 </ul>
               </div>
-              
+
               <div className="footer-links-column">
                 <h4>Información</h4>
                 <ul>
@@ -302,7 +306,7 @@ const MainPage = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="footer-bottom">
             <p>© 2025 Telo Fundi - Todos los derechos reservados</p>
             <p className="disclaimer">Acceso solo para mayores de 18 años. Este sitio contiene material para adultos.</p>

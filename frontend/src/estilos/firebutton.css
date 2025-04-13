@@ -1,0 +1,83 @@
+/* fireButton.css - Reemplaza o modifica tu archivo existente */
+:root {
+    --fireColor1: #ff5000;
+    --fireColor2: rgba(255, 80, 0, 0);
+    --fireDuration: 1s;
+    --blur: 0.4px;
+    --fireSize: 20px; /* Tamaño reducido de las partículas */
+  }
+  
+  .fire-button-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+    width: 100%;
+    height: 120px;
+  }
+  
+  #fire-container {
+    font-size: 24px;
+    filter: blur(var(--blur));
+    -webkit-filter: blur(var(--blur));
+    position: absolute;
+    width: 500px; /* Ancho ajustado para que coincida con el botón */
+    height: 12em;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  #fire-container .particle {
+    animation: rise var(--fireDuration) ease-in infinite;
+    background-image: radial-gradient(
+      var(--fireColor1) 30%,
+      var(--fireColor2) 70%
+    );
+    border-radius: 50%;
+    mix-blend-mode: screen;
+    opacity: 0;
+    position: absolute;
+    bottom: 0;
+    width: var(--fireSize);
+    height: var(--fireSize);
+  }
+  
+  .fire-button {
+    position: relative;
+    z-index: 2;
+    margin: 10px;
+    width: 400px;
+    height: 70px;
+    border-radius: 20px;
+    font-weight: 900;
+    border: none;
+    font-size: 40px;
+    cursor: pointer;
+    font-family: system-ui;
+    background-color: #fd6408;
+    color: #313131;
+    transition: all 0.8s;
+    -webkit-box-shadow: 0px 15px 24px -9px rgba(255, 255, 255, 0.2);
+    box-shadow: 0px 15px 24px -9px rgba(255, 255, 255, 0.2);
+  }
+  
+  .fire-button:hover {
+    background-color: rgba(255, 255, 255, 0);
+    box-shadow: none;
+    color: #fd6408;
+  }
+  
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(0) scale(1);
+    }
+    25% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10em) scale(0);
+    }
+  }

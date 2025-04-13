@@ -2,38 +2,42 @@
 
 body {
     font-family: 'Inter', sans-serif;
+    margin: 0;
 }
 
 .login-container {
-    position: absolute; /* Cambio importante: absoluto para flotar sobre la página */
-    top: 100px; /* o el valor que necesites */
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 999; /* Asegura que esté encima del contenido */
-    width: auto;
+    position: absolute;
+    top: 100px;
+    left: 0;
+    z-index: 999;
     height: auto;
-    display: flex;
+    display: none;
     justify-content: center;
     align-items: center;
-    background: none; /* elimina el fondo */
+    background: none;
     pointer-events: auto;
+    width: 100vw; /* Mantiene el ancho completo de la vista */
+    padding: 0 1rem; /* Reducido de 2rem para dar más espacio útil */
+    box-sizing: border-box;
 }
 
 .login-right {
     width: 100%;
-    padding: 0 2rem;
+    padding: 0 1.5rem; /* Reducido de 3rem para dar más espacio útil */
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 .login-form {
-    max-width: 500px; /* ya está bien definido */
-    background: #ffffff;
+    max-width: 1800px; /* Aumentado de 1400px a 1800px */
+    width: 90%; /* Usa un porcentaje en lugar de 100% para control más fino */
+    background: #000000 !important;
     border-radius: 30px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    padding: 2rem;
+    padding: 2.5rem; /* Aumentado un poco el padding interno */
     animation: fadeIn 0.3s ease-out;
+    border: 2px solid white;
 }
 
 @keyframes fadeIn {
@@ -41,19 +45,18 @@ body {
     100% { transform: translateY(0); opacity: 1; }
 }
 
+.login-title,
+.login-subtitle,
+.login-footer,
+.input-box label,
+.caps-tooltip,
+.caps-warning {
+    color: #fff !important;
+}
+
 .login-title {
     font-size: 2.5rem;
     font-weight: bold;
-    margin-bottom: 1.5rem;
-    color: #333;
-    text-align: center;
-}
-
-.login-subtitle {
-    font-size: 1.3rem;
-    margin-bottom: 2rem;
-    opacity: 0.8;
-    color: #555;
     text-align: center;
 }
 
@@ -83,15 +86,20 @@ body {
     border: none !important;
     outline: none !important;
     font-size: 1.3rem;
-    color: #333;
+    color: #333333; /* Color oscuro para asegurar visibilidad en fondos claros */
     padding: 12px 18px;
     border-radius: 30px;
     box-shadow: none;
     transition: all 0.3s ease-in-out;
 }
 
+.form-control::placeholder {
+    color: #666666; /* Cambiado de blanco a gris medio para visibilidad */
+}
+
 .password-box {
     position: relative;
+    flex: 1;
 }
 
 .caps-tooltip {
@@ -133,6 +141,8 @@ body {
     position: relative;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    min-height: 60px;
 }
 
 .toggle-password {
@@ -141,24 +151,29 @@ body {
     color: #666;
     cursor: pointer;
     transition: color 0.3s ease;
+    visibility: visible;
+    width: 24px;
+    text-align: center;
+}
+
+.toggle-password.hidden {
+    visibility: hidden;
 }
 
 .toggle-password:hover {
     color: #2575fc;
 }
 
-.password-box {
-    flex: 1;
-    position: relative;
-}
-
-.form-control::placeholder {
-    color: rgba(0, 0, 0, 0.6);
+.input-box input[type="text"],
+.input-box input[type="password"],
+.input-box input[type="email"] {
+    font-size: 1.5rem;
+    color: #333333; /* Color oscuro para texto en inputs específicos */
 }
 
 .form-control:focus {
     outline: none;
-    box-shadow: 0 0 10px rgba(37, 117, 252, 0.7);
+    box-shadow: 0 0 10px rgb(253, 254, 255);
 }
 
 .login-button {
@@ -226,9 +241,14 @@ body {
     border-bottom: 2px solid #ccc;
     padding-left: 40px;
     font-size: 1.3rem;
-    color: #333;
+    color: #333333; /* Cambiado de blanco a gris oscuro para visibilidad */
     font-weight: 500;
     transition: 0.3s ease-in-out;
+}
+
+/* Aseguramos que todos los inputs mostrando texto tengan color visible */
+input, textarea, select {
+    color: #333333 !important;
 }
 
 .caps-warning {
@@ -285,7 +305,42 @@ body {
     font-size: 1.5rem;
     cursor: pointer;
     position: absolute;
-    top: 10px;  /* Asegura que el botón esté más cerca de la parte superior */
-    left: 20px;  /* Ajusta la distancia desde la izquierda si es necesario */
-    z-index: 100;  /* Asegura que el botón esté por encima de otros elementos */
+    top: 10px;
+    left: 20px;
+    z-index: 100;
 }
+
+.input-box:has(input.filled),
+.input-box:has(input:focus) {
+    background: #ffffff;
+    border: 2px solid white;
+    border-radius: 10px;
+}
+
+/* Estilo específico para asegurar que texto es visible en fondo claro */
+.input-box:has(input.filled) input,
+.input-box:has(input:focus) input {
+    color: #333333 !important;
+}
+
+/* Media query para pantallas grandes */
+@media (min-width: 1600px) {
+    .login-form {
+        max-width: 2000px; /* Aún más ancho en pantallas muy grandes */
+        width: 95%;
+    }
+}
+
+/* Media query para pantallas más pequeñas */
+@media (max-width: 768px) {
+    .login-form {
+        width: 95%;
+        padding: 1.5rem;
+    }
+    
+    .login-right {
+        padding: 0 1rem;
+    }
+}
+
+
