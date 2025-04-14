@@ -23,21 +23,22 @@ body {
 
 .login-right {
   width: 100%;
-  padding: 0 1.5rem;
+  padding: 0 1rem;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .login-form {
-  max-width: 1800px;
+  max-width: 400px;
   width: 90%;
   background: #000000 !important;
   border-radius: 30px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  padding: 2.5rem;
+  padding: 1.8rem;
   animation: fadeIn 0.3s ease-out;
   border: 2px solid white;
+  position: relative; /* Aseguramos posición relativa para el botón de regreso */
 }
 
 @keyframes fadeIn {
@@ -64,16 +65,16 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   width: 100%;
-  height: 150px;
+  height: 130px;
 }
 
 .login-title-image {
   width: 100%;
-  max-width: 400px;
+  max-width: 350px;
   height: auto;
-  max-height: 250px;
+  max-height: 220px;
   object-fit: contain;
 }
 
@@ -102,8 +103,8 @@ body {
   background: transparent;
   border: none !important;
   outline: none !important;
-  font-size: 1.4rem; /* Tamaño de fuente más grande */
-  color: #333333;
+  font-size: 1.4rem;
+  color: #ffffff;
   padding: 12px 18px;
   border-radius: 30px;
   box-shadow: none;
@@ -155,17 +156,17 @@ body {
 .forgot-password {
   text-align: right;
   margin-top: -10px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .forgot-password button {
   background: none;
   border: none;
-  color: #2575fc;
+  color: #ffffff;
   font-weight: bold;
   cursor: pointer;
   padding: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .forgot-password button:hover {
@@ -177,12 +178,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 60px;
+  min-height: 55px;
 }
 
 .toggle-password {
   margin-left: 10px;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   color: #666;
   cursor: pointer;
   transition: color 0.3s ease;
@@ -196,25 +197,28 @@ body {
 }
 
 .toggle-password:hover {
-  color: #2575fc;
+  color: #ffffff;
 }
 
 .input-box input[type="text"],
 .input-box input[type="password"],
 .input-box input[type="email"] {
-  font-size: 1.4rem; /* Tamaño de fuente más grande */
-  color: #333333;
+  font-size: 1.3rem;
+  color: #ffffff;
   font-family: 'EB Garamond', serif;
   font-weight: 500;
+  background-color: #000000;
 }
 
 .input-box input[type="password"] {
-  font-size: 1.6rem; /* Más grande para contraseña */
+  font-size: 1.5rem;
+  background-color: #000000;
 }
 
 .form-control:focus {
   outline: none;
-  box-shadow: 0 0 10px rgb(253, 254, 255);
+  box-shadow: none;
+  background-color: #000000 !important;
 }
 
 .login-button {
@@ -250,15 +254,15 @@ body {
 }
 
 .login-footer {
-  margin-top: 1.5rem;
-  font-size: 1.1rem;
+  margin-top: 1.3rem;
+  font-size: 1rem;
   opacity: 0.8;
   text-align: center;
 }
 
 .login-footer a,
 .login-footer button {
-  color: #2575fc;
+  color: #ffffff;
   text-decoration: none;
   font-weight: bold;
   background: none;
@@ -275,8 +279,8 @@ body {
 .input-box {
   position: relative;
   width: 100%;
-  height: 60px;
-  margin: 25px 0;
+  height: 55px;
+  margin: 20px 0;
 }
 
 .input-box input {
@@ -287,8 +291,8 @@ body {
   outline: none;
   border: 1px solid white;
   padding-left: 40px;
-  font-size: 1.4rem; /* Tamaño de fuente más grande */
-  color: #333333;
+  font-size: 1.3rem;
+  color: #ffffff;
   font-weight: 500;
   transition: all 0.3s ease-in-out;
   border-radius: 5px;
@@ -298,7 +302,8 @@ body {
 input,
 textarea,
 select {
-  color: #333333;
+  color: #ffffff;
+  background-color: #000000;
 }
 
 .caps-warning {
@@ -306,7 +311,7 @@ select {
   margin-top: 6px;
   margin-left: 10px;
   font-size: 0.9rem;
-  color: #e74c3c;
+  color: #ffffff;
   animation: fadeIn 0.3s ease-in-out;
 }
 
@@ -328,7 +333,7 @@ select {
   top: -12px;
   left: 0;
   font-size: 14px;
-  color: #2575fc;
+  color: #ffffff;
   font-family: 'Open Sans', sans-serif;
   font-weight: 500;
 }
@@ -338,25 +343,26 @@ select {
   top: 50%;
   left: 10px;
   transform: translateY(-50%);
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   color: #666;
   transition: color 0.3s;
 }
 
 .input-box input:focus ~ .input-icon,
 .input-box input.filled ~ .input-icon {
-  color: #2575fc;
+  color: #ffffff;
 }
 
+/* Ajustado el botón de regreso para que esté dentro del formulario */
 .back-button {
   background: none;
   border: none;
-  color: #2575fc;
-  font-size: 1.5rem;
+  color: #ffffff;
+  font-size: 1.4rem;
   cursor: pointer;
   position: absolute;
-  top: 10px;
-  left: 20px;
+  top: 15px;
+  left: 15px;
   z-index: 100;
 }
 
@@ -369,25 +375,219 @@ select {
 
 .input-box:has(input.filled) input,
 .input-box:has(input:focus) input {
-  color: #fd6408 !important;
+  color: #ffffff !important;
+  background-color: #000000 !important;
 }
 
-/* Media query para pantallas grandes */
+/* Estilos para el botón de fuego */
+.fire-button-container {
+  position: relative;
+  width: 100%;
+  margin: 15px 0;
+  overflow: hidden;
+  border-radius: 30px;
+}
+
+#fire-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Botón de inicio de sesión más pequeño */
+.fire-button {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(to right, #ff4500, #ff8c00);
+  color: white;
+  font-weight: bold;
+  font-size: 1.1rem; /* Reducido de 1.2rem */
+  border: none;
+  width: 60%; /* Reducido de 75% */
+  margin: 0 auto;
+  display: block;
+  padding: 10px 0; /* Reducido de 12px */
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.fire-button:hover {
+  background: linear-gradient(to right, #ff8c00, #ff4500);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
+}
+
+/* Partículas de fuego - versión original mejorada */
+.particle {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background-color: transparent;
+  bottom: 0;
+  border-radius: 50%;
+  filter: blur(1px);
+  animation: rise 3s linear infinite;
+  z-index: 0;
+}
+
+.particle::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255,69,0,0.8) 0%, rgba(255,140,0,0.4) 70%, transparent 100%);
+  border-radius: 50%;
+  animation: glow 2s ease-out infinite;
+}
+
+@keyframes rise {
+  0% {
+    bottom: -5px;
+    opacity: 0;
+    width: 5px;
+    height: 5px;
+  }
+  10% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.7;
+  }
+  100% {
+    bottom: 100px;
+    width: 15px;
+    height: 15px;
+    opacity: 0;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px 2px rgba(255,69,0,0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px 3px rgba(255,140,0,0.5);
+  }
+}
+
+.texto-inicar {
+  color: white;
+  font-size: 16px; /* Reducido de 20px */
+}
+
+/* Media query mejorado para pantallas grandes */
 @media (min-width: 1600px) {
   .login-form {
-    max-width: 2000px;
+    max-width: 450px;
     width: 95%;
   }
 }
 
-/* Media query para pantallas más pequeñas */
+/* Media queries mejorados para dispositivos móviles */
 @media (max-width: 768px) {
   .login-form {
     width: 95%;
     padding: 1.5rem;
+    max-width: 320px;
+    border-radius: 20px;
   }
 
   .login-right {
-    padding: 0 1rem;
+    padding: 0 0.5rem;
+  }
+  
+  .login-title {
+    height: 110px;
+    margin-bottom: 1.2rem;
+  }
+  
+  .login-title-image {
+    max-width: 300px;
+    max-height: 180px;
+  }
+  
+  .input-box {
+    height: 50px;
+    margin: 18px 0;
+  }
+  
+  .input-box input {
+    font-size: 1.2rem;
+  }
+  
+  .input-box .input-icon {
+    font-size: 1.2rem;
+  }
+  
+  .fire-button {
+    width: 70%; /* Ajustado para móviles */
+    font-size: 1rem;
+    padding: 9px 0;
+  }
+  
+  .back-button {
+    font-size: 1.3rem;
+    top: 12px;
+    left: 12px;
+  }
+}
+
+/* Media query para móviles pequeños */
+@media (max-width: 480px) {
+  .login-form {
+    max-width: 300px;
+    padding: 1.2rem;
+    border-width: 1px;
+  }
+  
+  .login-title {
+    height: 90px;
+    margin-bottom: 1rem;
+  }
+  
+  .login-title-image {
+    max-width: 250px;
+    max-height: 150px;
+  }
+  
+  .input-box {
+    height: 45px;
+    margin: 15px 0;
+  }
+  
+  .input-box label {
+    font-size: 14px;
+  }
+  
+  .input-box input {
+    font-size: 1.1rem;
+    padding-left: 35px;
+  }
+  
+  .input-box .input-icon {
+    font-size: 1.1rem;
+    left: 8px;
+  }
+  
+  .fire-button {
+    width: 75%;
+    font-size: 0.9rem;
+    padding: 8px 0;
+  }
+  
+  .login-footer {
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+  
+  .forgot-password button {
+    font-size: 0.85rem;
   }
 }
