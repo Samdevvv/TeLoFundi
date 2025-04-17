@@ -1,0 +1,218 @@
+/* Importando fuentes */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
+/* Variables de colores - Coherente con el esquema de PerfilAcompañante */
+:root {
+  --primary-color: #9f2910; /* Naranja oscuro */
+  --secondary-color: #7d2010; /* Versión más oscura del naranja */
+  --dark-bg: #000000; /* Fondo oscuro */
+  --text-light: #f0f0f0; /* Texto claro */
+  --text-muted: #aaaaaa; /* Texto con menos énfasis */
+  --border-color: #222222; /* Color de bordes */
+  --gradient-primary: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+}
+
+/* Estilos del header */
+.header {
+  width: 100%;
+  background-color: var(--dark-bg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 1px solid var(--border-color);
+  max-height: 50px; /* Forzar una altura máxima en escritorio */
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 5px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-height: 90px;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-image {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
+  max-height: 30px;
+}
+
+.nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.nav ul {
+  display: flex;
+  list-style: none;
+  gap: 15px;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+}
+
+.nav ul li {
+  display: flex;
+  align-items: center;
+}
+
+.nav ul li a {
+  text-decoration: none;
+  color: var(--text-light);
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: color 0.3s;
+  position: relative;
+  line-height: 1;
+}
+
+.nav ul li a:hover,
+.nav ul li a.active {
+  color: var(--primary-color);
+}
+
+.nav ul li a.active:after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background-color: var(--primary-color);
+}
+
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auth-buttons button {
+  padding: 4px 10px;
+  border: none;
+  cursor: pointer;
+  border-radius: 18px;
+  font-weight: 500;
+  font-size: 0.8rem;
+  transition: all 0.3s;
+  line-height: 1;
+}
+
+.login {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.signup {
+  background: var(--gradient-primary);
+  color: white;
+}
+
+.auth-buttons button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(159, 41, 16, 0.2);
+}
+
+.user-profile-icon a {
+  color: var(--text-light);
+  background-color: var(--primary-color);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.user-profile-icon a:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(159, 41, 16, 0.2);
+}
+
+/* Responsividad */
+@media (max-width: 768px) {
+  .header {
+    max-height: none; /* Permitir que el header crezca según el contenido */
+  }
+
+  .header-content {
+    padding: 4px 10px;
+    max-height: none; /* Eliminar restricción de altura */
+    flex-wrap: wrap; /* Permitir que los elementos se envuelvan */
+    gap: 5px; /* Espacio entre elementos envueltos */
+  }
+
+  .logo-image {
+    height: 25px;
+    max-height: 25px;
+  }
+
+  .nav {
+    width: auto; /* Ajustar el ancho para que no ocupe todo */
+  }
+
+  .nav ul {
+    gap: 10px;
+  }
+
+  .nav ul li a {
+    font-size: 0.8rem;
+  }
+
+  .auth-buttons {
+    gap: 5px;
+  }
+
+  .auth-buttons button {
+    padding: 3px 8px;
+    font-size: 0.75rem;
+  }
+
+  .user-profile-icon a {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-content {
+    flex-direction: column; /* Cambiar a columna para apilar los elementos */
+    align-items: flex-start;
+    padding: 5px 10px;
+    gap: 3px;
+  }
+
+  .logo-container {
+    margin-bottom: 5px; /* Espacio debajo del logo */
+  }
+
+  .nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .nav ul {
+    gap: 8px;
+    flex-wrap: wrap; /* Permitir que los enlaces se envuelvan si es necesario */
+  }
+
+  .auth-buttons {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 4px;
+    margin-top: 5px; /* Espacio encima de los botones */
+  }
+}

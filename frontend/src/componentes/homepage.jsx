@@ -4,6 +4,8 @@ import chica1 from "../assets/imagen chica 1.jpg";
 import chica2 from "../assets/chica 2.jpg";
 import chica3 from "../assets/chica 3.jpg";
 import logoImage from "../assets/logo png.png";
+import '../estilos/Header.css';
+import Header from './Header';
 
 const users = [
   {
@@ -73,28 +75,7 @@ const HomePage = (props) => {
 
   return (
     <div className="page-container">
-      <header className="header">
-        <div className="header-content">
-          <div className="logo-container">
-            <img src={logoImage} alt="Telo Fundi" className="logo-image" />
-          </div>
-          <nav className="nav">
-            <ul>
-              <li><a href="#" className="active">Inio</a></li>
-              <li><a href="#">Explorar</a></li>
-              <li><a href="#">VIP</a></li>
-            </ul>
-          </nav>
-          <div className="auth-buttons">
-            <button className="login" onClick={() => props.setMenu("login")}>
-              Iniciar Sesión
-            </button>
-            <button className="signup" onClick={() => props.setMenu("registro")}>
-              ¡Regístrate!
-            </button>
-          </div>
-        </div>
-      </header>
+        <Header />
 
       <main className="main-content">
         <div className="search-container">

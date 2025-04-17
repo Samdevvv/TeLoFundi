@@ -1,39 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaCalendarAlt, FaUser, FaEnvelope, FaPhone, FaGlobe, FaInstagram, FaTwitter, FaFacebook, FaBuilding } from 'react-icons/fa';
-import '../estilos/Perfil.css';
-import Header from './Header'; // Asumiendo que tienes un componente Header separado
-import defaultProfilePic from '../assets/logo png.png'; // Imagen por defecto
-import loginImage from '../assets/logo png.png'; // Asegúrate de que la ruta sea correcta
-
+import { FaMapMarkerAlt, FaCalendarAlt, FaUser, FaEnvelope, FaPhone, FaGlobe, FaInstagram, FaTwitter, FaFacebook, FaBuilding, FaCheckCircle, FaPhoneAlt, FaWhatsapp } from 'react-icons/fa';
+import '../estilos/PerfilAcompañante.css';
+import '../estilos/Header.css';
+import Header from './Header';
+import defaultProfilePic from '../assets/publicacion.jpg';
 
 const Perfil = ({ userType = "acompanante", userData = {} }) => {
-  // Estado para manejar las pestañas del perfil
-  const [activeTab, setActiveTab] = useState('informacion');
-  
-  // Estado para manejar si es el perfil propio o de otro usuario
+  const [activeTab, setActiveTab] = useState('publicaciones');
   const [isOwnProfile, setIsOwnProfile] = useState(false);
-  
-  // Datos de ejemplo (reemplazarías esto con datos reales)
+
   const defaultData = {
     acompanante: {
-      nombre: "Laura Martínez",
-      ubicacion: "Madrid, España",
+      nombre: "Rosse Tejada",
+      ubicacion: "Republica Dominicana, Santo Domingo",
       fotoPerfil: defaultProfilePic,
       edad: 28,
       genero: "Femenino",
-      descripcion: "Hola, soy Laura. Me encanta viajar y conocer nuevas culturas. Soy una acompañante profesional con experiencia en eventos sociales y corporativos.",
+      descripcion: "Hola, soy Rosse. Me encanta viajar y conocer nuevas culturas. Soy una acompañante profesional con experiencia en eventos sociales y corporativos.",
       telefono: "+34 612 345 678",
-      email: "laura@example.com",
+      email: "rosse@example.com",
       fechaRegistro: "Enero 2023",
       servicios: ["Eventos sociales", "Cenas de negocios", "Turismo"],
       disponibilidad: "Lunes a Sábado",
       idiomas: ["Español", "Inglés", "Francés"],
       redes: {
-        instagram: "laura_martinez",
-        twitter: "lauram",
-        facebook: "lauramartinez"
+        instagram: "rosse_tejada",
+        twitter: "rosset",
+        facebook: "rossetejada"
       },
-      galeria: [defaultProfilePic, defaultProfilePic, defaultProfilePic, defaultProfilePic, defaultProfilePic, defaultProfilePic]
+      publicaciones: [
+        { imagen: defaultProfilePic, descripcion: "Disfrutando de un evento social en Santo Domingo. ¡Contáctame para más detalles!" },
+        { imagen: defaultProfilePic, descripcion: "Cena de negocios en un restaurante exclusivo. ¿Te gustaría acompañarme?" },
+        { imagen: defaultProfilePic, descripcion: "Explorando la ciudad con un cliente. ¡Una experiencia inolvidable!" },
+        { imagen: defaultProfilePic, descripcion: "Asistiendo a una conferencia internacional. Profesional y elegante." },
+        { imagen: defaultProfilePic, descripcion: "Turismo cultural por la ciudad. ¿Te unes?" },
+        { imagen: defaultProfilePic, descripcion: "Evento de gala benéfica. Una noche para recordar." }
+      ],
+      verificado: true,
+      agenciaVerificadora: "Élite Acompañantes"
     },
     agencia: {
       nombre: "Élite Acompañantes",
@@ -55,29 +59,26 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
         { nombre: "Carlos Ruiz", foto: defaultProfilePic },
         { nombre: "Ana Belén", foto: defaultProfilePic }
       ],
-      galeria: [defaultProfilePic, defaultProfilePic, defaultProfilePic, defaultProfilePic]
-    },
-    cliente: {
-      nombre: "Miguel Ángel Fernández",
-      ubicacion: "Valencia, España",
-      fotoPerfil: defaultProfilePic,
-      email: "miguel@example.com",
-      fechaRegistro: "Junio 2023",
-      descripcion: "Empresario del sector tecnológico. Busco acompañantes para eventos corporativos y conferencias internacionales.",
-      preferencias: ["Eventos corporativos", "Conversación inteligente", "Conocimiento de tecnología"],
-      eventosRecientes: 5
+      publicaciones: [
+        { imagen: defaultProfilePic, descripcion: "Nuestros acompañantes en un evento corporativo de alto nivel." },
+        { imagen: defaultProfilePic, descripcion: "Gala benéfica organizada con nuestros mejores profesionales." },
+        { imagen: defaultProfilePic, descripcion: "Congreso internacional con presencia de Élite Acompañantes." },
+        { imagen: defaultProfilePic, descripcion: "Evento privado con clientes exclusivos." }
+      ],
+      verificado: true,
+      agenciaVerificadora: "Asociación de Agencias Premium"
     }
   };
-  
-  // Usar datos pasados como prop, o los datos de ejemplo si no hay datos
+
   const profileData = userData.nombre ? userData : defaultData[userType];
 
-  // Efecto para determinar si es el perfil propio (simulado)
   useEffect(() => {
-    // Aquí podrías comparar con el ID del usuario logueado
-    // Para el ejemplo, lo definimos como falso
     setIsOwnProfile(false);
   }, []);
+
+  // Formatear el número de teléfono para el enlace de WhatsApp
+  const whatsappNumber = profileData.telefono ? profileData.telefono.replace(/\D/g, '') : '';
+  const whatsappLink = `https://wa.me/${whatsappNumber}`;
 
   return (
     <div className="perfil-container">
@@ -95,19 +96,32 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
           <div className="perfil-info-header">
             <div className="perfil-name-buttons">
               <h1>{profileData.nombre}</h1>
-              {!isOwnProfile && (
-                <div className="perfil-action-buttons">
-                  <button className="btn-contactar">Contactar</button>
-                  <button className="btn-favorito">Favorito</button>
-                </div>
-              )}
               {isOwnProfile && (
                 <button className="btn-editar-perfil">Editar Perfil</button>
+              )}
+            </div>
+            <div className="perfil-verification">
+              <FaCheckCircle className={profileData.verificado ? "verified-icon" : "unverified-icon"} />
+              <span>{profileData.verificado ? "Perfil Verificado" : "Perfil No Verificado"}</span>
+              {profileData.verificado && profileData.agenciaVerificadora && (
+                <span className="agencia-verificadora"> por {profileData.agenciaVerificadora}</span>
               )}
             </div>
             <p className="perfil-ubicacion">
               <FaMapMarkerAlt /> {profileData.ubicacion}
             </p>
+            <div className="perfil-contact-icons">
+              {profileData.redes?.instagram && (
+                <a href={`https://instagram.com/${profileData.redes.instagram}`} target="_blank" rel="noopener noreferrer">
+                  <FaInstagram className="contact-icon instagram" />
+                </a>
+              )}
+              {profileData.telefono && (
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                  <FaWhatsapp className="contact-icon whatsapp" />
+                </a>
+              )}
+            </div>
             {userType === "acompanante" && (
               <div className="perfil-datos-rapidos">
                 <span><FaUser /> {profileData.edad} años</span>
@@ -121,31 +135,24 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
                 <span><FaCalendarAlt /> Desde {profileData.fechaRegistro}</span>
               </div>
             )}
-            {userType === "cliente" && (
-              <div className="perfil-datos-rapidos">
-                <span><FaUser /> Cliente</span>
-                <span><FaCalendarAlt /> Miembro desde {profileData.fechaRegistro}</span>
-                <span>{profileData.eventosRecientes} eventos recientes</span>
-              </div>
-            )}
           </div>
         </div>
         
         <div className="perfil-tabs">
+          {(userType === "acompanante" || userType === "agencia") && (
+            <button 
+              className={`perfil-tab ${activeTab === 'publicaciones' ? 'active' : ''}`}
+              onClick={() => setActiveTab('publicaciones')}
+            >
+              Publicaciones
+            </button>
+          )}
           <button 
             className={`perfil-tab ${activeTab === 'informacion' ? 'active' : ''}`}
             onClick={() => setActiveTab('informacion')}
           >
             Información
           </button>
-          {(userType === "acompanante" || userType === "agencia") && (
-            <button 
-              className={`perfil-tab ${activeTab === 'galeria' ? 'active' : ''}`}
-              onClick={() => setActiveTab('galeria')}
-            >
-              Galería
-            </button>
-          )}
           {userType === "agencia" && (
             <button 
               className={`perfil-tab ${activeTab === 'acompanantes' ? 'active' : ''}`}
@@ -154,62 +161,67 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
               Acompañantes
             </button>
           )}
-          {userType === "cliente" && (
-            <button 
-              className={`perfil-tab ${activeTab === 'preferencias' ? 'active' : ''}`}
-              onClick={() => setActiveTab('preferencias')}
-            >
-              Preferencias
-            </button>
-          )}
         </div>
         
         <div className="perfil-tab-content">
-          {/* Contenido de la pestaña de Información */}
+          {(userType === "acompanante" || userType === "agencia") && activeTab === 'publicaciones' && (
+            <div className="perfil-publicaciones">
+              {profileData.publicaciones && profileData.publicaciones.map((publicacion, index) => (
+                <div className="perfil-publicacion-item" key={index}>
+                  <img src={publicacion.imagen} alt={`Publicación ${index + 1}`} />
+                  <div className="publicacion-descripcion">
+                    <p>{publicacion.descripcion}</p>
+                    <button className="btn-contacto-publicacion">
+                      <FaPhoneAlt /> Contactar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
           {activeTab === 'informacion' && (
             <div className="perfil-informacion">
-              <div className="perfil-seccion">
-                <h3>Sobre {userType === "cliente" ? "mí" : userType === "agencia" ? "nosotros" : "mí"}</h3>
+              <div className="perfil-seccion perfil-sobre-mi">
+                <h3>Sobre {userType === "agencia" ? "Nosotros" : "Mí"}</h3>
                 <p>{profileData.descripcion}</p>
               </div>
               
               {(userType === "acompanante" || userType === "agencia") && (
-                <div className="perfil-seccion">
-                  <h3>Servicios</h3>
-                  <ul className="perfil-servicios-list">
-                    {profileData.servicios && profileData.servicios.map((servicio, index) => (
-                      <li key={index}>{servicio}</li>
-                    ))}
-                  </ul>
+                <div className="perfil-seccion perfil-detalles">
+                  <h3>Detalles</h3>
+                  <div className="perfil-detalles-content">
+                    {(userType === "acompanante") && (
+                      <>
+                        <div className="perfil-detalle-item">
+                          <span className="detalle-label">Disponibilidad:</span>
+                          <span>{profileData.disponibilidad}</span>
+                        </div>
+                        <div className="perfil-detalle-item">
+                          <span className="detalle-label">Idiomas:</span>
+                          <span>{profileData.idiomas && profileData.idiomas.join(', ')}</span>
+                        </div>
+                      </>
+                    )}
+                    {userType === "agencia" && (
+                      <div className="perfil-detalle-item">
+                        <span className="detalle-label">Horario de Atención:</span>
+                        <span>{profileData.horarioAtencion}</span>
+                      </div>
+                    )}
+                    <div className="perfil-detalle-item">
+                      <span className="detalle-label">Servicios:</span>
+                      <ul className="perfil-servicios-list">
+                        {profileData.servicios && profileData.servicios.map((servicio, index) => (
+                          <li key={index}>{servicio}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               )}
               
-              {userType === "acompanante" && (
-                <div className="perfil-seccion">
-                  <h3>Disponibilidad</h3>
-                  <p>{profileData.disponibilidad}</p>
-                </div>
-              )}
-              
-              {userType === "agencia" && (
-                <div className="perfil-seccion">
-                  <h3>Horario de Atención</h3>
-                  <p>{profileData.horarioAtencion}</p>
-                </div>
-              )}
-              
-              {userType === "cliente" && profileData.preferencias && (
-                <div className="perfil-seccion">
-                  <h3>Preferencias</h3>
-                  <ul className="perfil-preferencias-list">
-                    {profileData.preferencias.map((preferencia, index) => (
-                      <li key={index}>{preferencia}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              <div className="perfil-seccion">
+              <div className="perfil-seccion perfil-contacto">
                 <h3>Información de Contacto</h3>
                 <div className="perfil-contacto-info">
                   {profileData.email && (
@@ -228,7 +240,7 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
               </div>
               
               {(userType === "acompanante" || userType === "agencia") && profileData.redes && (
-                <div className="perfil-seccion">
+                <div className="perfil-seccion perfil-redes">
                   <h3>Redes Sociales</h3>
                   <div className="perfil-redes-sociales">
                     {profileData.redes.instagram && (
@@ -252,18 +264,6 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
             </div>
           )}
           
-          {/* Contenido de la pestaña de Galería */}
-          {activeTab === 'galeria' && (userType === "acompanante" || userType === "agencia") && (
-            <div className="perfil-galeria">
-              {profileData.galeria && profileData.galeria.map((imagen, index) => (
-                <div className="perfil-galeria-item" key={index}>
-                  <img src={imagen} alt={`Imagen ${index + 1}`} />
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {/* Contenido de la pestaña de Acompañantes (solo para agencias) */}
           {activeTab === 'acompanantes' && userType === "agencia" && (
             <div className="perfil-acompanantes">
               {profileData.acompanantes && profileData.acompanantes.map((acompanante, index) => (
@@ -273,20 +273,6 @@ const Perfil = ({ userType = "acompanante", userData = {} }) => {
                   <button className="btn-ver-perfil">Ver Perfil</button>
                 </div>
               ))}
-            </div>
-          )}
-          
-          {/* Contenido de la pestaña de Preferencias (solo para clientes) */}
-          {activeTab === 'preferencias' && userType === "cliente" && (
-            <div className="perfil-preferencias">
-              <div className="perfil-seccion">
-                <h3>Mis Preferencias</h3>
-                <ul className="perfil-preferencias-list">
-                  {profileData.preferencias && profileData.preferencias.map((preferencia, index) => (
-                    <li key={index}>{preferencia}</li>
-                  ))}
-                </ul>
-              </div>
             </div>
           )}
         </div>

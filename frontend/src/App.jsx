@@ -3,9 +3,11 @@ import Login from "./componentes/login";
 import Registro from "./componentes/registro";
 import Mainpage from "./componentes/MainPage";
 import HomePage from "./componentes/homepage";
-import Perfil from "./componentes/Perfil";
+import PerfilAcompañante from "./componentes/PerfilAcompañante";
+import PerfilCliente from "./componentes/PerfilCliente";
+import PerfilAgencia from "./componentes/PerfilAgencia";
 import "./estilos/login.css";
-import "./estilos/Perfil.css";
+import "./estilos/PerfilAcompañante.css";
 import "./estilos/homepage.css";
 import ForgetPsw from "./componentes/Forgetpswd";
 
@@ -14,7 +16,7 @@ function App() {
 
   return (
     <div>
-      <Perfil setMenu={setMenu} /> 
+      <PerfilAgencia  setMenu={setMenu} /> 
       
       {menu === "login" && (
   <div className="modal-overlay">

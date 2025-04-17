@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaSearch, FaUser } from 'react-icons/fa';
-import '../estilos/Perfil.css';
+import '../estilos/Header.css';
 import loginImage from '../assets/logo png.png'; // Asegúrate de que la ruta sea correcta
 
 const Header = ({ onNavigate, userLoggedIn = false }) => {

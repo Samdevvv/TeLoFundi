@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import "../estilos/Mainpage.css";
 
-// Importaciones de imágenes (reemplaza estas rutas con tus imágenes reales)
 import heroImage from "../assets/heroimage.webp";
 import femaleServiceImg from "../assets/scort femenino.webp";
 import transServiceImg from "../assets/scorts trnas.jpg";
@@ -10,6 +9,8 @@ import companionServiceImg from "../assets/compañia.jpg";
 import vipServiceImg from "../assets/vip.jpg";
 import massageServiceImg from "../assets/masaje.jpg";
 import logoImage from "../assets/logo png.png";
+import '../estilos/Header.css';
+import Header from './Header';
 
 const MainPage = (props) => {
   // Estado para controlar la visibilidad del modal de filtros
@@ -78,28 +79,7 @@ const MainPage = (props) => {
 
   return (
     <div className="page-container">
-      <header className="header">
-        <div className="header-content">
-          <div className="logo-container">
-            <img src={logoImage} alt="Telo Fundi" className="logo-image" />
-          </div>
-          <nav className="nav">
-            <ul>
-              <li><a href="#" className="active">Inicio</a></li>
-              <li><a href="#">Explorar</a></li>
-              <li><a href="#">VIP</a></li>
-            </ul>
-          </nav>
-          <div className="auth-buttons">
-            <button className="login" onClick={() => props.setMenu("login")}>
-              Iniciar Sesión
-            </button>
-            <button className="signup" onClick={() => props.setMenu("registro")}>
-              ¡Regístrate!
-            </button>
-          </div>
-        </div>
-      </header>
+        <Header />
 
       {/* Hero Section Mejorada */}
       <section className="hero-section" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.6)), url(${heroImage})` }}>
