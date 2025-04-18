@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:wght@400;500;700&family=Open+Sans:wght@400;500&display=swap');
+
+/* Contenedor principal */
+.age-restriction-container {
+  max-width: 600px;
+  width: 95%;
+  background: #000000;
+  border-radius: 30px;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  padding: 2rem;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Animación de entrada */
+@keyframes fadeIn {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Contenedor del logo */
+.age-restriction-logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.age-restriction-logo-image {
+  max-width: 180px;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Texto de restricción de edad */
+.age-restriction-text {
+  font-size: 1.2rem;
+  text-align: center;
+  color: #ffffff;
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 500;
+  margin: 0 0 20px; /* Añadido margen inferior para separar del botón */
+  width: 90%;
+  max-width: 500px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Botón Volver */
+.age-restriction-back-button {
+  background: #ff4500;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background 0.3s ease;
+}
+
+.age-restriction-back-button:hover {
+  background: #e03e00;
+}
+
+/* Media Queries para responsividad */
+@media (min-width: 1600px) {
+  .age-restriction-container {
+    max-width: 650px;
+  }
+  .age-restriction-logo-image {
+    max-width: 220px;
+  }
+  .age-restriction-text {
+    font-size: 1.3rem;
+    max-width: 550px;
+  }
+}
+
+@media (max-width: 768px) {
+  .age-restriction-container {
+    max-width: 450px;
+    padding: 1.5rem;
+    min-height: 40vh;
+  }
+  .age-restriction-logo-image {
+    max-width: 150px;
+  }
+  .age-restriction-text {
+    font-size: 1rem;
+    max-width: 360px;
+  }
+  .age-restriction-back-button {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .age-restriction-container {
+    max-width: 370px;
+    padding: 1.2rem;
+    border-width: 1px;
+    min-height: 35vh;
+  }
+  .age-restriction-logo-image {
+    max-width: 120px;
+  }
+  .age-restriction-text {
+    font-size: 0.9rem;
+    max-width: 320px;
+  }
+  .age-restriction-back-button {
+    font-size: 0.85rem;
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .age-restriction-container {
+    max-width: 340px;
+  }
+  .age-restriction-text {
+    font-size: 0.85rem;
+    max-width: 300px;
+  }
+}

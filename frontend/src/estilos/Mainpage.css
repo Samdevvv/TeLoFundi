@@ -542,28 +542,35 @@ html, body {
 
 .filters-modal {
   background: #000000 !important; /* Fondo negro puro */
-  border-radius: 20px;
-  width: 90%;
+  border-radius: 12px;
+  width: 90% !important;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
   animation: slideUp 0.3s;
-  border: 1px solid #2a2a2a;
+  border: 1px solid #ffffff !important; /* Borde blanco */
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .modal-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center; /* Centra el título horizontalmente */
   align-items: center;
-  padding: 20px;
+  padding: 15px;
   border-bottom: 1px solid #2a2a2a;
+  position: relative; /* Permite posicionar el botón de cierre */
 }
 
 .modal-header h3 {
-  color: var(--text-light);
-  font-size: 1.8rem;
+  color: #ffffff !important; /* Color blanco para "Búsqueda avanzada" */
+  font-size: 1.6rem;
   font-weight: 700;
+  margin: 0 auto; /* Centra el título */
+  text-align: center; /* Asegura centrado del texto */
+  flex: 1; /* Permite que el título ocupe el espacio central */
+  padding-right: 30px; /* Espacio para evitar choque con la X */
 }
 
 .close-modal {
@@ -572,15 +579,17 @@ html, body {
   cursor: pointer;
   color: var(--text-light);
   transition: color 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute; /* Posiciona el botón de cierre en la esquina */
+  right: 15px;
+  top: 15px;
   padding: 5px;
 }
 
 .close-modal svg {
   stroke: #888;
   transition: stroke 0.2s ease;
+  width: 22px;
+  height: 22px;
 }
 
 .close-modal:hover svg {
@@ -588,26 +597,26 @@ html, body {
 }
 
 .filters-container-modal {
-  padding: 0 20px 20px;
+  padding: 0 15px 15px;
 }
 
 .filter-group {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .filter-group label {
   font-weight: 600;
-  color: var(--text-light);
+  color: #ffffff !important; /* Color blanco para "Categoría de Servicio" y "Ubicación" */
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .filter-select {
   width: 100%;
-  padding: 12px 15px;
+  padding: 10px 12px;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14px;
   background-color: #111;
   color: var(--text-light);
 }
@@ -615,30 +624,31 @@ html, body {
 .range-inputs {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .range-input {
   flex: 1;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
   background-color: #111;
   color: var(--text-light);
   text-align: center;
+  font-size: 14px;
 }
 
 .apply-filters {
   width: 100%;
-  padding: 15px;
+  padding: 12px;
   background: var(--gradient-primary);
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 20px;
+  margin-top: 15px;
   transition: all 0.3s;
 }
 
@@ -817,6 +827,39 @@ html, body {
   .footer-logo-image {
     height: 70px;
   }
+
+  /* Responsive para modal */
+  .filters-modal {
+    width: 85% !important;
+    max-width: 420px !important; /* Más ancho */
+    padding: 10px;
+    margin: 60px auto !important;
+    border-radius: 12px;
+    max-height: 80vh !important;
+  }
+
+  .modal-header h3 {
+    font-size: 1.3rem;
+  }
+
+  .filter-group label {
+    font-size: 14px;
+  }
+
+  .filter-select {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .range-input {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .apply-filters {
+    padding: 12px;
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -880,9 +923,69 @@ html, body {
   .footer-logo-image {
     height: 60px;
   }
-}
 
-/* Añadir estos estilos al final de ambos archivos CSS */
+  /* Responsive para modal en móviles (optimizado para iPhone XR) */
+  .filters-modal {
+    width: 85% !important;
+    max-width: 360px !important; /* Mucho más ancho */
+    padding: 8px !important;
+    margin: 120px auto !important;
+    border-radius: 10px !important;
+    max-height: 400px !important;
+    box-sizing: border-box;
+  }
+
+  .modal-header {
+    padding: 8px;
+  }
+
+  .modal-header h3 {
+    font-size: 1rem;
+    padding-right: 40px; /* Más espacio para la X */
+  }
+
+  .close-modal {
+    right: 10px; /* Más alejado del borde */
+    top: 10px;
+  }
+
+  .close-modal svg {
+    width: 18px; /* Más pequeño */
+    height: 18px;
+  }
+
+  .filters-container-modal {
+    padding: 0 10px 10px;
+  }
+
+  .filter-group {
+    margin-bottom: 12px;
+  }
+
+  .filter-group label {
+    font-size: 12px;
+  }
+
+  .filter-select {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .range-inputs {
+    gap: 6px;
+  }
+
+  .range-input {
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .apply-filters {
+    padding: 10px;
+    font-size: 12px;
+    margin-top: 12px;
+  }
+}
 
 /* Corrección para el header negro */
 .header {
@@ -937,7 +1040,7 @@ img.logo-image,
 img.footer-logo-image {
   min-height: 160px !important;
   height: 240px !important;
-  width:60px !important;
+  width: 60px !important;
   max-width: none !important;
   object-fit: contain !important;
 }

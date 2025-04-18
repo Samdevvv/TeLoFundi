@@ -9,6 +9,7 @@ import loginImage from '../assets/logo png.png';
 
 const Registro = (props) => {
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [nombre, setNombre] = useState("");
   const [nombreAgencia, setNombreAgencia] = useState("");
   const [pais, setPais] = useState(null);
@@ -44,6 +45,7 @@ const Registro = (props) => {
         setCiudad("");
         setPhone("");
         setGenero(null);
+        setUsername("");
       }
       setTimeout(() => {
         setFormVisible(true);
@@ -104,7 +106,7 @@ const Registro = (props) => {
         </div>
 
         <div className={`registro-fields-container ${formVisible ? 'visible' : 'hidden'}`}>
-          <div className="registro-input-box">
+          <div className="registro-input-box registro-input-email">
             <input
               type="email"
               required
@@ -115,6 +117,34 @@ const Registro = (props) => {
             <label>Correo Electrónico:</label>
             <FaEnvelope className="input-icon" />
           </div>
+
+          {userType === "cliente" && (
+            <div className="registro-cliente-inputs">
+              <div className="registro-input-box">
+                <input
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={`form-control ${username ? 'filled' : ''}`}
+                />
+                <label>Usuario:</label>
+                <FaUser className="input-icon" />
+              </div>
+
+              <div className="registro-input-box">
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`form-control ${password ? 'filled' : ''}`}
+                />
+                <label>Contraseña:</label>
+                <FaLock className="input-icon" />
+              </div>
+            </div>
+          )}
 
           {userType !== "cliente" && (
             <>
@@ -190,26 +220,21 @@ const Registro = (props) => {
             </>
           )}
 
-          <div className="registro-input-box">
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`form-control ${password ? 'filled' : ''}`}
-            />
-            <label>Contraseña:</label>
-            <FaLock className="input-icon" />
-          </div>
+          {userType !== "cliente" && (
+            <div className="registro-button-container">
+              <button type="button" className="registro-button">
+                Regístrate
+              </button>
+            </div>
+          )}
 
-          <div className="registro-button-container">
-            <button
-              type="button"
-              className="registro-button"
-            >
-              Regístrate
-            </button>
-          </div>
+          {userType === "cliente" && (
+            <div className="registro-button-container">
+              <button type="button" className="registro-button">
+                Regístrate
+              </button>
+            </div>
+          )}
 
           <div className="registro-footer">
             ¿Ya tienes cuenta?
