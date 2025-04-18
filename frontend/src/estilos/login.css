@@ -7,7 +7,7 @@ body {
 
 .login-container {
   position: absolute;
-  top: 100px;
+  top: 120px; /* Ajustado para bajar un poco el contenedor */
   left: 0;
   z-index: 999;
   height: auto;
@@ -30,15 +30,16 @@ body {
 }
 
 .login-form {
-  max-width: 400px;
+  max-width: 480px; /* Más ancho */
   width: 90%;
   background: #000000 !important;
   border-radius: 30px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  padding: 1.8rem;
+  padding: 2.5rem 1.8rem; /* Más padding superior para alargar */
   animation: fadeIn 0.3s ease-out;
   border: 2px solid white;
-  position: relative; /* Aseguramos posición relativa para el botón de regreso */
+  position: relative;
+  min-height: 500px; /* Más largo verticalmente */
 }
 
 @keyframes fadeIn {
@@ -57,7 +58,8 @@ body {
 .login-footer,
 .input-box label,
 .caps-tooltip,
-.caps-warning {
+.caps-warning,
+.input-tooltip {
   color: #fff !important;
 }
 
@@ -65,14 +67,14 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem; /* Más espacio debajo del logo */
   width: 100%;
-  height: 130px;
+  height: 150px; /* Aumentado para dar más espacio */
 }
 
 .login-title-image {
   width: 100%;
-  max-width: 350px;
+  max-width: 250px; /* Ajustado para mantener proporciones */
   height: auto;
   max-height: 220px;
   object-fit: contain;
@@ -128,6 +130,25 @@ body {
   position: absolute;
   top: -28px;
   right: 10px;
+  background-color: #333333;
+  color: #ffffff;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 400;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  animation: slideIn 0.2s ease-in-out;
+  z-index: 10;
+  border: 1px solid #555;
+}
+
+.input-tooltip {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
   background-color: #333333;
   color: #ffffff;
   padding: 4px 8px;
@@ -221,36 +242,31 @@ body {
   background-color: #000000 !important;
 }
 
-.login-button {
-  background: linear-gradient(to right, #2575fc, #6a11cb);
-  padding: 18px;
-  font-size: 1.5rem;
-  border-radius: 30px;
-  border: none;
-  transition: all 0.3s ease;
+.registro-button-container {
+  position: relative;
   width: 100%;
-  cursor: pointer;
+  margin: 20px 0 10px;
+}
+
+.registro-button {
+  position: relative;
+  background: #ff4500;
   color: white;
   font-weight: bold;
+  font-size: 1.1rem;
+  border: none;
+  width: 90%;
+  margin: 0 auto;
+  display: block;
+  padding: 12px 0;
+  border-radius: 10px;
+  cursor: pointer;
   text-transform: uppercase;
-  animation: pulse 1.5s infinite ease-in-out;
+  letter-spacing: 1px;
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.login-button:hover {
-  background: linear-gradient(to right, #6a11cb, #2575fc);
-  box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.3);
+.registro-button:hover {
+  background: #e03e00;
 }
 
 .login-footer {
@@ -353,7 +369,6 @@ select {
   color: #ffffff;
 }
 
-/* Ajustado el botón de regreso para que esté dentro del formulario */
 .back-button {
   background: none;
   border: none;
@@ -379,159 +394,53 @@ select {
   background-color: #000000 !important;
 }
 
-/* Estilos para el botón de fuego */
-.fire-button-container {
-  position: relative;
-  width: 100%;
-  margin: 15px 0;
-  overflow: hidden;
-  border-radius: 30px;
-}
-
-#fire-container {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 100px;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* Botón de inicio de sesión más pequeño */
-.fire-button {
-  position: relative;
-  z-index: 1;
-  background: linear-gradient(to right, #ff4500, #ff8c00);
-  color: white;
-  font-weight: bold;
-  font-size: 1.1rem; /* Reducido de 1.2rem */
-  border: none;
-  width: 60%; /* Reducido de 75% */
-  margin: 0 auto;
-  display: block;
-  padding: 10px 0; /* Reducido de 12px */
-  border-radius: 30px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.fire-button:hover {
-  background: linear-gradient(to right, #ff8c00, #ff4500);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
-}
-
-/* Partículas de fuego - versión original mejorada */
-.particle {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  background-color: transparent;
-  bottom: 0;
-  border-radius: 50%;
-  filter: blur(1px);
-  animation: rise 3s linear infinite;
-  z-index: 0;
-}
-
-.particle::before {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255,69,0,0.8) 0%, rgba(255,140,0,0.4) 70%, transparent 100%);
-  border-radius: 50%;
-  animation: glow 2s ease-out infinite;
-}
-
-@keyframes rise {
-  0% {
-    bottom: -5px;
-    opacity: 0;
-    width: 5px;
-    height: 5px;
-  }
-  10% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 0.7;
-  }
-  100% {
-    bottom: 100px;
-    width: 15px;
-    height: 15px;
-    opacity: 0;
-  }
-}
-
-@keyframes glow {
-  0%, 100% {
-    box-shadow: 0 0 5px 2px rgba(255,69,0,0.3);
-  }
-  50% {
-    box-shadow: 0 0 10px 3px rgba(255,140,0,0.5);
-  }
-}
-
-.texto-inicar {
-  color: white;
-  font-size: 16px; /* Reducido de 20px */
-}
-
-/* Media query mejorado para pantallas grandes */
 @media (min-width: 1600px) {
   .login-form {
-    max-width: 450px;
-    width: 95%;
+    max-width: 520px; /* Más ancho para pantallas grandes */
+    min-height: 550px; /* Más largo */
+    padding: 3rem 2rem;
+  }
+  .login-title {
+    height: 160px;
+  }
+  .login-title-image {
+    max-width: 280px;
   }
 }
 
-/* Media queries mejorados para dispositivos móviles */
 @media (max-width: 768px) {
   .login-form {
     width: 95%;
-    padding: 1.5rem;
-    max-width: 320px;
+    max-width: 380px; /* Más ancho en tablets */
+    min-height: 450px; /* Más largo */
+    padding: 2rem 1.5rem;
     border-radius: 20px;
   }
-
   .login-right {
     padding: 0 0.5rem;
   }
-  
   .login-title {
-    height: 110px;
-    margin-bottom: 1.2rem;
+    height: 120px;
+    margin-bottom: 1.5rem;
   }
-  
   .login-title-image {
-    max-width: 300px;
+    max-width: 220px;
     max-height: 180px;
   }
-  
   .input-box {
     height: 50px;
     margin: 18px 0;
   }
-  
   .input-box input {
     font-size: 1.2rem;
   }
-  
   .input-box .input-icon {
     font-size: 1.2rem;
   }
-  
-  .fire-button {
-    width: 70%; /* Ajustado para móviles */
-    font-size: 1rem;
-    padding: 9px 0;
+  .registro-button {
+    width: 95%;
+    font-size: 1.1rem;
   }
-  
   .back-button {
     font-size: 1.3rem;
     top: 12px;
@@ -539,54 +448,44 @@ select {
   }
 }
 
-/* Media query para móviles pequeños */
 @media (max-width: 480px) {
   .login-form {
-    max-width: 300px;
-    padding: 1.2rem;
+    max-width: 340px; /* Más ancho en móviles pequeños */
+    min-height: 420px; /* Más largo */
+    padding: 1.8rem 1.2rem;
     border-width: 1px;
   }
-  
   .login-title {
-    height: 90px;
+    height: 100px;
     margin-bottom: 1rem;
   }
-  
   .login-title-image {
-    max-width: 250px;
+    max-width: 200px;
     max-height: 150px;
   }
-  
   .input-box {
     height: 45px;
     margin: 15px 0;
   }
-  
   .input-box label {
     font-size: 14px;
   }
-  
   .input-box input {
     font-size: 1.1rem;
     padding-left: 35px;
   }
-  
   .input-box .input-icon {
     font-size: 1.1rem;
     left: 8px;
   }
-  
-  .fire-button {
-    width: 75%;
-    font-size: 0.9rem;
-    padding: 8px 0;
+  .registro-button {
+    width: 95%;
+    font-size: 1rem;
   }
-  
   .login-footer {
     font-size: 0.9rem;
     margin-top: 1rem;
   }
-  
   .forgot-password button {
     font-size: 0.85rem;
   }

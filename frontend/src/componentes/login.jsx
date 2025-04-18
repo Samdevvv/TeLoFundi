@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import "../estilos/login.css";
-import "../estilos/fireButton.css";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from 'react-icons/fa';
 import loginImage from '../assets/logo png.png';
 
@@ -9,36 +8,54 @@ const Login = (props) => {
   const [password, setPassword] = useState('');
   const [isCapsLockOn, setIsCapsLockOn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [emailTooltip, setEmailTooltip] = useState('');
+  const [passwordTooltip, setPasswordTooltip] = useState('');
 
-  const handleEmailChange = (e) => setEmail(e.target.value);
-  const handlePasswordChange = (e) => setPassword(e.target.value);
+  const forbiddenChars = /['";#=/*\\%&_|^<>()\[\]\-]/;
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    console.log('Email input:', value); // Depuración
+    if (forbiddenChars.test(value)) {
+      setEmailTooltip('Esos caracteres no son admitidos');
+      const filteredValue = value.replace(forbiddenChars, '');
+      setEmail(filteredValue);
+    } else {
+      setEmailTooltip('');
+      setEmail(value);
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    const value = e.target.value;
+    console.log('Password input:', value); // Depuración
+    if (forbiddenChars.test(value)) {
+      setPasswordTooltip('Esos caracteres no son admitidos');
+      const filteredValue = value.replace(forbiddenChars, '');
+      setPassword(filteredValue);
+    } else {
+      setPasswordTooltip('');
+      setPassword(value);
+    }
+  };
+
+  useEffect(() => {
+    if (emailTooltip || passwordTooltip) {
+      const timer = setTimeout(() => {
+        setEmailTooltip('');
+        setPasswordTooltip('');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [emailTooltip, passwordTooltip]);
+
   const handlePasswordKeyUp = (e) => setIsCapsLockOn(e.getModifierState('CapsLock'));
   const handlePasswordBlur = () => setIsCapsLockOn(false);
   const togglePasswordVisibility = () => setShowPassword(prev => !prev);
 
-  useEffect(() => {
-    const fireContainer = document.getElementById("fire-container");
-    if (fireContainer) {
-      fireContainer.innerHTML = '';
-      createParticles(fireContainer, 40, 25);
-    }
-  }, []);
-
-  const createParticles = (container, num, leftSpacing) => {
-    for (let i = 0; i < num; i += 1) {
-      let particle = document.createElement("div");
-      particle.style.left = `calc((100%) * ${i / leftSpacing})`;
-      particle.setAttribute("class", "particle");
-      particle.style.animationDelay = (3 * Math.random() + 0.5) + "s";
-      particle.style.animationDuration = (3 * Math.random() + 2) + "s";
-      container.appendChild(particle);
-    }
-  };
-
   return (
     <div className="login-right">
       <form className="login-form">
-        {/* Botón de flecha ahora está dentro del form con position: absolute */}
         <button
           className="back-button"
           onClick={() => props.setMenu("mainpage")}
@@ -61,6 +78,9 @@ const Login = (props) => {
           />
           <label>Correo Electrónico</label>
           <FaUser className="input-icon" />
+          {emailTooltip && (
+            <div className="input-tooltip">{emailTooltip}</div>
+          )}
         </div>
 
         <div className="password-wrapper">
@@ -79,6 +99,9 @@ const Login = (props) => {
             {isCapsLockOn && (
               <div className="caps-tooltip">Bloq Mayús activado</div>
             )}
+            {passwordTooltip && (
+              <div className="input-tooltip">{passwordTooltip}</div>
+            )}
           </div>
           <span className="toggle-password" onClick={togglePasswordVisibility}>
             {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -91,14 +114,13 @@ const Login = (props) => {
           </button>
         </div>
 
-        <div className="fire-button-container">
-          <div id="fire-container"></div>
+        <div className="registro-button-container">
           <button
             type="button"
             id="confirm"
-            className="fire-button"
+            className="registro-button"
           >
-            <span className="texto-inicar">Iniciar Sesión</span>
+            Iniciar Sesión
           </button>
         </div>
 

@@ -1,4 +1,4 @@
-/* css mainpage*/
+/* css mainpage */
 
 /* Estilos base generales con nueva paleta de colores más oscura */
 :root {
@@ -46,7 +46,7 @@ html, body {
 /* Header Styles */
 .header {
   width: 100%;
-  background-color: var(--darker-color); /* Fondo oscuro para el header */
+  background-color: var(--darker-color);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
   position: fixed;
   top: 0;
@@ -68,7 +68,7 @@ html, body {
 }
 
 .logo-image {
-  height: 80px; /* Logo mucho más grande */
+  height: 80px;
   width: auto;
   margin-right: 15px;
 }
@@ -145,7 +145,7 @@ html, body {
   justify-content: center;
   text-align: center;
   color: white;
-  margin-top: 80px; /* Ajustado para el header más alto */
+  margin-top: 80px;
   overflow: hidden;
 }
 
@@ -227,7 +227,7 @@ html, body {
 
 .search-button {
   padding: 0 25px;
-  background-color: #ffffff; /* Fondo oscuro para el botón de búsqueda */
+  background-color: #ffffff;
   border: none;
   color: white;
   cursor: pointer;
@@ -541,7 +541,7 @@ html, body {
 }
 
 .filters-modal {
-  background: #161616;
+  background: #000000 !important; /* Fondo negro puro */
   border-radius: 20px;
   width: 90%;
   max-width: 600px;
@@ -585,20 +585,6 @@ html, body {
 
 .close-modal:hover svg {
   stroke: var(--primary-color);
-}
-
-.modal-search {
-  padding: 20px;
-}
-
-.modal-search-input {
-  width: 100%;
-  padding: 15px;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  font-size: 16px;
-  background-color: #111;
-  color: var(--text-light);
 }
 
 .filters-container-modal {
@@ -681,7 +667,7 @@ html, body {
 }
 
 .footer-logo-image {
-  height: 80px; /* Logo más grande en el footer también */
+  height: 80px;
   width: auto;
   margin-bottom: 15px;
 }
@@ -895,10 +881,6 @@ html, body {
     height: 60px;
   }
 }
-.header{
-  background-color: black;
-}
-
 
 /* Añadir estos estilos al final de ambos archivos CSS */
 
@@ -947,6 +929,7 @@ html, body {
     padding-top: 160px !important;
   }
 }
+
 .logo-container .logo-image,
 .header-content .logo-image,
 .footer-logo .footer-logo-image,
@@ -997,6 +980,6 @@ img.footer-logo-image {
   }
 }
 
-.modal-overlay{
+.modal-overlay {
   background-color: #000000;
 }

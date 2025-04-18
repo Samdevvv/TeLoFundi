@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import "../estilos/Mainpage.css";
-
+import "../estilos/AgeVerificationModal.css";
 import heroImage from "../assets/heroimage.webp";
 import femaleServiceImg from "../assets/scort femenino.webp";
 import transServiceImg from "../assets/scorts trnas.jpg";
@@ -12,21 +12,67 @@ import logoImage from "../assets/logo png.png";
 import '../estilos/Header.css';
 import Header from './Header';
 
-const MainPage = (props) => {
-  // Estado para controlar la visibilidad del modal de filtros
+const MainPage = ({ setMenu }) => {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [showAgeModal, setShowAgeModal] = useState(true);
 
-  // Función para mostrar el modal
+  // Desactivar scroll e interactividad del body cuando la modal de edad está abierta
+  useEffect(() => {
+    if (showAgeModal) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.height = '100vh';
+      const pageContainer = document.querySelector('.page-container');
+      if (pageContainer) {
+        pageContainer.style.pointerEvents = 'none';
+      }
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.height = '';
+      const pageContainer = document.querySelector('.page-container');
+      if (pageContainer) {
+        pageContainer.style.pointerEvents = 'auto';
+      }
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.height = '';
+      const pageContainer = document.querySelector('.page-container');
+      if (pageContainer) {
+        pageContainer.style.pointerEvents = 'auto';
+      }
+    };
+  }, [showAgeModal]);
+
   const openFiltersModal = () => {
     setShowFiltersModal(true);
   };
 
-  // Función para cerrar el modal
   const closeFiltersModal = () => {
     setShowFiltersModal(false);
   };
 
-  // Datos de servicios
+  const handleAgeAccept = () => {
+    setShowAgeModal(false);
+  };
+
+  const handleAgeCancel = () => {
+    window.location.href = 'https://github.com/Lonxs69';
+  };
+
+  const fireParticles = Array.from({ length: 20 }).map((_, index) => (
+    <div
+      key={index}
+      className="fire-particle"
+      style={{
+        left: `${index % 2 === 0 ? Math.random() * 90 : 90 + Math.random() * 10}%`,
+        animationDelay: `${Math.random() * 3}s`
+      }}
+    />
+  ));
+
   const services = [
     {
       id: 'female',
@@ -72,16 +118,34 @@ const MainPage = (props) => {
     }
   ];
 
-  // Obtener servicios destacados
   const getFeaturedServices = () => {
     return services.filter(service => service.featured);
   };
 
   return (
     <div className="page-container">
-        <Header />
+      {showAgeModal && (
+        <div className="age-modal-overlay">
+          <div className="age-modal">
+            {fireParticles}
+            <img src={logoImage} alt="Telo Fundi Logo" className="age-modal-logo" />
+            <p className="age-modal-text">
+              Este sitio contiene contenido exclusivo para mayores de 18 años. 
+              Al continuar, confirmas que tienes la edad legal para acceder. 
+              Telo Fundi no se responsabiliza por accesos no autorizados. 
+              Por favor, selecciona una opción para proceder.
+            </p>
+            <div className="age-modal-buttons">
+              <button className="age-accept" onClick={handleAgeAccept}></button>
+              <button className="age-cancel" onClick={handleAgeCancel}></button>
+            </div>
+            <p className="age-modal-footer">Telo Fundi - ©2025</p>
+          </div>
+        </div>
+      )}
 
-      {/* Hero Section Mejorada */}
+      <Header onNavigate={setMenu} />
+
       <section className="hero-section" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.6)), url(${heroImage})` }}>
         <div className="hero-overlay"></div>
         <div className="hero-content">
@@ -107,7 +171,6 @@ const MainPage = (props) => {
         </div>
       </section>
 
-      {/* Servicios Destacados */}
       <section className="featured-services-section">
         <div className="container">
           <div className="section-header">
@@ -133,7 +196,6 @@ const MainPage = (props) => {
         </div>
       </section>
 
-      {/* Todos los Servicios */}
       <section className="all-services-section">
         <div className="container">
           <div className="section-header">
@@ -155,7 +217,6 @@ const MainPage = (props) => {
         </div>
       </section>
 
-      {/* Sección de Banner Promocional */}
       <section className="promo-banner">
         <div className="container">
           <div className="promo-content">
@@ -166,7 +227,6 @@ const MainPage = (props) => {
         </div>
       </section>
 
-      {/* Sección de Servicios Populares */}
       <section className="popular-services">
         <div className="container">
           <div className="section-header">
@@ -187,7 +247,6 @@ const MainPage = (props) => {
         </div>
       </section>
 
-      {/* Modal de Filtros */}
       {showFiltersModal && (
         <div className="modal-overlay" onClick={closeFiltersModal}>
           <div className="filters-modal" onClick={(e) => e.stopPropagation()}>
@@ -199,14 +258,6 @@ const MainPage = (props) => {
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
-            </div>
-
-            <div className="modal-search">
-              <input
-                type="text"
-                placeholder="Buscar por tipo de servicio..."
-                className="modal-search-input"
-              />
             </div>
 
             <div className="filters-container-modal">
