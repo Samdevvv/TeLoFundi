@@ -340,7 +340,7 @@ const MainPage = ({ setMenu }) => {
 
           <div className="footer-bottom">
             <p>© 2025 Telo Fundi - Todos los derechos reservados</p>
-            <p className="disclaimer">Acceso solo para mayores de 18 años. Este sitio contiene material para adultos.</p>
+            <p className="disclaimer">Acceso solo para mayores de 18 años, Este sitio contiene material para adultos.</p>
           </div>
         </div>
       </footer>
