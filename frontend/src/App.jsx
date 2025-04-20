@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Login from "./componentes/login";
 import Registro from "./componentes/registro";
 import Mainpage from "./componentes/MainPage";
+import Agevic from "./componentes/AgeRestriction";
 import HomePage from "./componentes/homepage";
 import PerfilAcompañante from "./componentes/PerfilAcompañante";
 import PerfilCliente from "./componentes/PerfilCliente";

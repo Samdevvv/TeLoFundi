@@ -12,12 +12,11 @@
   animation: fadeIn 0.3s ease-out;
   position: relative;
   margin: auto;
-  height: auto;
-  min-height: 60vh;
-  max-height: 90vh;
+  height: 60vh;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #ff4500 #000000;
+  box-sizing: border-box;
 }
 
 .registro-form::-webkit-scrollbar {
@@ -27,12 +26,23 @@
 .registro-form::-webkit-scrollbar-track {
   background: #000000;
   border-radius: 10px;
+  margin: 4rem 0;
 }
 
 .registro-form::-webkit-scrollbar-thumb {
   background-color: #ff4500;
   border-radius: 10px;
   border: 2px solid #000000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.registro-form:hover::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+.registro-form::-webkit-scrollbar-button {
+  display: none;
 }
 
 @keyframes fadeIn {
@@ -63,19 +73,28 @@
 }
 
 /* Ajustes específicos para cada tipo de formulario */
-.cliente-form {
-  max-width: 500px;
-  min-height: 50vh;
+.cliente-form, .agencia-form, .acompanante-form {
+  max-width: 600px;
+  height: 60vh;
   display: flex;
   flex-direction: column;
 }
 
-.agencia-form, .acompanante-form {
-  max-width: 600px;
-  min-height: 60vh;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-gap: 18px;
+/* Fila para inputs horizontales */
+.registro-input-row {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+  width: 100%;
+  margin: 15px 0;
+}
+
+.registro-input-row .registro-input-box,
+.registro-input-row .registro-select-box,
+.registro-input-row .registro-phone-container {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 /* Logo del registro */
@@ -195,7 +214,7 @@
 
 .registro-input-username,
 .registro-input-password {
-  flex: 1; /* Cada input ocupa el mismo espacio */
+  flex: 1;
   width: 100%;
 }
 
@@ -222,19 +241,13 @@
   font-size: 16px;
   color: #888;
   pointer-events: none;
-  transition: 0.3s ease-in-out;
+  transition: all 0.3s ease-in-out;
   font-family: 'Open Sans', sans-serif;
   font-weight: 400;
-}
-
-.registro-input-box .input-icon {
-  position: absolute;
-  top: 50%;
-  left: 10px;
-  transform: translateY(-50%);
-  font-size: 1.2rem;
-  color: #ffffff;
-  transition: color 0.3s;
+  display: block;
+  opacity: 1;
+  visibility: visible;
+  z-index: 3;
 }
 
 .registro-input-box input:focus ~ label,
@@ -254,6 +267,20 @@
   border: 1px solid white !important;
 }
 
+.registro-input-box .input-icon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  color: #ffffff;
+  transition: color 0.3s;
+  z-index: 1;
+  display: block;
+  opacity: 1;
+  visibility: visible;
+}
+
 /* Select Box */
 .registro-select-box {
   position: relative;
@@ -265,8 +292,8 @@
 
 .registro-select-label {
   position: absolute;
-  top: -12px;
-  left: 0;
+  top: -14px;
+  left: 5px;
   font-size: 14px;
   z-index: 1;
   font-family: 'Open Sans', sans-serif;
@@ -330,8 +357,31 @@
   transition: background-color 0.2s ease;
 }
 
-.registro-custom-select .select__option--is-focused {
-  background-color: #333333;
+.registro-custom-select .select__option[data-value="masculino"] {
+  background-color: #000000;
+}
+
+.registro-custom-select .select__option[data-value="masculino"]:hover,
+.registro-custom-select .select__option[data-value="masculino"]--is-focused {
+  background-color: #0000FF !important;
+}
+
+.registro-custom-select .select__option[data-value="femenino"] {
+  background-color: #000000;
+}
+
+.registro-custom-select .select__option[data-value="femenino"]:hover,
+.registro-custom-select .select__option[data-value="femenino"]--is-focused {
+  background-color: #FF69B4 !important;
+}
+
+.registro-custom-select .select__option[data-value="otro"] {
+  background-color: #000000;
+}
+
+.registro-custom-select .select__option[data-value="otro"]:hover,
+.registro-custom-select .select__option[data-value="otro"]--is-focused {
+  background-color: #333333 !important;
 }
 
 .registro-custom-select .select__option--is-selected {
@@ -358,34 +408,49 @@
 .registro-phone-container {
   position: relative;
   width: 100%;
+  height: 45px;
   margin: 15px 0;
-  padding-top: 15px;
   transition: all 0.3s ease;
 }
 
-.registro-phone-label {
+.registro-phone-container .registro-phone-label {
   position: absolute;
-  top: -5px;
-  left: 0;
-  font-size: 14px;
-  z-index: 1;
+  top: -12px !important; /* Fijado arriba permanentemente */
+  left: 0 !important;
+  font-size: 14px !important;
+  color: #ffffff !important;
+  pointer-events: none;
   font-family: 'Open Sans', sans-serif;
   font-weight: 500;
-  color: #fff !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 3 !important; /* Sobre otros elementos */
 }
 
 .registro-phone-icon {
   position: absolute;
-  top: 30px;
-  left: 50px;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
   font-size: 1.2rem;
-  color: #ffffff;
+  color: #ffffff !important;
   z-index: 1;
+  display: block;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .registro-phone-wrapper {
   width: 100%;
+  height: 100%;
+  position: relative;
   transition: all 0.3s ease;
+}
+
+.registro-form .react-tel-input .flag-dropdown {
+  z-index: 2;
+  border-right: 1px solid white;
 }
 
 .registro-form .react-tel-input .flag-dropdown .country-list {
@@ -408,14 +473,14 @@
 
 .registro-phone-input {
   width: 100% !important;
-  height: 45px !important;
+  height: 100% !important;
   background-color: #000000 !important;
   border: 1px solid white !important;
   border-radius: 5px !important;
   color: white !important;
   font-family: 'EB Garamond', serif !important;
   font-size: 1.2rem !important;
-  padding-left: 80px !important;
+  padding-left: 40px !important;
   transition: all 0.3s ease !important;
 }
 
@@ -424,6 +489,7 @@
   border: none !important;
   border-right: 1px solid white !important;
   transition: background-color 0.3s ease !important;
+  z-index: 2;
 }
 
 .registro-phone-dropdown:hover {
@@ -510,9 +576,11 @@
 @media (min-width: 1600px) {
   .registro-form {
     max-width: 650px;
+    height: 60vh;
   }
-  .cliente-form {
-    max-width: 550px;
+  .cliente-form, .agencia-form, .acompanante-form {
+    max-width: 650px;
+    height: 60vh;
   }
   .registro-logo-container {
     height: 200px;
@@ -542,6 +610,7 @@
     border: 2px solid rgba(255, 255, 255, 0.8);
     scrollbar-width: thin;
     scrollbar-color: #ff4500 #000000;
+    height: 60vh;
   }
   .registro-form::-webkit-scrollbar {
     width: 6px;
@@ -549,19 +618,30 @@
   .registro-form::-webkit-scrollbar-track {
     background: #000000;
     border-radius: 10px;
+    margin: 3rem 0;
   }
   .registro-form::-webkit-scrollbar-thumb {
     background-color: #ff4500;
     border-radius: 10px;
     border: 2px solid #000000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
   }
-  .cliente-form {
-    max-width: 400px;
+  .registro-form:hover::-webkit-scrollbar-thumb {
+    opacity: 1;
   }
-  .agencia-form,
-  .acompanante-form {
+  .registro-form::-webkit-scrollbar-button {
+    display: none;
+  }
+  .cliente-form, .agencia-form, .acompanante-form {
+    max-width: 450px;
+    height: 60vh;
     display: flex;
     flex-direction: column;
+  }
+  .registro-input-row {
+    flex-direction: column;
+    gap: 12px;
   }
   .registro-logo-container {
     height: 150px;
@@ -596,7 +676,7 @@
     width: 100%;
   }
   .registro-cliente-inputs {
-    flex-direction: column; /* Apilar verticalmente en pantallas pequeñas */
+    flex-direction: column;
   }
   .registro-toggle input + label {
     padding: 10px 5px;
@@ -625,6 +705,7 @@
     border: 2px solid rgba(255, 255, 255, 0.8);
     scrollbar-width: thin;
     scrollbar-color: #ff4500 #000000;
+    height: 60vh;
   }
   .registro-form::-webkit-scrollbar {
     width: 6px;
@@ -632,14 +713,24 @@
   .registro-form::-webkit-scrollbar-track {
     background: #000000;
     border-radius: 10px;
+    margin: 2.5rem 0;
   }
   .registro-form::-webkit-scrollbar-thumb {
     background-color: #ff4500;
     border-radius: 10px;
     border: 2px solid #000000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
   }
-  .cliente-form {
-    max-width: 320px;
+  .registro-form:hover::-webkit-scrollbar-thumb {
+    opacity: 1;
+  }
+  .registro-form::-webkit-scrollbar-button {
+    display: none;
+  }
+  .cliente-form, .agencia-form, .acompanante-form {
+    max-width: 370px;
+    height: 60vh;
   }
   .registro-logo-container {
     height: 120px;

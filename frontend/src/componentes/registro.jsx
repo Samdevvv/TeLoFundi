@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaUser, FaLock, FaArrowLeft, FaEnvelope, FaPhone, FaBuilding, FaGlobe, FaVenusMars, FaCity } from 'react-icons/fa';
+import { FaUser, FaLock, FaArrowLeft, FaEnvelope, FaPhone, FaBuilding, FaGlobe, FaVenusMars, FaCity, FaComment, FaMapMarkerAlt, FaBirthdayCake } from 'react-icons/fa';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import Select from 'react-select';
@@ -17,6 +17,9 @@ const Registro = (props) => {
   const [phone, setPhone] = useState("");
   const [genero, setGenero] = useState(null);
   const [password, setPassword] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [edad, setEdad] = useState("");
   const [userType, setUserType] = useState("cliente");
   const [formVisible, setFormVisible] = useState(true);
 
@@ -25,8 +28,7 @@ const Registro = (props) => {
   const genderOptions = [
     { value: 'masculino', label: 'Masculino' },
     { value: 'femenino', label: 'Femenino' },
-    { value: 'otro', label: 'Otro' },
-    { value: 'prefiero_no_decir', label: 'Prefiero no decir' }
+    { value: 'otro', label: 'Otro' }
   ];
 
   useEffect(() => {
@@ -38,7 +40,7 @@ const Registro = (props) => {
     setFormVisible(false);
     setTimeout(() => {
       setUserType(e.target.value);
-      if (e.target.value === "cliente") {
+      if (e.target.value === "cliente" || e.target.value === "agencia") {
         setNombre("");
         setNombreAgencia("");
         setPais(null);
@@ -46,11 +48,43 @@ const Registro = (props) => {
         setPhone("");
         setGenero(null);
         setUsername("");
+        setPassword("");
+        setDescripcion("");
+        setDireccion("");
+        setEdad("");
       }
       setTimeout(() => {
         setFormVisible(true);
       }, 50);
     }, 300);
+  };
+
+  const handleEdadChange = (e) => {
+    const value = e.target.value;
+    // Permitir vacío o hasta dos dígitos
+    if (value === "") {
+      setEdad("");
+      return;
+    }
+    if (/^\d{0,2}$/.test(value)) {
+      const num = parseInt(value, 10);
+      // Validar según el primer dígito
+      if (value.length === 1) {
+        // Primer dígito puede ser 1-9
+        if (num >= 1 && num <= 9) {
+          setEdad(value);
+        }
+      } else if (value.length === 2) {
+        // Si el primer dígito es 1, el segundo debe ser 8 o 9
+        if (value[0] === "1" && (value[1] === "8" || value[1] === "9")) {
+          setEdad(value);
+        }
+        // Si el primer dígito es 2-9, aceptar cualquier segundo dígito (20-98)
+        else if (value[0] >= "2" && num >= 20 && num <= 98) {
+          setEdad(value);
+        }
+      }
+    }
   };
 
   return (
@@ -106,102 +140,233 @@ const Registro = (props) => {
         </div>
 
         <div className={`registro-fields-container ${formVisible ? 'visible' : 'hidden'}`}>
-          <div className="registro-input-box registro-input-email">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={`form-control ${email ? 'filled' : ''}`}
-            />
-            <label>Correo Electrónico:</label>
-            <FaEnvelope className="input-icon" />
-          </div>
-
           {userType === "cliente" && (
-            <div className="registro-cliente-inputs">
-              <div className="registro-input-box">
+            <>
+              <div className="registro-input-box registro-input-email">
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={`form-control ${username ? 'filled' : ''}`}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`form-control ${email ? 'filled' : ''}`}
                 />
-                <label>Usuario:</label>
-                <FaUser className="input-icon" />
+                <label>Correo Electrónico:</label>
+                <FaEnvelope className="input-icon" />
               </div>
 
-              <div className="registro-input-box">
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`form-control ${password ? 'filled' : ''}`}
-                />
-                <label>Contraseña:</label>
-                <FaLock className="input-icon" />
+              <div className="registro-cliente-inputs">
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className={`form-control ${username ? 'filled' : ''}`}
+                  />
+                  <label>Usuario:</label>
+                  <FaUser className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`form-control ${password ? 'filled' : ''}`}
+                  />
+                  <label>Contraseña:</label>
+                  <FaLock className="input-icon" />
+                </div>
               </div>
-            </div>
+            </>
           )}
 
-          {userType !== "cliente" && (
+          {userType === "agencia" && (
             <>
+              <div className="registro-input-row">
+                <div className="registro-input-box">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`form-control ${email ? 'filled' : ''}`}
+                  />
+                  <label>Correo Electrónico:</label>
+                  <FaEnvelope className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`form-control ${password ? 'filled' : ''}`}
+                  />
+                  <label>Contraseña:</label>
+                  <FaLock className="input-icon" />
+                </div>
+              </div>
+
+              <div className="registro-input-row">
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={nombreAgencia}
+                    onChange={(e) => setNombreAgencia(e.target.value)}
+                    className={`form-control ${nombreAgencia ? 'filled' : ''}`}
+                  />
+                  <label>Nombre de la Agencia:</label>
+                  <FaBuilding className="input-icon" />
+                </div>
+
+                <div className="registro-select-box">
+                  <label className="registro-select-label">País:</label>
+                  <FaGlobe className="registro-select-icon" />
+                  <Select
+                    value={pais}
+                    onChange={setPais}
+                    options={countries}
+                    getOptionLabel={(option) => option.label}
+                    placeholder="Seleccione su país"
+                    className="registro-custom-select"
+                    classNamePrefix="select"
+                    menuPortalTarget={document.body}
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                  />
+                </div>
+              </div>
+
+              <div className="registro-input-row">
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={ciudad}
+                    onChange={(e) => setCiudad(e.target.value)}
+                    className={`form-control ${ciudad ? 'filled' : ''}`}
+                  />
+                  <label>Ciudad:</label>
+                  <FaCity className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    className={`form-control ${direccion ? 'filled' : ''}`}
+                  />
+                  <label>Dirección:</label>
+                  <FaMapMarkerAlt className="input-icon" />
+                </div>
+              </div>
+
               <div className="registro-input-box">
                 <input
                   type="text"
                   required
-                  value={userType === "acompanante" ? nombre : nombreAgencia}
-                  onChange={(e) => userType === "acompanante" ? setNombre(e.target.value) : setNombreAgencia(e.target.value)}
-                  className={`form-control ${(userType === "acompanante" ? nombre : nombreAgencia) ? 'filled' : ''}`}
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  className={`form-control ${descripcion ? 'filled' : ''}`}
                 />
-                <label>{userType === "acompanante" ? "Nombre Completo:" : "Nombre de la Agencia:"}</label>
-                {userType === "acompanante" ? <FaUser className="input-icon" /> : <FaBuilding className="input-icon" />}
+                <label>Descripción:</label>
+                <FaComment className="input-icon" />
+              </div>
+            </>
+          )}
+
+          {userType === "acompanante" && (
+            <>
+              <div className="registro-input-row">
+                <div className="registro-input-box">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`form-control ${email ? 'filled' : ''}`}
+                  />
+                  <label>Correo Electrónico:</label>
+                  <FaEnvelope className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`form-control ${password ? 'filled' : ''}`}
+                  />
+                  <label>Contraseña:</label>
+                  <FaLock className="input-icon" />
+                </div>
               </div>
 
-              <div className="registro-select-box">
-                <label className="registro-select-label">País:</label>
-                <FaGlobe className="registro-select-icon" />
-                <Select
-                  value={pais}
-                  onChange={setPais}
-                  options={countries}
-                  placeholder="Seleccione su país"
-                  className="registro-custom-select"
-                  classNamePrefix="select"
-                  menuPortalTarget={document.body}
-                  styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                />
+              <div className="registro-input-row">
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    className={`form-control ${nombre ? 'filled' : ''}`}
+                  />
+                  <label>Nombre Completo:</label>
+                  <FaUser className="input-icon" />
+                </div>
+
+                <div className="registro-input-box registro-phone-container">
+                  <label className="registro-phone-label">Número de teléfono:</label>
+                  <FaPhone className="registro-phone-icon" />
+                  <PhoneInput
+                    country={'es'}
+                    value={phone}
+                    onChange={setPhone}
+                    inputClass="registro-phone-input"
+                    containerClass="registro-phone-wrapper"
+                    buttonClass="registro-phone-dropdown"
+                    dropdownClass="registro-phone-dropdown-list"
+                  />
+                </div>
               </div>
 
-              <div className="registro-input-box">
-                <input
-                  type="text"
-                  required
-                  value={ciudad}
-                  onChange={(e) => setCiudad(e.target.value)}
-                  className={`form-control ${ciudad ? 'filled' : ''}`}
-                />
-                <label>Ciudad:</label>
-                <FaCity className="input-icon" />
+              <div className="registro-input-row">
+                <div className="registro-select-box">
+                  <label className="registro-select-label">País:</label>
+                  <FaGlobe className="registro-select-icon" />
+                  <Select
+                    value={pais}
+                    onChange={setPais}
+                    options={countries}
+                    getOptionLabel={(option) => option.label}
+                    placeholder="Seleccione su país"
+                    className="registro-custom-select"
+                    classNamePrefix="select"
+                    menuPortalTarget={document.body}
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                  />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={ciudad}
+                    onChange={(e) => setCiudad(e.target.value)}
+                    className={`form-control ${ciudad ? 'filled' : ''}`}
+                  />
+                  <label>Ciudad:</label>
+                  <FaCity className="input-icon" />
+                </div>
               </div>
 
-              <div className="registro-phone-container">
-                <label className="registro-phone-label">Número de teléfono:</label>
-                <FaPhone className="registro-phone-icon" />
-                <PhoneInput
-                  country={'es'}
-                  value={phone}
-                  onChange={setPhone}
-                  inputClass="registro-phone-input"
-                  containerClass="registro-phone-wrapper"
-                  buttonClass="registro-phone-dropdown"
-                  dropdownClass="registro-phone-dropdown-list"
-                />
-              </div>
-
-              {userType === "acompanante" && (
+              <div className="registro-input-row">
                 <div className="registro-select-box">
                   <label className="registro-select-label">Género:</label>
                   <FaVenusMars className="registro-select-icon" />
@@ -209,14 +374,32 @@ const Registro = (props) => {
                     value={genero}
                     onChange={setGenero}
                     options={genderOptions}
+                    getOptionLabel={(option) => option.label}
                     placeholder="Seleccione su género"
                     className="registro-custom-select"
                     classNamePrefix="select"
                     menuPortalTarget={document.body}
                     styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                    getOptionValue={(option) => option.value}
+                    formatOptionLabel={(option) => (
+                      <div data-value={option.value}>{option.label}</div>
+                    )}
                   />
                 </div>
-              )}
+
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    maxLength="2"
+                    value={edad}
+                    onChange={handleEdadChange}
+                    className={`form-control ${edad ? 'filled' : ''}`}
+                  />
+                  <label>Edad (18-98):</label>
+                  <FaBirthdayCake className="input-icon" />
+                </div>
+              </div>
             </>
           )}
 
