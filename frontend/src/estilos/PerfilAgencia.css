@@ -270,9 +270,6 @@ body {
   font-size: 0.95rem;
 }
 
-.perfil-sobre-mi {
-  /* Estilo adicional si es necesario */
-}
 
 .perfil-detalles-content {
   display: flex;
@@ -445,4 +442,28 @@ body {
   .perfil-name-buttons h1 {
     font-size: 1.5rem;
   }
+}
+.perfil-edit-input,
+.perfil-edit-textarea {
+  background-color: var(--darker-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 8px;
+  color: var(--text-light);
+  width: 100%;
+  font-size: 0.95rem;
+}
+
+.perfil-edit-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.perfil-foto-upload {
+  margin-top: 10px;
+  background-color: var(--darker-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+  padding: 5px;
+  border-radius: 5px;
 }

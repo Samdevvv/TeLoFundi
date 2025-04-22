@@ -6,10 +6,12 @@ import Select from 'react-select';
 import countryList from 'react-select-country-list';
 import "../estilos/registr.css";
 import loginImage from '../assets/logo png.png';
+import axios from 'axios';
 
-const Registro = (props) => {
+const Registro = ({ setMenu, onRegisterSuccess }) => {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState(""); // Campo corregido
   const [nombre, setNombre] = useState("");
   const [nombreAgencia, setNombreAgencia] = useState("");
   const [pais, setPais] = useState(null);
@@ -22,6 +24,9 @@ const Registro = (props) => {
   const [edad, setEdad] = useState("");
   const [userType, setUserType] = useState("cliente");
   const [formVisible, setFormVisible] = useState(true);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
 
   const [countries, setCountries] = useState([]);
 
@@ -49,6 +54,7 @@ const Registro = (props) => {
         setGenero(null);
         setUsername("");
         setPassword("");
+        setConfirmPassword(""); // Reiniciar confirmPassword
         setDescripcion("");
         setDireccion("");
         setEdad("");
@@ -61,48 +67,92 @@ const Registro = (props) => {
 
   const handleEdadChange = (e) => {
     const value = e.target.value;
-    // Permitir vacío o hasta dos dígitos
     if (value === "") {
       setEdad("");
       return;
     }
     if (/^\d{0,2}$/.test(value)) {
       const num = parseInt(value, 10);
-      // Validar según el primer dígito
       if (value.length === 1) {
-        // Primer dígito puede ser 1-9
         if (num >= 1 && num <= 9) {
           setEdad(value);
         }
       } else if (value.length === 2) {
-        // Si el primer dígito es 1, el segundo debe ser 8 o 9
         if (value[0] === "1" && (value[1] === "8" || value[1] === "9")) {
           setEdad(value);
-        }
-        // Si el primer dígito es 2-9, aceptar cualquier segundo dígito (20-98)
-        else if (value[0] >= "2" && num >= 20 && num <= 98) {
+        } else if (value[0] >= "2" && num >= 20 && num <= 98) {
           setEdad(value);
         }
       }
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    // Validar que las contraseñas coincidan
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      setLoading(false);
+      return;
+    }
+
+    const payload = {
+      email,
+      password,
+      userType,
+      ...(userType === "cliente" && { username }),
+      ...(userType === "acompanante" && {
+        nombre,
+        phone,
+        genero: genero?.value,
+        edad: parseInt(edad),
+        pais: pais?.label,
+        ciudad
+      }),
+      ...(userType === "agencia" && {
+        nombreAgencia,
+        pais: pais?.label,
+        ciudad,
+        direccion,
+        descripcion
+      })
+    };
+
+    try {
+      const response = await axios.post('https://api.loveconnect.com/auth/register', payload);
+      setSuccess('Registro exitoso. Por favor, inicia sesión.');
+      onRegisterSuccess();
+      setTimeout(() => setMenu("login"), 2000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al registrarse');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="login-right">
-      <form className={`registro-form ${userType}-form`}>
-        <button 
-          className="registro-back-button" 
-          onClick={() => props.setMenu("mainpage")}
+      <form className={`registro-form ${userType}-form`} onSubmit={handleSubmit}>
+        <button
+          className="registro-back-button"
+          onClick={() => setMenu("mainpage")}
           type="button"
         >
           <FaArrowLeft size={20} />
         </button>
-        
+
         <div className="registro-logo-container">
           <img src={loginImage} alt="Logo" className="registro-logo-image" />
         </div>
-        
-        <p className="registro-subtitle">¿Qué esperas? Ingresa tus datos ahora y registrate</p>
+
+        <p className="registro-subtitle">¿Qué esperas? Ingresa tus datos ahora y regístrate</p>
+
+        {error && <div className="error-message">{error}</div>}
+        {success && <div className="success-message">{success}</div>}
 
         <div className="registro-account-container">
           <label className="registro-account-label">Tipo de cuenta:</label>
@@ -114,6 +164,7 @@ const Registro = (props) => {
               id="sizeCliente"
               checked={userType === "cliente"}
               onChange={handleRadioChange}
+              disabled={loading}
             />
             <label htmlFor="sizeCliente">Cliente</label>
 
@@ -124,9 +175,10 @@ const Registro = (props) => {
               id="sizeAcompanante"
               checked={userType === "acompanante"}
               onChange={handleRadioChange}
+              disabled={loading}
             />
             <label htmlFor="sizeAcompanante">Acompañante</label>
-            
+
             <input
               type="radio"
               name="userType"
@@ -134,6 +186,7 @@ const Registro = (props) => {
               id="sizeAgencia"
               checked={userType === "agencia"}
               onChange={handleRadioChange}
+              disabled={loading}
             />
             <label htmlFor="sizeAgencia">Agencia</label>
           </div>
@@ -149,6 +202,7 @@ const Registro = (props) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={`form-control ${email ? 'filled' : ''}`}
+                  disabled={loading}
                 />
                 <label>Correo Electrónico:</label>
                 <FaEnvelope className="input-icon" />
@@ -162,6 +216,7 @@ const Registro = (props) => {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className={`form-control ${username ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Usuario:</label>
                   <FaUser className="input-icon" />
@@ -174,8 +229,22 @@ const Registro = (props) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`form-control ${password ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Contraseña:</label>
+                  <FaLock className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`form-control ${confirmPassword ? 'filled' : ''}`}
+                    disabled={loading}
+                  />
+                  <label>Confirmar Contraseña:</label>
                   <FaLock className="input-icon" />
                 </div>
               </div>
@@ -192,6 +261,7 @@ const Registro = (props) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className={`form-control ${email ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Correo Electrónico:</label>
                   <FaEnvelope className="input-icon" />
@@ -204,6 +274,7 @@ const Registro = (props) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`form-control ${password ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Contraseña:</label>
                   <FaLock className="input-icon" />
@@ -213,16 +284,32 @@ const Registro = (props) => {
               <div className="registro-input-row">
                 <div className="registro-input-box">
                   <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`form-control ${confirmPassword ? 'filled' : ''}`}
+                    disabled={loading}
+                  />
+                  <label>Confirmar Contraseña:</label>
+                  <FaLock className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
                     type="text"
                     required
                     value={nombreAgencia}
                     onChange={(e) => setNombreAgencia(e.target.value)}
                     className={`form-control ${nombreAgencia ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Nombre de la Agencia:</label>
                   <FaBuilding className="input-icon" />
                 </div>
+              </div>
 
+              <div className="registro-input-row">
                 <div className="registro-select-box">
                   <label className="registro-select-label">País:</label>
                   <FaGlobe className="registro-select-icon" />
@@ -236,7 +323,21 @@ const Registro = (props) => {
                     classNamePrefix="select"
                     menuPortalTarget={document.body}
                     styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                    isDisabled={loading}
                   />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
+                    type="text"
+                    required
+                    value={ciudad}
+                    onChange={(e) => setCiudad(e.target.value)}
+                    className={`form-control ${ciudad ? 'filled' : ''}`}
+                    disabled={loading}
+                  />
+                  <label>Ciudad:</label>
+                  <FaCity className="input-icon" />
                 </div>
               </div>
 
@@ -245,37 +346,27 @@ const Registro = (props) => {
                   <input
                     type="text"
                     required
-                    value={ciudad}
-                    onChange={(e) => setCiudad(e.target.value)}
-                    className={`form-control ${ciudad ? 'filled' : ''}`}
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    className={`form-control ${direccion ? 'filled' : ''}`}
+                    disabled={loading}
                   />
-                  <label>Ciudad:</label>
-                  <FaCity className="input-icon" />
+                  <label>Dirección:</label>
+                  <FaMapMarkerAlt className="input-icon" />
                 </div>
 
                 <div className="registro-input-box">
                   <input
                     type="text"
                     required
-                    value={direccion}
-                    onChange={(e) => setDireccion(e.target.value)}
-                    className={`form-control ${direccion ? 'filled' : ''}`}
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    className={`form-control ${descripcion ? 'filled' : ''}`}
+                    disabled={loading}
                   />
-                  <label>Dirección:</label>
-                  <FaMapMarkerAlt className="input-icon" />
+                  <label>Descripción:</label>
+                  <FaComment className="input-icon" />
                 </div>
-              </div>
-
-              <div className="registro-input-box">
-                <input
-                  type="text"
-                  required
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  className={`form-control ${descripcion ? 'filled' : ''}`}
-                />
-                <label>Descripción:</label>
-                <FaComment className="input-icon" />
               </div>
             </>
           )}
@@ -290,6 +381,7 @@ const Registro = (props) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className={`form-control ${email ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Correo Electrónico:</label>
                   <FaEnvelope className="input-icon" />
@@ -302,6 +394,7 @@ const Registro = (props) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`form-control ${password ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Contraseña:</label>
                   <FaLock className="input-icon" />
@@ -311,16 +404,32 @@ const Registro = (props) => {
               <div className="registro-input-row">
                 <div className="registro-input-box">
                   <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`form-control ${confirmPassword ? 'filled' : ''}`}
+                    disabled={loading}
+                  />
+                  <label>Confirmar Contraseña:</label>
+                  <FaLock className="input-icon" />
+                </div>
+
+                <div className="registro-input-box">
+                  <input
                     type="text"
                     required
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
                     className={`form-control ${nombre ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Nombre Completo:</label>
                   <FaUser className="input-icon" />
                 </div>
+              </div>
 
+              <div className="registro-input-row">
                 <div className="registro-input-box registro-phone-container">
                   <label className="registro-phone-label">Número de teléfono:</label>
                   <FaPhone className="registro-phone-icon" />
@@ -332,11 +441,10 @@ const Registro = (props) => {
                     containerClass="registro-phone-wrapper"
                     buttonClass="registro-phone-dropdown"
                     dropdownClass="registro-phone-dropdown-list"
+                    disabled={loading}
                   />
                 </div>
-              </div>
 
-              <div className="registro-input-row">
                 <div className="registro-select-box">
                   <label className="registro-select-label">País:</label>
                   <FaGlobe className="registro-select-icon" />
@@ -350,9 +458,12 @@ const Registro = (props) => {
                     classNamePrefix="select"
                     menuPortalTarget={document.body}
                     styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                    isDisabled={loading}
                   />
                 </div>
+              </div>
 
+              <div className="registro-input-row">
                 <div className="registro-input-box">
                   <input
                     type="text"
@@ -360,13 +471,12 @@ const Registro = (props) => {
                     value={ciudad}
                     onChange={(e) => setCiudad(e.target.value)}
                     className={`form-control ${ciudad ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Ciudad:</label>
                   <FaCity className="input-icon" />
                 </div>
-              </div>
 
-              <div className="registro-input-row">
                 <div className="registro-select-box">
                   <label className="registro-select-label">Género:</label>
                   <FaVenusMars className="registro-select-icon" />
@@ -384,9 +494,12 @@ const Registro = (props) => {
                     formatOptionLabel={(option) => (
                       <div data-value={option.value}>{option.label}</div>
                     )}
+                    isDisabled={loading}
                   />
                 </div>
+              </div>
 
+              <div className="registro-input-row">
                 <div className="registro-input-box">
                   <input
                     type="text"
@@ -395,6 +508,7 @@ const Registro = (props) => {
                     value={edad}
                     onChange={handleEdadChange}
                     className={`form-control ${edad ? 'filled' : ''}`}
+                    disabled={loading}
                   />
                   <label>Edad (18-98):</label>
                   <FaBirthdayCake className="input-icon" />
@@ -403,25 +517,15 @@ const Registro = (props) => {
             </>
           )}
 
-          {userType !== "cliente" && (
-            <div className="registro-button-container">
-              <button type="button" className="registro-button">
-                Regístrate
-              </button>
-            </div>
-          )}
-
-          {userType === "cliente" && (
-            <div className="registro-button-container">
-              <button type="button" className="registro-button">
-                Regístrate
-              </button>
-            </div>
-          )}
+          <div className="registro-button-container">
+            <button type="submit" className="registro-button" disabled={loading}>
+              {loading ? 'Cargando...' : 'Regístrate'}
+            </button>
+          </div>
 
           <div className="registro-footer">
             ¿Ya tienes cuenta?
-            <button type="button" onClick={() => props.setMenu("login")}>
+            <button type="button" onClick={() => setMenu("login")} disabled={loading}>
               Inicia Sesión
             </button>
           </div>

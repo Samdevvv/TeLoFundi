@@ -7,6 +7,10 @@ import HomePage from "./componentes/homepage";
 import PerfilAcompañante from "./componentes/PerfilAcompañante";
 import PerfilCliente from "./componentes/PerfilCliente";
 import PerfilAgencia from "./componentes/PerfilAgencia";
+import PerfilAcompañantePropio from "./componentes/PerfilAcompañantePropio";
+import PerfilClientePropio from "./componentes/PerfilClientePropio";
+import PerfilAgenciaPropio from "./componentes/PerfilAgenciaPropio";
+import PerfilAdmin from "./componentes/PerfilAdmin";
 import "./estilos/login.css";
 import "./estilos/PerfilAcompañante.css";
 import "./estilos/homepage.css";
@@ -17,7 +21,7 @@ function App() {
 
   return (
     <div>
-      <Mainpage  setMenu={setMenu} /> 
+      <PerfilAdmin setMenu={setMenu} /> 
       
       {menu === "login" && (
   <div className="modal-overlay">
