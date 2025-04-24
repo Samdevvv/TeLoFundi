@@ -21,34 +21,27 @@ function App() {
 
   return (
     <div>
-      <PerfilAdmin setMenu={setMenu} /> 
-      
+      <Mainpage setMenu={setMenu} />
+
       {menu === "login" && (
-  <div className="modal-overlay">
-    <Login setMenu={setMenu} />
-  </div>
-)}
+        <div className="modal-overlay">
+          <Login setMenu={setMenu} />
+        </div>
+      )}
 
-{menu === "registro" && (
-  <div className="modal-overlay">
-    <Registro setMenu={setMenu} />
-  </div>
-)}
+      {menu === "registro" && (
+        <div className="modal-overlay">
+          <Registro setMenu={setMenu} />
+        </div>
+      )}
 
-
-
-{menu === "recuperar" && (
-  <div className="modal-overlay">
-    <ForgetPsw setMenu={setMenu} />
-  </div>
-)}
-
+      {menu === "recuperar" && (
+        <div className="modal-overlay">
+          <ForgetPsw setMenu={setMenu} />
+        </div>
+      )}
     </div>
   );
 }
 
 export default App;
-
-
-
-
