@@ -21,7 +21,7 @@ function App() {
 
   return (
     <div>
-      <PerfilAdmin setMenu={setMenu} /> 
+      <Mainpage setMenu={setMenu} /> 
       
       {menu === "login" && (
   <div className="modal-overlay">
