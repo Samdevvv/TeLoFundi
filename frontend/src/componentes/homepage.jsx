@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import "../estilos/homepage.css";
 import chica1 from "../assets/imagen chica 1.jpg";
 import chica2 from "../assets/chica 2.jpg";
 import chica3 from "../assets/chica 3.jpg";
-import logoImage from "../assets/logo png.png";
-import '../estilos/Header.css';
-import Header from './Header';
+import "../estilos/Header.css";
+import Header from "./Header";
 
 const users = [
   {
@@ -14,7 +13,8 @@ const users = [
     age: 26,
     location: "Madrid, España",
     photo: chica1,
-    description: "Amante de los viajes y la buena música. Busco nuevas experiencias y conversaciones interesantes."
+    description:
+      "Amante de los viajes y la buena música. Busco nuevas experiencias y conversaciones interesantes.",
   },
   {
     id: 2,
@@ -22,7 +22,8 @@ const users = [
     age: 29,
     location: "Ciudad de México, México",
     photo: chica2,
-    description: "Amante del cine y la tecnología. Me encanta explorar nuevos lugares y conocer gente nueva."
+    description:
+      "Amante del cine y la tecnología. Me encanta explorar nuevos lugares y conocer gente nueva.",
   },
   {
     id: 3,
@@ -30,7 +31,8 @@ const users = [
     age: 24,
     location: "Buenos Aires, Argentina",
     photo: chica3,
-    description: "Me encanta el arte, la fotografía y la aventura. Busco alguien con quien compartir momentos únicos."
+    description:
+      "Me encanta el arte, la fotografía y la aventura. Busco alguien con quien compartir momentos únicos.",
   },
   {
     id: 1,
@@ -38,7 +40,8 @@ const users = [
     age: 26,
     location: "Madrid, España",
     photo: chica1,
-    description: "Amante de los viajes y la buena música. Busco nuevas experiencias y conversaciones interesantes."
+    description:
+      "Amante de los viajes y la buena música. Busco nuevas experiencias y conversaciones interesantes.",
   },
   {
     id: 2,
@@ -46,7 +49,8 @@ const users = [
     age: 29,
     location: "Ciudad de México, México",
     photo: chica2,
-    description: "Amante del cine y la tecnología. Me encanta explorar nuevos lugares y conocer gente nueva."
+    description:
+      "Amante del cine y la tecnología. Me encanta explorar nuevos lugares y conocer gente nueva.",
   },
   {
     id: 3,
@@ -54,9 +58,9 @@ const users = [
     age: 24,
     location: "Buenos Aires, Argentina",
     photo: chica3,
-    description: "Me encanta el arte, la fotografía y la aventura. Busco alguien con quien compartir momentos únicos."
+    description:
+      "Me encanta el arte, la fotografía y la aventura. Busco alguien con quien compartir momentos únicos.",
   },
-
 ];
 
 const HomePage = (props) => {
@@ -75,7 +79,7 @@ const HomePage = (props) => {
 
   return (
     <div className="page-container">
-        <Header />
+      <Header />
 
       <main className="main-content">
         <div className="search-container">
@@ -87,7 +91,9 @@ const HomePage = (props) => {
               onClick={openFiltersModal}
               readOnly
             />
-            <button className="search-button" onClick={openFiltersModal}>🔍</button>
+            <button className="search-button" onClick={openFiltersModal}>
+              🔍
+            </button>
           </div>
         </div>
 
@@ -97,7 +103,9 @@ const HomePage = (props) => {
             <div className="filters-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h3 className="Titulo-Busqueda">Búsqueda avanzada</h3>
-                <button className="close-modal" onClick={closeFiltersModal}>×</button>
+                <button className="close-modal" onClick={closeFiltersModal}>
+                  ×
+                </button>
               </div>
 
               <div className="modal-search">
@@ -112,9 +120,21 @@ const HomePage = (props) => {
                 <div className="filter-group">
                   <label>Edad</label>
                   <div className="range-inputs">
-                    <input type="number" placeholder="Min" min="18" max="100" className="range-input" />
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      min="18"
+                      max="100"
+                      className="range-input"
+                    />
                     <span>-</span>
-                    <input type="number" placeholder="Max" min="18" max="100" className="range-input" />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      min="18"
+                      max="100"
+                      className="range-input"
+                    />
                   </div>
                 </div>
 
@@ -155,7 +175,9 @@ const HomePage = (props) => {
             <div key={user.id} className="user-card">
               <img src={user.photo} alt={user.name} className="user-photo" />
               <div className="user-info">
-                <h3>{user.name}, {user.age}</h3>
+                <h3>
+                  {user.name}, {user.age}
+                </h3>
                 <p className="location">{user.location}</p>
                 <p className="description">{user.description}</p>
                 <div className="buttons">

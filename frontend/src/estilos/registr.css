@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:wght@400;500;700&family=Open+Sans:wght@400;500&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:wght@400;500;700&family=Open+Sans:wght@400;500&display=swap");
 
 /* Estilos específicos para el componente de registro */
 .registro-form {
@@ -73,7 +73,9 @@
 }
 
 /* Ajustes específicos para cada tipo de formulario */
-.cliente-form, .agencia-form, .acompanante-form {
+.cliente-form,
+.agencia-form,
+.acompanante-form {
   max-width: 600px;
   height: 60vh;
   display: flex;
@@ -144,7 +146,7 @@
   display: block;
   margin-bottom: 10px;
   font-size: 14px;
-  font-family: 'Open Sans', sans-serif;
+  font-family: "Open Sans", sans-serif;
   font-weight: 500;
   color: #fff !important;
 }
@@ -172,7 +174,7 @@
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-family: 'Open Sans', sans-serif;
+  font-family: "Open Sans", sans-serif;
   margin: 0 4px;
   border-radius: 5px;
 }
@@ -230,7 +232,7 @@
   font-weight: 500;
   transition: all 0.3s ease-in-out;
   border-radius: 5px;
-  font-family: 'EB Garamond', serif;
+  font-family: "EB Garamond", serif;
 }
 
 .registro-input-box label {
@@ -242,7 +244,7 @@
   color: #888;
   pointer-events: none;
   transition: all 0.3s ease-in-out;
-  font-family: 'Open Sans', sans-serif;
+  font-family: "Open Sans", sans-serif;
   font-weight: 400;
   display: block;
   opacity: 1;
@@ -256,7 +258,7 @@
   left: 0;
   font-size: 14px;
   color: #ffffff;
-  font-family: 'Open Sans', sans-serif;
+  font-family: "Open Sans", sans-serif;
   font-weight: 500;
 }
 
@@ -296,7 +298,7 @@
   left: 5px;
   font-size: 14px;
   z-index: 1;
-  font-family: 'Open Sans', sans-serif;
+  font-family: "Open Sans", sans-serif;
   font-weight: 500;
   color: #fff !important;
 }
@@ -363,7 +365,7 @@
 
 .registro-custom-select .select__option[data-value="masculino"]:hover,
 .registro-custom-select .select__option[data-value="masculino"]--is-focused {
-  background-color: #0000FF !important;
+  background-color: #0000ff !important;
 }
 
 .registro-custom-select .select__option[data-value="femenino"] {
@@ -372,7 +374,7 @@
 
 .registro-custom-select .select__option[data-value="femenino"]:hover,
 .registro-custom-select .select__option[data-value="femenino"]--is-focused {
-  background-color: #FF69B4 !important;
+  background-color: #ff69b4 !important;
 }
 
 .registro-custom-select .select__option[data-value="otro"] {
@@ -390,18 +392,18 @@
 
 .registro-custom-select .select__placeholder {
   color: #888;
-  font-family: 'EB Garamond', serif;
+  font-family: "EB Garamond", serif;
 }
 
 .registro-custom-select .select__single-value {
   color: white;
-  font-family: 'EB Garamond', serif;
+  font-family: "EB Garamond", serif;
   transition: all 0.3s ease;
 }
 
 .registro-custom-select .select__input-container {
   color: white;
-  font-family: 'EB Garamond', serif;
+  font-family: "EB Garamond", serif;
 }
 
 /* Phone Input */
@@ -420,7 +422,7 @@
   font-size: 14px !important;
   color: #ffffff !important;
   pointer-events: none;
-  font-family: 'Open Sans', sans-serif;
+  font-family: "Open Sans", sans-serif;
   font-weight: 500;
   display: block !important;
   opacity: 1 !important;
@@ -478,7 +480,7 @@
   border: 1px solid white !important;
   border-radius: 5px !important;
   color: white !important;
-  font-family: 'EB Garamond', serif !important;
+  font-family: "EB Garamond", serif !important;
   font-size: 1.2rem !important;
   padding-left: 40px !important;
   transition: all 0.3s ease !important;
@@ -578,7 +580,9 @@
     max-width: 650px;
     height: 60vh;
   }
-  .cliente-form, .agencia-form, .acompanante-form {
+  .cliente-form,
+  .agencia-form,
+  .acompanante-form {
     max-width: 650px;
     height: 60vh;
   }
@@ -633,7 +637,9 @@
   .registro-form::-webkit-scrollbar-button {
     display: none;
   }
-  .cliente-form, .agencia-form, .acompanante-form {
+  .cliente-form,
+  .agencia-form,
+  .acompanante-form {
     max-width: 450px;
     height: 60vh;
     display: flex;
@@ -663,8 +669,8 @@
     width: 95%;
     font-size: 1.1rem;
   }
-  .registro-input-box, 
-  .registro-select-box, 
+  .registro-input-box,
+  .registro-select-box,
   .registro-phone-container,
   .registro-account-container,
   .registro-button-container,
@@ -728,7 +734,9 @@
   .registro-form::-webkit-scrollbar-button {
     display: none;
   }
-  .cliente-form, .agencia-form, .acompanante-form {
+  .cliente-form,
+  .agencia-form,
+  .acompanante-form {
     max-width: 370px;
     height: 60vh;
   }
@@ -806,4 +814,66 @@
   border-radius: 5px;
   margin-bottom: 15px;
   text-align: center;
+} /* Modal */
+.registro-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.registro-modal-content {
+  background: #000000;
+  border: 2px solid white;
+  border-radius: 15px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  color: white;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.registro-modal-content h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.registro-modal-content p {
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.registro-modal-button {
+  background: linear-gradient(to right, #ff4500, #ff8c00);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.registro-modal-button:hover {
+  background: linear-gradient(to right, #ff8c00, #ff4500);
+  transform: translateY(-2px);
+}
+
+/* Ajustes para nuevos campos */
+.registro-input-box input[type="number"] {
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.registro-input-box input[type="number"]::-webkit-inner-spin-button,
+.registro-input-box input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
