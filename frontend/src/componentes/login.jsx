@@ -2,29 +2,27 @@ import { useState, useEffect } from "react";
 import "../estilos/login.css";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from "react-icons/fa";
 import loginImage from "../assets/logo png.png";
-import axios from "axios";
 
 const Login = ({ setMenu, onLoginSuccess }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isCapsLockOn, setIsCapsLockOn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [emailTooltip, setEmailTooltip] = useState("");
-  const [passwordTooltip, setPasswordTooltip] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
 
   const forbiddenChars = /['";#=/*\\%&_|^<>()[\]-]/;
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
     if (forbiddenChars.test(value)) {
-      setEmailTooltip("Esos caracteres no son admitidos");
+      setError({
+        title: "Caracteres no permitidos",
+        message: "El correo contiene caracteres no admitidos.",
+      });
       const filteredValue = value.replace(forbiddenChars, "");
       setEmail(filteredValue);
     } else {
-      setEmailTooltip("");
       setEmail(value);
     }
   };
@@ -32,55 +30,124 @@ const Login = ({ setMenu, onLoginSuccess }) => {
   const handlePasswordChange = (e) => {
     const value = e.target.value;
     if (forbiddenChars.test(value)) {
-      setPasswordTooltip("Esos caracteres no son admitidos");
+      setError({
+        title: "Caracteres no permitidos",
+        message: "La contraseña contiene caracteres no admitidos.",
+      });
       const filteredValue = value.replace(forbiddenChars, "");
       setPassword(filteredValue);
     } else {
-      setPasswordTooltip("");
       setPassword(value);
     }
   };
 
   useEffect(() => {
-    if (emailTooltip || passwordTooltip) {
-      const timer = setTimeout(() => {
-        setEmailTooltip("");
-        setPasswordTooltip("");
-      }, 2000);
+    if (error && error.title === "Caracteres no permitidos") {
+      const timer = setTimeout(() => setError(null), 2000);
       return () => clearTimeout(timer);
     }
-  }, [emailTooltip, passwordTooltip]);
+  }, [error]);
 
   const handlePasswordKeyUp = (e) =>
     setIsCapsLockOn(e.getModifierState("CapsLock"));
   const handlePasswordBlur = () => setIsCapsLockOn(false);
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
 
+  const validateForm = () => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!email || !emailRegex.test(email.trim())) {
+      return "Por favor, ingrese un correo electrónico válido.";
+    }
+    if (!password || password.trim().length < 6) {
+      return "La contraseña debe tener al menos 6 caracteres.";
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
-    setSuccess("");
+    setError(null);
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError({
+        title: "Error de Validación",
+        message: validationError,
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
-      const response = await axios.post(
-        "https://api.loveconnect.com/auth/login",
-        {
-          email,
-          password,
-        }
-      );
+      const payload = {
+        Email: email.trim(),
+        Password: password.trim(),
+      };
 
-      const { token, user } = response.data;
-      localStorage.setItem("token", token);
-      setSuccess("Inicio de sesión exitoso");
-      onLoginSuccess(user);
-      setTimeout(() => setMenu("homepage"), 1000);
+      const response = await fetch("https://localhost:7134/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 400) {
+          throw new Error(
+            errorData.Message || "Email o contraseña incorrectos."
+          );
+        } else if (response.status === 401) {
+          throw new Error("Credenciales inválidas.");
+        } else {
+          throw new Error(
+            `Error al iniciar sesión (Código: ${response.status})`
+          );
+        }
+      }
+
+      const data = await response.json();
+      localStorage.setItem("accessToken", data.AccessToken);
+      localStorage.setItem("refreshToken", data.RefreshToken);
+
+      // Assuming the backend returns user data with tipoUsuario
+      const userData = {
+        id: data.UserId || 1, // Adjust based on actual response
+        email: email,
+        tipoUsuario: data.TipoUsuario || "cliente", // Adjust based on actual response
+      };
+      localStorage.setItem("user", JSON.stringify(userData));
+      onLoginSuccess(userData);
+
+      setError({
+        title: "Bienvenido",
+        message: "Inicio de sesión exitoso. ¡Bienvenido de vuelta!",
+      });
     } catch (err) {
-      setError(err.response?.data?.message || "Error al iniciar sesión");
+      let errorMessage = err.message;
+      if (err.message.includes("Failed to fetch")) {
+        errorMessage =
+          "No se pudo conectar con el servidor. Verifica tu conexión.";
+      }
+      setError({
+        title: "Error de Inicio de Sesión",
+        message: errorMessage,
+        retry: true,
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const closeModal = () => {
+    if (error?.title === "Bienvenido") {
+      setMenu("homepage");
+    }
+    setError(null);
+  };
+
+  const retrySubmit = () => {
+    handleSubmit({ preventDefault: () => {} });
   };
 
   return (
@@ -98,9 +165,6 @@ const Login = ({ setMenu, onLoginSuccess }) => {
           <img src={loginImage} alt="Login" className="login-title-image" />
         </div>
 
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
-
         <div className="input-box">
           <input
             type="email"
@@ -112,7 +176,6 @@ const Login = ({ setMenu, onLoginSuccess }) => {
           />
           <label>Correo Electrónico</label>
           <FaUser className="input-icon" />
-          {emailTooltip && <div className="input-tooltip">{emailTooltip}</div>}
         </div>
 
         <div className="password-wrapper">
@@ -126,14 +189,11 @@ const Login = ({ setMenu, onLoginSuccess }) => {
               onBlur={handlePasswordBlur}
               className={`form-control ${password ? "filled" : ""}`}
               disabled={loading}
-            />
+          />
             <label>Contraseña</label>
             <FaLock className="input-icon" />
             {isCapsLockOn && (
               <div className="caps-tooltip">Bloq Mayús activado</div>
-            )}
-            {passwordTooltip && (
-              <div className="input-tooltip">{passwordTooltip}</div>
             )}
           </div>
           <span className="toggle-password" onClick={togglePasswordVisibility}>
@@ -165,6 +225,25 @@ const Login = ({ setMenu, onLoginSuccess }) => {
           </button>
         </div>
       </form>
+
+      {error && (
+        <div className="registro-modal">
+          <div className="registro-modal-content">
+            <h3>{error.title}</h3>
+            <p>{error.message}</p>
+            <div className="registro-modal-buttons">
+              {error.retry && (
+                <button onClick={retrySubmit} className="registro-modal-button">
+                  Reintentar
+                </button>
+              )}
+              <button onClick={closeModal} className="registro-modal-button">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

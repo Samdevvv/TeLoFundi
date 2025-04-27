@@ -1,12 +1,51 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:wght@400;500;700&family=Open+Sans:wght@400;500&display=swap");
 
-/* Estilos específicos para el componente de registro */
+/* Variables CSS para colores y estilos comunes */
+:root {
+  --bg-color: #000000;
+  --text-color: #ffffff;
+  --accent-color: #ff4500;
+  --secondary-color: #e03e00;
+  --input-border: 1px solid white;
+  --border-radius: 5px;
+  --shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  --transition: all 0.3s ease;
+  --font-primary: "EB Garamond", serif;
+  --font-secondary: "Open Sans", sans-serif;
+  --scrollbar-track-color: #000000;
+  --scrollbar-thumb-color: #ff4500;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInMenu {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estilos base del formulario */
 .registro-form {
   max-width: 600px;
   width: 95%;
-  background: #000000 !important;
+  background: var(--bg-color) !important;
   border-radius: 30px;
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow);
   border: 2px solid rgba(255, 255, 255, 0.8);
   padding: 2rem;
   animation: fadeIn 0.3s ease-out;
@@ -15,24 +54,25 @@
   height: 60vh;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #ff4500 #000000;
+  scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
   box-sizing: border-box;
 }
 
+/* Scrollbar personalizado */
 .registro-form::-webkit-scrollbar {
   width: 6px;
 }
 
 .registro-form::-webkit-scrollbar-track {
-  background: #000000;
+  background: var(--scrollbar-track-color);
   border-radius: 10px;
   margin: 4rem 0;
 }
 
 .registro-form::-webkit-scrollbar-thumb {
-  background-color: #ff4500;
+  background-color: var(--scrollbar-thumb-color);
   border-radius: 10px;
-  border: 2px solid #000000;
+  border: 2px solid var(--scrollbar-track-color);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -45,21 +85,20 @@
   display: none;
 }
 
-@keyframes fadeIn {
-  0% {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
+/* Contenedores de formularios específicos */
+.cliente-form,
+.agencia-form,
+.acompanante-form {
+  max-width: 600px;
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Container para campos de formulario con animación */
+/* Contenedor de campos */
 .registro-fields-container {
   display: contents;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: var(--transition);
 }
 
 .registro-fields-container.visible {
@@ -70,16 +109,6 @@
 .registro-fields-container.hidden {
   opacity: 0;
   transform: translateY(10px);
-}
-
-/* Ajustes específicos para cada tipo de formulario */
-.cliente-form,
-.agencia-form,
-.acompanante-form {
-  max-width: 600px;
-  height: 60vh;
-  display: flex;
-  flex-direction: column;
 }
 
 /* Fila para inputs horizontales */
@@ -99,9 +128,8 @@
   min-width: 0;
 }
 
-/* Logo del registro */
+/* Logo y subtítulo */
 .registro-logo-container {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -117,7 +145,6 @@
   object-fit: contain;
 }
 
-/* Subtítulo */
 .registro-subtitle {
   position: absolute;
   top: 200px;
@@ -125,7 +152,7 @@
   transform: translateX(-50%);
   font-size: 1.1rem;
   text-align: center;
-  color: #ffffff !important;
+  color: var(--text-color) !important;
   opacity: 1;
   z-index: 10;
   margin: 0;
@@ -139,16 +166,15 @@
 /* Account Type Toggle */
 .registro-account-container {
   margin: 40px 0 15px;
-  grid-column: 1 / -1;
 }
 
 .registro-account-label {
   display: block;
   margin-bottom: 10px;
   font-size: 14px;
-  font-family: "Open Sans", sans-serif;
+  font-family: var(--font-secondary);
   font-weight: 500;
-  color: #fff !important;
+  color: var(--text-color) !important;
 }
 
 .registro-toggle {
@@ -167,26 +193,26 @@
 .registro-toggle input + label {
   flex: 1;
   padding: 12px 8px;
-  background-color: #000000;
-  border: 1px solid white;
-  color: white;
+  background-color: var(--bg-color);
+  border: var(--input-border);
+  color: var(--text-color);
   text-align: center;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: "Open Sans", sans-serif;
+  transition: var(--transition);
+  font-family: var(--font-secondary);
   margin: 0 4px;
-  border-radius: 5px;
+  border-radius: var(--border-radius);
 }
 
 .registro-toggle input:checked + label {
-  background-color: #ff4500;
-  border-color: #ff4500;
-  color: white;
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-color);
 }
 
 .registro-toggle input + label:hover {
-  border-color: white;
+  border-color: var(--text-color);
   background-color: rgba(255, 69, 0, 0.1);
 }
 
@@ -196,11 +222,10 @@
   width: 100%;
   height: 45px;
   margin: 15px 0;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .registro-input-email {
-  grid-column: 1 / -1;
   width: 100%;
   max-width: 100%;
   margin: 15px 0 20px;
@@ -210,7 +235,6 @@
   display: flex;
   flex-direction: row;
   gap: 15px;
-  grid-column: 1 / -1;
   width: 100%;
 }
 
@@ -220,19 +244,20 @@
   width: 100%;
 }
 
+/* Estilos comunes para inputs */
 .registro-input-box input {
   width: 100%;
   height: 100%;
   background: transparent;
-  border: 1px solid white !important;
+  border: var(--input-border) !important;
   outline: none;
   padding-left: 35px;
   font-size: 1.2rem;
-  color: #ffffff;
+  color: var(--text-color);
   font-weight: 500;
-  transition: all 0.3s ease-in-out;
-  border-radius: 5px;
-  font-family: "EB Garamond", serif;
+  transition: var(--transition);
+  border-radius: var(--border-radius);
+  font-family: var(--font-primary);
 }
 
 .registro-input-box label {
@@ -243,8 +268,8 @@
   font-size: 16px;
   color: #888;
   pointer-events: none;
-  transition: all 0.3s ease-in-out;
-  font-family: "Open Sans", sans-serif;
+  transition: var(--transition);
+  font-family: var(--font-secondary);
   font-weight: 400;
   display: block;
   opacity: 1;
@@ -257,16 +282,16 @@
   top: -12px;
   left: 0;
   font-size: 14px;
-  color: #ffffff;
-  font-family: "Open Sans", sans-serif;
+  color: var(--text-color);
+  font-family: var(--font-secondary);
   font-weight: 500;
 }
 
 .registro-input-box input:focus,
 .registro-input-box input.filled {
-  color: #ffffff !important;
-  background-color: #000000 !important;
-  border: 1px solid white !important;
+  color: var(--text-color) !important;
+  background-color: var(--bg-color) !important;
+  border: var(--input-border) !important;
 }
 
 .registro-input-box .input-icon {
@@ -275,12 +300,19 @@
   left: 10px;
   transform: translateY(-50%);
   font-size: 1.2rem;
-  color: #ffffff;
+  color: var(--text-color);
   transition: color 0.3s;
   z-index: 1;
   display: block;
   opacity: 1;
   visibility: visible;
+}
+
+/* Remove number input arrows */
+.registro-input-box input[type="number"]::-webkit-inner-spin-button,
+.registro-input-box input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Select Box */
@@ -289,7 +321,7 @@
   width: 100%;
   margin: 15px 0;
   height: auto;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .registro-select-label {
@@ -298,9 +330,9 @@
   left: 5px;
   font-size: 14px;
   z-index: 1;
-  font-family: "Open Sans", sans-serif;
+  font-family: var(--font-secondary);
   font-weight: 500;
-  color: #fff !important;
+  color: var(--text-color) !important;
 }
 
 .registro-select-icon {
@@ -308,59 +340,50 @@
   top: 13px;
   left: 10px;
   font-size: 1.2rem;
-  color: #ffffff;
+  color: var(--text-color);
   z-index: 1;
 }
 
+/* React-Select styling */
 .registro-custom-select {
   width: 100%;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .registro-custom-select .select__control {
-  background-color: #000000;
-  border: 1px solid white !important;
-  border-radius: 5px;
+  background-color: var(--bg-color);
+  border: var(--input-border) !important;
+  border-radius: var(--border-radius);
   padding: 2px 2px 2px 35px;
   box-shadow: none;
   min-height: 45px;
-  transition: all 0.3s ease !important;
+  transition: var(--transition) !important;
 }
 
 .registro-custom-select .select__control:hover,
 .registro-custom-select .select__control--is-focused {
-  border-color: white !important;
+  border-color: var(--text-color) !important;
   box-shadow: none;
 }
 
 .registro-custom-select .select__menu {
-  background-color: #000000;
-  border: 1px solid white;
-  border-radius: 5px;
+  background-color: var(--bg-color);
+  border: var(--input-border);
+  border-radius: var(--border-radius);
   z-index: 9999;
   position: absolute;
   animation: fadeInMenu 0.2s ease;
 }
 
-@keyframes fadeInMenu {
-  from {
-    opacity: 0;
-    transform: translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .registro-custom-select .select__option {
-  background-color: #000000;
-  color: white;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   transition: background-color 0.2s ease;
 }
 
+/* Opciones de género */
 .registro-custom-select .select__option[data-value="masculino"] {
-  background-color: #000000;
+  background-color: var(--bg-color);
 }
 
 .registro-custom-select .select__option[data-value="masculino"]:hover,
@@ -369,7 +392,7 @@
 }
 
 .registro-custom-select .select__option[data-value="femenino"] {
-  background-color: #000000;
+  background-color: var(--bg-color);
 }
 
 .registro-custom-select .select__option[data-value="femenino"]:hover,
@@ -378,7 +401,7 @@
 }
 
 .registro-custom-select .select__option[data-value="otro"] {
-  background-color: #000000;
+  background-color: var(--bg-color);
 }
 
 .registro-custom-select .select__option[data-value="otro"]:hover,
@@ -387,23 +410,23 @@
 }
 
 .registro-custom-select .select__option--is-selected {
-  background-color: #ff4500;
+  background-color: var(--accent-color);
 }
 
 .registro-custom-select .select__placeholder {
   color: #888;
-  font-family: "EB Garamond", serif;
+  font-family: var(--font-primary);
 }
 
 .registro-custom-select .select__single-value {
-  color: white;
-  font-family: "EB Garamond", serif;
-  transition: all 0.3s ease;
+  color: var(--text-color);
+  font-family: var(--font-primary);
+  transition: var(--transition);
 }
 
 .registro-custom-select .select__input-container {
-  color: white;
-  font-family: "EB Garamond", serif;
+  color: var(--text-color);
+  font-family: var(--font-primary);
 }
 
 /* Phone Input */
@@ -412,22 +435,22 @@
   width: 100%;
   height: 45px;
   margin: 15px 0;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .registro-phone-container .registro-phone-label {
   position: absolute;
-  top: -12px !important; /* Fijado arriba permanentemente */
+  top: -12px !important;
   left: 0 !important;
   font-size: 14px !important;
-  color: #ffffff !important;
+  color: var(--text-color) !important;
   pointer-events: none;
-  font-family: "Open Sans", sans-serif;
+  font-family: var(--font-secondary);
   font-weight: 500;
   display: block !important;
   opacity: 1 !important;
   visibility: visible !important;
-  z-index: 3 !important; /* Sobre otros elementos */
+  z-index: 3 !important;
 }
 
 .registro-phone-icon {
@@ -436,7 +459,7 @@
   left: 10px;
   transform: translateY(-50%);
   font-size: 1.2rem;
-  color: #ffffff !important;
+  color: var(--text-color) !important;
   z-index: 1;
   display: block;
   opacity: 1 !important;
@@ -447,9 +470,10 @@
   width: 100%;
   height: 100%;
   position: relative;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
+/* React-Phone-Input styling */
 .registro-form .react-tel-input .flag-dropdown {
   z-index: 2;
   border-right: 1px solid white;
@@ -457,15 +481,15 @@
 
 .registro-form .react-tel-input .flag-dropdown .country-list {
   z-index: 9999;
-  background-color: #000000;
-  border: 1px solid white;
+  background-color: var(--bg-color);
+  border: var(--input-border);
   max-height: 200px;
   overflow-y: auto;
   animation: fadeInMenu 0.2s ease;
 }
 
 .registro-form .react-tel-input .flag-dropdown .country-list .country {
-  color: white;
+  color: var(--text-color);
 }
 
 .registro-form .react-tel-input .flag-dropdown .country-list .country.highlight,
@@ -476,18 +500,18 @@
 .registro-phone-input {
   width: 100% !important;
   height: 100% !important;
-  background-color: #000000 !important;
-  border: 1px solid white !important;
-  border-radius: 5px !important;
-  color: white !important;
-  font-family: "EB Garamond", serif !important;
+  background-color: var(--bg-color) !important;
+  border: var(--input-border) !important;
+  border-radius: var(--border-radius) !important;
+  color: var(--text-color) !important;
+  font-family: var(--font-primary) !important;
   font-size: 1.2rem !important;
   padding-left: 40px !important;
-  transition: all 0.3s ease !important;
+  transition: var(--transition) !important;
 }
 
 .registro-phone-dropdown {
-  background-color: #000000 !important;
+  background-color: var(--bg-color) !important;
   border: none !important;
   border-right: 1px solid white !important;
   transition: background-color 0.3s ease !important;
@@ -503,13 +527,12 @@
   position: relative;
   width: 100%;
   margin: 20px 0 10px;
-  grid-column: 1 / -1;
 }
 
 .registro-button {
   position: relative;
-  background: #ff4500;
-  color: white;
+  background: var(--accent-color);
+  color: var(--text-color);
   font-weight: bold;
   font-size: 1.1rem;
   border: none;
@@ -525,7 +548,7 @@
 }
 
 .registro-button:hover {
-  background: #e03e00;
+  background: var(--secondary-color);
 }
 
 /* Footer */
@@ -534,13 +557,12 @@
   font-size: 1rem;
   opacity: 0.8;
   text-align: center;
-  grid-column: 1 / -1;
-  color: #fff !important;
-  transition: all 0.3s ease;
+  color: var(--text-color) !important;
+  transition: var(--transition);
 }
 
 .registro-footer button {
-  color: #ffffff;
+  color: var(--text-color);
   text-decoration: none;
   font-weight: bold;
   background: none;
@@ -558,246 +580,22 @@
 .registro-back-button {
   background: none;
   border: none;
-  color: #ffffff;
+  color: var(--text-color);
   font-size: 1.4rem;
   cursor: pointer;
   position: absolute;
   top: 15px;
   left: 15px;
   z-index: 100;
-  grid-column: 1 / -1;
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
 .registro-back-button:hover {
   transform: translateX(-3px);
-  color: #ff4500;
+  color: var(--accent-color);
 }
 
-/* Media Queries */
-@media (min-width: 1600px) {
-  .registro-form {
-    max-width: 650px;
-    height: 60vh;
-  }
-  .cliente-form,
-  .agencia-form,
-  .acompanante-form {
-    max-width: 650px;
-    height: 60vh;
-  }
-  .registro-logo-container {
-    height: 200px;
-  }
-  .registro-logo-image {
-    max-width: 220px;
-  }
-  .registro-subtitle {
-    top: 220px;
-    font-size: 1.2rem;
-    width: 95%;
-    max-width: 550px;
-    opacity: 1;
-  }
-  .registro-account-container {
-    margin: 50px 0 15px;
-  }
-}
-
-@media (max-width: 768px) {
-  .registro-form {
-    max-width: 450px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    scrollbar-width: thin;
-    scrollbar-color: #ff4500 #000000;
-    height: 60vh;
-  }
-  .registro-form::-webkit-scrollbar {
-    width: 6px;
-  }
-  .registro-form::-webkit-scrollbar-track {
-    background: #000000;
-    border-radius: 10px;
-    margin: 3rem 0;
-  }
-  .registro-form::-webkit-scrollbar-thumb {
-    background-color: #ff4500;
-    border-radius: 10px;
-    border: 2px solid #000000;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  .registro-form:hover::-webkit-scrollbar-thumb {
-    opacity: 1;
-  }
-  .registro-form::-webkit-scrollbar-button {
-    display: none;
-  }
-  .cliente-form,
-  .agencia-form,
-  .acompanante-form {
-    max-width: 450px;
-    height: 60vh;
-    display: flex;
-    flex-direction: column;
-  }
-  .registro-input-row {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .registro-logo-container {
-    height: 150px;
-  }
-  .registro-logo-image {
-    max-width: 150px;
-  }
-  .registro-subtitle {
-    top: 160px;
-    font-size: 0.9rem;
-    width: 95%;
-    max-width: 360px;
-    opacity: 1;
-  }
-  .registro-account-container {
-    margin: 30px 0 10px;
-  }
-  .registro-button {
-    width: 95%;
-    font-size: 1.1rem;
-  }
-  .registro-input-box,
-  .registro-select-box,
-  .registro-phone-container,
-  .registro-account-container,
-  .registro-button-container,
-  .registro-footer,
-  .registro-logo-container,
-  .registro-input-email,
-  .registro-cliente-inputs {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-  .registro-cliente-inputs {
-    flex-direction: column;
-  }
-  .registro-toggle input + label {
-    padding: 10px 5px;
-    font-size: 0.85rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .registro-subtitle {
-    top: 150px;
-    font-size: 0.85rem;
-    width: 95%;
-    max-width: 340px;
-  }
-  .registro-account-container {
-    margin: 25px 0 10px;
-  }
-}
-
-@media (max-width: 480px) {
-  .registro-form {
-    max-width: 370px;
-    padding: 1.2rem;
-    border-width: 1px;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    scrollbar-width: thin;
-    scrollbar-color: #ff4500 #000000;
-    height: 60vh;
-  }
-  .registro-form::-webkit-scrollbar {
-    width: 6px;
-  }
-  .registro-form::-webkit-scrollbar-track {
-    background: #000000;
-    border-radius: 10px;
-    margin: 2.5rem 0;
-  }
-  .registro-form::-webkit-scrollbar-thumb {
-    background-color: #ff4500;
-    border-radius: 10px;
-    border: 2px solid #000000;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  .registro-form:hover::-webkit-scrollbar-thumb {
-    opacity: 1;
-  }
-  .registro-form::-webkit-scrollbar-button {
-    display: none;
-  }
-  .cliente-form,
-  .agencia-form,
-  .acompanante-form {
-    max-width: 370px;
-    height: 60vh;
-  }
-  .registro-logo-container {
-    height: 120px;
-  }
-  .registro-logo-image {
-    max-width: 120px;
-  }
-  .registro-subtitle {
-    top: 130px;
-    font-size: 0.85rem;
-    width: 95%;
-    max-width: 320px;
-    opacity: 1;
-  }
-  .registro-account-container {
-    margin: 15px 0 10px;
-  }
-  .registro-input-box {
-    height: 40px;
-    margin: 12px 0;
-  }
-  .registro-select-box,
-  .registro-phone-container {
-    margin: 12px 0;
-  }
-  .registro-input-email {
-    margin: 12px 0 15px;
-  }
-  .registro-cliente-inputs {
-    gap: 12px;
-  }
-  .registro-input-box input {
-    font-size: 1rem;
-    padding-left: 30px;
-  }
-  .registro-input-box .input-icon {
-    font-size: 1rem;
-  }
-  .registro-toggle {
-    flex-direction: column;
-    gap: 8px;
-  }
-  .registro-toggle input + label {
-    margin: 2px 0;
-    padding: 8px;
-  }
-}
-
-@media (max-width: 400px) {
-  .registro-subtitle {
-    top: 125px;
-    font-size: 0.8rem;
-    width: 95%;
-    max-width: 300px;
-  }
-  .registro-account-container {
-    margin: 10px 0 10px;
-  }
-}
+/* Mensajes de error y éxito */
 .error-message {
   color: #dc3545;
   background-color: rgba(220, 53, 69, 0.1);
@@ -814,7 +612,9 @@
   border-radius: 5px;
   margin-bottom: 15px;
   text-align: center;
-} /* Modal */
+}
+
+/* Modal */
 .registro-modal {
   position: fixed;
   top: 0;
@@ -829,14 +629,14 @@
 }
 
 .registro-modal-content {
-  background: #000000;
+  background: var(--bg-color);
   border: 2px solid white;
   border-radius: 15px;
   padding: 2rem;
   max-width: 400px;
   width: 90%;
   text-align: center;
-  color: white;
+  color: var(--text-color);
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -851,29 +651,200 @@
 }
 
 .registro-modal-button {
-  background: linear-gradient(to right, #ff4500, #ff8c00);
-  color: white;
+  background: linear-gradient(to right, var(--accent-color), #ff8c00);
+  color: var(--text-color);
   border: none;
   padding: 10px 20px;
   border-radius: 20px;
   cursor: pointer;
   font-weight: bold;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .registro-modal-button:hover {
-  background: linear-gradient(to right, #ff8c00, #ff4500);
+  background: linear-gradient(to right, #ff8c00, var(--accent-color));
   transform: translateY(-2px);
 }
 
-/* Ajustes para nuevos campos */
-.registro-input-box input[type="number"] {
-  -webkit-appearance: none;
-  -moz-appearance: textfield;
+/* Responsive styles */
+@media (min-width: 1600px) {
+  .registro-form, 
+  .cliente-form,
+  .agencia-form,
+  .acompanante-form {
+    max-width: 650px;
+    height: 60vh;
+  }
+  
+  .registro-logo-container {
+    height: 200px;
+  }
+  
+  .registro-logo-image {
+    max-width: 220px;
+  }
+  
+  .registro-subtitle {
+    top: 220px;
+    font-size: 1.2rem;
+    width: 95%;
+    max-width: 550px;
+  }
+  
+  .registro-account-container {
+    margin: 50px 0 15px;
+  }
 }
 
-.registro-input-box input[type="number"]::-webkit-inner-spin-button,
-.registro-input-box input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+@media (max-width: 768px) {
+  .registro-form {
+    max-width: 450px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+    height: 60vh;
+  }
+  
+  .cliente-form,
+  .agencia-form,
+  .acompanante-form {
+    max-width: 450px;
+    height: 60vh;
+  }
+  
+  .registro-input-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .registro-logo-container {
+    height: 150px;
+  }
+  
+  .registro-logo-image {
+    max-width: 150px;
+  }
+  
+  .registro-subtitle {
+    top: 160px;
+    font-size: 0.9rem;
+    width: 95%;
+    max-width: 360px;
+  }
+  
+  .registro-account-container {
+    margin: 30px 0 10px;
+  }
+  
+  .registro-button {
+    width: 95%;
+    font-size: 1.1rem;
+  }
+  
+  .registro-cliente-inputs {
+    flex-direction: column;
+  }
+  
+  .registro-toggle input + label {
+    padding: 10px 5px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .registro-subtitle {
+    top: 150px;
+    font-size: 0.85rem;
+    width: 95%;
+    max-width: 340px;
+  }
+  
+  .registro-account-container {
+    margin: 25px 0 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .registro-form {
+    max-width: 370px;
+    padding: 1.2rem;
+    border-width: 1px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+  
+  .cliente-form,
+  .agencia-form,
+  .acompanante-form {
+    max-width: 370px;
+  }
+  
+  .registro-logo-container {
+    height: 120px;
+  }
+  
+  .registro-logo-image {
+    max-width: 120px;
+  }
+  
+  .registro-subtitle {
+    top: 130px;
+    font-size: 0.85rem;
+    width: 95%;
+    max-width: 320px;
+  }
+  
+  .registro-account-container {
+    margin: 15px 0 10px;
+  }
+  
+  .registro-input-box {
+    height: 40px;
+    margin: 12px 0;
+  }
+  
+  .registro-select-box,
+  .registro-phone-container {
+    margin: 12px 0;
+  }
+  
+  .registro-input-email {
+    margin: 12px 0 15px;
+  }
+  
+  .registro-cliente-inputs {
+    gap: 12px;
+  }
+  
+  .registro-input-box input {
+    font-size: 1rem;
+    padding-left: 30px;
+  }
+  
+  .registro-input-box .input-icon {
+    font-size: 1rem;
+  }
+  
+  .registro-toggle {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .registro-toggle input + label {
+    margin: 2px 0;
+    padding: 8px;
+  }
+}
+
+@media (max-width: 400px) {
+  .registro-subtitle {
+    top: 125px;
+    font-size: 0.8rem;
+    width: 95%;
+    max-width: 300px;
+  }
+  
+  .registro-account-container {
+    margin: 10px 0 10px;
+  }
 }

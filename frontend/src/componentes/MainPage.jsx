@@ -12,7 +12,7 @@ import logoImage from "../assets/logo png.png";
 import '../estilos/Header.css';
 import Header from './Header';
 
-const MainPage = ({ setMenu }) => {
+const MainPage = ({ setMenu, userLoggedIn, handleLogout }) => {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showAgeModal, setShowAgeModal] = useState(true);
 
@@ -144,7 +144,7 @@ const MainPage = ({ setMenu }) => {
         </div>
       )}
 
-      <Header onNavigate={setMenu} />
+      <Header onNavigate={setMenu} userLoggedIn={userLoggedIn} handleLogout={handleLogout} />
 
       <section className="hero-section" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.6)), url(${heroImage})` }}>
         <div className="hero-overlay"></div>

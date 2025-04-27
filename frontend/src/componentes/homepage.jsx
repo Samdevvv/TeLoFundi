@@ -63,7 +63,7 @@ const users = [
   },
 ];
 
-const HomePage = (props) => {
+const HomePage = ({ setMenu, userLoggedIn, handleLogout }) => {
   // Estado para controlar la visibilidad del modal de filtros
   const [showFiltersModal, setShowFiltersModal] = useState(false);
 
@@ -79,7 +79,7 @@ const HomePage = (props) => {
 
   return (
     <div className="page-container">
-      <Header />
+      <Header onNavigate={setMenu} userLoggedIn={userLoggedIn} handleLogout={handleLogout} />
 
       <main className="main-content">
         <div className="search-container">

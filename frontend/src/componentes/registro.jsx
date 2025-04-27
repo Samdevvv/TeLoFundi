@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FaUser,
   FaLock,
@@ -19,29 +19,32 @@ import countryList from "react-select-country-list";
 import "../estilos/registr.css";
 import loginImage from "../assets/logo png.png";
 
-const Registro = (props) => {
-  // Estados para los campos del formulario
-  const [email, setEmail] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [nombreAgencia, setNombreAgencia] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [pais, setPais] = useState(null);
-  const [ciudad, setCiudad] = useState("");
-  const [phone, setPhone] = useState("");
-  const [genero, setGenero] = useState(null);
-  const [edad, setEdad] = useState("");
-  const [password, setPassword] = useState("");
-  const [userType, setUserType] = useState("acompanante");
-  const [formVisible, setFormVisible] = useState(true);
-  const [error, setError] = useState(null);
+const Registro = ({ setMenu }) => {
+  // Definimos el formulario como un único objeto para reducir re-renders
+  const [formData, setFormData] = useState({
+    email: "",
+    nickname: "",
+    nombre: "",
+    nombreAgencia: "",
+    descripcion: "",
+    direccion: "",
+    pais: null,
+    ciudad: "",
+    phone: "",
+    genero: null,
+    edad: "",
+    password: "",
+    userType: "acompanante",
+  });
+
+  // Manejo de UI
   const [loading, setLoading] = useState(false);
-
-  // Opciones para el select de países
-  const [countries, setCountries] = useState([]);
-
-  // Opciones para el select de género
+  const [error, setError] = useState(null);
+  
+  // Memoizar las opciones de país para no recrearlas en cada render
+  const countries = useMemo(() => countryList().getData(), []);
+  
+  // Opciones de género - no dependen del estado, las definimos fuera del componente
   const genderOptions = [
     { value: "masculino", label: "Masculino" },
     { value: "femenino", label: "Femenino" },
@@ -49,69 +52,94 @@ const Registro = (props) => {
     { value: "prefiero_no_decir", label: "Prefiero no decir" },
   ];
 
-  // Efecto inicial
+  // Efecto para crear partículas de fuego - solo se ejecuta una vez
   useEffect(() => {
-    const options = countryList().getData();
-    setCountries(options);
-
     const fireContainer = document.getElementById("registro-fire-particles");
     if (fireContainer) {
-      fireContainer.innerHTML = "";
-      createParticles(fireContainer, 40, 25);
+      createParticles(fireContainer, 25, 15); // Reducido el número de partículas
     }
   }, []);
 
   const createParticles = (container, num, leftSpacing) => {
+    container.innerHTML = ""; // Limpia el contenedor
     for (let i = 0; i < num; i += 1) {
-      let particle = document.createElement("div");
+      const particle = document.createElement("div");
       particle.style.left = `calc((100%) * ${i / leftSpacing})`;
       particle.setAttribute("class", "registro-particle");
-      particle.style.animationDelay = 3 * Math.random() + 0.5 + "s";
-      particle.style.animationDuration = 3 * Math.random() + 2 + "s";
+      // Optimizamos la duración y retraso de animación para mejor rendimiento
+      particle.style.animationDelay = (2 * Math.random() + 0.5) + "s";
+      particle.style.animationDuration = (2 * Math.random() + 2) + "s";
       container.appendChild(particle);
     }
   };
 
-  const handleRadioChange = (e) => {
-    setFormVisible(false);
-    setTimeout(() => {
-      setUserType(e.target.value);
-      if (e.target.value === "cliente") {
-        setNombre("");
-        setNombreAgencia("");
-        setPais(null);
-        setCiudad("");
-        setPhone("");
-        setGenero(null);
-        setEdad("");
-        setDescripcion("");
-        setDireccion("");
-      } else if (e.target.value === "acompanante") {
-        setNickname("");
-        setNombreAgencia("");
-        setDescripcion("");
-        setDireccion("");
-      } else if (e.target.value === "agencia") {
-        setNickname("");
-        setNombre("");
-        setPhone("");
-        setGenero(null);
-        setEdad("");
-      }
-      setTimeout(() => setFormVisible(true), 50);
-    }, 300);
+  // Manejador unificado para cambios en inputs simples
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Manejador específico para cambio de tipo de usuario
+  const handleUserTypeChange = (e) => {
+    const newUserType = e.target.value;
+    
+    // Reseteamos los campos específicos según el tipo de usuario
+    let updatedFormData = { ...formData, userType: newUserType };
+    
+    if (newUserType === "cliente") {
+      updatedFormData = {
+        ...updatedFormData,
+        nombre: "",
+        nombreAgencia: "",
+        pais: null,
+        ciudad: "",
+        phone: "",
+        genero: null,
+        edad: "",
+        descripcion: "",
+        direccion: "",
+      };
+    } else if (newUserType === "acompanante") {
+      updatedFormData = {
+        ...updatedFormData,
+        nickname: "",
+        nombreAgencia: "",
+        descripcion: "",
+        direccion: "",
+      };
+    } else if (newUserType === "agencia") {
+      updatedFormData = {
+        ...updatedFormData,
+        nickname: "",
+        nombre: "",
+        phone: "",
+        genero: null,
+        edad: "",
+      };
+    }
+    
+    setFormData(updatedFormData);
+  };
+
+  // Valida el formulario y retorna error si existe
   const validateForm = () => {
-    // Validación más estricta para email
+    const { 
+      email, password, userType, nombre, genero, edad,
+      nombreAgencia, descripcion, ciudad, pais, direccion 
+    } = formData;
+    
+    // Validación de email
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!email || !emailRegex.test(email.trim())) {
       return "Por favor, ingrese un correo electrónico válido (ejemplo: user@domain.com).";
     }
+    
+    // Validación de contraseña
     if (!password || password.trim().length < 6) {
       return "La contraseña debe tener al menos 6 caracteres.";
     }
 
+    // Validaciones específicas por tipo de usuario
     if (userType === "acompanante") {
       if (!nombre || !nombre.trim())
         return "El nombre de perfil es obligatorio.";
@@ -133,12 +161,13 @@ const Registro = (props) => {
     return null;
   };
 
+  // Maneja el envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    // Validaciones en el frontend
+    // Validaciones
     const validationError = validateForm();
     if (validationError) {
       setError({
@@ -150,135 +179,102 @@ const Registro = (props) => {
     }
 
     try {
-      if (userType === "cliente") {
-        const payload = {
-          Email: email.trim(),
-          Password: password.trim(),
-          Nickname: nickname ? nickname.trim() : undefined,
-        };
-        console.log("Enviando payload:", payload);
-        const response = await fetch(
-          "https://localhost:7134/api/clientes/registro",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
+      // Preparamos el payload para la API según el tipo de usuario
+      const preparePayload = () => {
+        const { 
+          email, password, userType, nombre, genero, edad,
+          ciudad, pais, phone, nickname, nombreAgencia, descripcion, direccion 
+        } = formData;
+        
+        if (userType === "cliente") {
+          return {
+            Email: email.trim(),
+            Password: password.trim(),
+            Nickname: nickname ? nickname.trim() : undefined,
+          };
+        } else if (userType === "acompanante") {
+          return {
+            Email: email.trim(),
+            Password: password.trim(),
+            NombrePerfil: nombre.trim(),
+            Genero: genero?.value,
+            Edad: parseInt(edad),
+            Ciudad: ciudad ? ciudad.trim() : undefined,
+            Pais: pais?.label,
+            WhatsApp: phone ? phone.trim() : undefined,
+          };
+        } else if (userType === "agencia") {
+          return {
+            Nombre: nombreAgencia.trim(),
+            Email: email.trim(),
+            Password: password.trim(),
+            Descripcion: descripcion.trim(),
+            Ciudad: ciudad.trim(),
+            Pais: pais?.label,
+            Direccion: direccion.trim(),
+          };
+        }
+      };
+      
+      const payload = preparePayload();
+      console.log("Enviando payload:", payload);
+      
+      // Definimos la URL según el tipo de usuario
+      const getUrl = () => {
+        switch (formData.userType) {
+          case "cliente": return "https://localhost:7134/api/clientes/registro";
+          case "acompanante": return "https://localhost:7134/api/Acompanantes/registro";
+          case "agencia": return "https://localhost:7134/api/Agencia/solicitar-registro";
+          default: return "";
+        }
+      };
+      
+      const url = getUrl();
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.log("Respuesta de error:", errorData);
-          if (response.status === 400) {
-            throw new Error(
-              errorData.Detail ||
-                "Datos de registro inválidos. Verifica que el correo sea válido y la contraseña tenga al menos 6 caracteres."
-            );
-          } else if (response.status === 409) {
-            throw new Error(
-              errorData.Detail || "El correo electrónico ya está registrado."
-            );
-          } else if (response.status === 500) {
-            throw new Error(
-              errorData.Detail ||
-                "Error interno del servidor. Por favor, intenta de nuevo más tarde."
-            );
-          }
+      // Manejo de respuestas de error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log("Respuesta de error:", errorData);
+        
+        // Mensajes de error personalizados según status y tipo de usuario
+        if (response.status === 400) {
           throw new Error(
-            `Error al registrar cliente (Código: ${response.status})`
+            errorData.Detail || errorData.Message || errorData.mensaje ||
+            "Datos de registro inválidos. Verifique los campos obligatorios."
+          );
+        } else if (response.status === 409) {
+          throw new Error("El correo electrónico ya está registrado.");
+        } else if (response.status === 500) {
+          throw new Error(
+            "Error interno del servidor. Por favor, intenta de nuevo más tarde."
           );
         }
+        throw new Error(
+          `Error al registrar (Código: ${response.status})`
+        );
+      }
 
-        const data = await response.json();
+      // Manejo de éxito
+      const data = await response.json();
+      
+      // Mensajes de éxito según tipo de usuario
+      if (formData.userType === "cliente") {
         setError({
           title: "Registro Exitoso",
           message: `Cliente registrado con éxito. ID: ${data.Id}. Por favor, inicia sesión.`,
         });
-      } else if (userType === "acompanante") {
-        const payload = {
-          Email: email.trim(),
-          Password: password.trim(),
-          NombrePerfil: nombre.trim(),
-          Genero: genero?.value,
-          Edad: parseInt(edad),
-          Ciudad: ciudad ? ciudad.trim() : undefined,
-          Pais: pais?.label,
-          WhatsApp: phone ? phone.trim() : undefined,
-        };
-        console.log("Enviando payload:", payload);
-        const response = await fetch(
-          "https://localhost:7134/api/Acompanantes/registro",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.log("Respuesta de error:", errorData);
-          if (response.status === 400) {
-            throw new Error(
-              errorData.Message ||
-                "Datos de registro inválidos. Verifica los campos obligatorios (correo, contraseña, nombre de perfil, género, edad)."
-            );
-          } else if (response.status === 500) {
-            throw new Error(
-              errorData.Message ||
-                "Error interno del servidor. Por favor, intenta de nuevo más tarde."
-            );
-          }
-          throw new Error(
-            `Error al registrar acompañante (Código: ${response.status})`
-          );
-        }
-
-        const data = await response.json();
+      } else if (formData.userType === "acompanante") {
         setError({
           title: "Registro Exitoso",
           message: `Acompañante registrado con éxito. ID: ${data.AcompananteId}. Por favor, inicia sesión.`,
         });
-      } else if (userType === "agencia") {
-        const payload = {
-          Nombre: nombreAgencia.trim(),
-          Email: email.trim(),
-          Password: password.trim(),
-          Descripcion: descripcion.trim(),
-          Ciudad: ciudad.trim(),
-          Pais: pais?.label,
-          Direccion: direccion.trim(),
-        };
-        console.log("Enviando payload:", payload);
-        const response = await fetch(
-          "https://localhost:7134/api/Agencia/solicitar-registro",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.log("Respuesta de error:", errorData);
-          if (response.status === 400) {
-            throw new Error(
-              errorData.mensaje ||
-                "Datos de solicitud inválidos. Verifica los campos obligatorios (nombre, correo, contraseña, descripción, ciudad, país, dirección)."
-            );
-          } else if (response.status === 500) {
-            throw new Error(
-              errorData.mensaje ||
-                "Error interno del servidor. Por favor, intenta de nuevo más tarde."
-            );
-          }
-          throw new Error(
-            `Error al enviar solicitud de agencia (Código: ${response.status})`
-          );
-        }
-
-        const data = await response.json();
+      } else if (formData.userType === "agencia") {
         setError({
           title: "Solicitud Enviada",
           message: `Tu solicitud ha sido enviada con ID: ${data.solicitudId}. Está en proceso de revisión. Te notificaremos por email cuando haya sido procesada.`,
@@ -288,12 +284,12 @@ const Registro = (props) => {
       let errorMessage = err.message;
       if (err.message.includes("Failed to fetch")) {
         errorMessage =
-          "No se pudo conectar con el servidor. Verifica que el backend esté corriendo en https://localhost:7134 y que CORS esté configurado para permitir solicitudes desde tu frontend (por ejemplo, http://localhost:3000).";
+          "No se pudo conectar con el servidor. Verifica que el backend esté corriendo.";
       }
       setError({
         title: "Error de Registro",
         message: errorMessage,
-        retry: !errorMessage.includes("ya está registrado"), // No reintentar si es un error de duplicado
+        retry: !errorMessage.includes("ya está registrado"),
       });
     } finally {
       setLoading(false);
@@ -302,7 +298,7 @@ const Registro = (props) => {
 
   const closeModal = () => {
     if (!error?.title.includes("Error")) {
-      props.setMenu(userType === "agencia" ? "mainpage" : "login");
+      setMenu(formData.userType === "agencia" ? "mainpage" : "login");
     }
     setError(null);
   };
@@ -311,26 +307,28 @@ const Registro = (props) => {
     handleSubmit({ preventDefault: () => {} });
   };
 
+  // Renderizado optimizado con secciones condicionales
   return (
-    <div className="login-right">
+    <div className="registro-container">
       <form
-        className={`registro-form ${userType}-form`}
+        className={`registro-form ${formData.userType}-form`}
         onSubmit={handleSubmit}
       >
         <button
           className="registro-back-button"
-          onClick={() => props.setMenu("mainpage")}
+          onClick={() => setMenu("mainpage")}
           type="button"
+          aria-label="Volver"
         >
           <FaArrowLeft size={20} />
         </button>
 
-        <div className="registro-logo-container">
-          <img src={loginImage} alt="Logo" className="registro-logo-image" />
+        <div className="registro-header">
+          <div className="registro-logo-container">
+            <img src={loginImage} alt="Logo" className="registro-logo-image" />
+          </div>
+          <p className="registro-subtitle">Ingresa tus datos para registrarte</p>
         </div>
-
-        <h2 className="registro-title">Crea tu cuenta</h2>
-        <p className="registro-subtitle">Ingresa tus datos para registrarte</p>
 
         <div className="registro-account-container">
           <label className="registro-account-label">Tipo de cuenta:</label>
@@ -340,8 +338,8 @@ const Registro = (props) => {
               name="userType"
               value="cliente"
               id="sizeCliente"
-              checked={userType === "cliente"}
-              onChange={handleRadioChange}
+              checked={formData.userType === "cliente"}
+              onChange={handleUserTypeChange}
             />
             <label htmlFor="sizeCliente">Cliente</label>
 
@@ -350,8 +348,8 @@ const Registro = (props) => {
               name="userType"
               value="acompanante"
               id="sizeAcompanante"
-              checked={userType === "acompanante"}
-              onChange={handleRadioChange}
+              checked={formData.userType === "acompanante"}
+              onChange={handleUserTypeChange}
             />
             <label htmlFor="sizeAcompanante">Acompañante</label>
 
@@ -360,72 +358,66 @@ const Registro = (props) => {
               name="userType"
               value="agencia"
               id="sizeAgencia"
-              checked={userType === "agencia"}
-              onChange={handleRadioChange}
+              checked={formData.userType === "agencia"}
+              onChange={handleUserTypeChange}
             />
             <label htmlFor="sizeAgencia">Agencia</label>
           </div>
         </div>
 
-        <div
-          className={`registro-fields-container ${
-            formVisible ? "visible" : "hidden"
-          }`}
-        >
-          {/* Email */}
+        <div className="registro-fields-container">
+          {/* Email - Común para todos */}
           <div className="registro-input-box">
             <input
               type="email"
+              name="email"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={`form-control ${email ? "filled" : ""}`}
+              value={formData.email}
+              onChange={handleInputChange}
+              className={`form-control ${formData.email ? "filled" : ""}`}
             />
             <label>Correo Electrónico:</label>
             <FaEnvelope className="input-icon" aria-hidden="true" />
           </div>
 
-          {userType === "cliente" && (
-            <>
-              {/* Nickname */}
-              <div className="registro-input-box">
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  className={`form-control ${nickname ? "filled" : ""}`}
-                />
-                <label>Apodo:</label>
-                <FaUser className="input-icon" aria-hidden="true" />
-              </div>
-            </>
+          {/* Campos específicos para CLIENTE */}
+          {formData.userType === "cliente" && (
+            <div className="registro-input-box">
+              <input
+                type="text"
+                name="nickname"
+                value={formData.nickname}
+                onChange={handleInputChange}
+                className={`form-control ${formData.nickname ? "filled" : ""}`}
+              />
+              <label>Apodo:</label>
+              <FaUser className="input-icon" aria-hidden="true" />
+            </div>
           )}
 
-          {userType !== "cliente" && (
+          {/* Campos específicos para ACOMPAÑANTE y AGENCIA */}
+          {formData.userType !== "cliente" && (
             <>
-              {/* Nombre o NombreAgencia */}
+              {/* Nombre o Nombre Agencia */}
               <div className="registro-input-box">
                 <input
                   type="text"
+                  name={formData.userType === "acompanante" ? "nombre" : "nombreAgencia"}
                   required
-                  value={userType === "acompanante" ? nombre : nombreAgencia}
-                  onChange={(e) =>
-                    userType === "acompanante"
-                      ? setNombre(e.target.value)
-                      : setNombreAgencia(e.target.value)
-                  }
+                  value={formData.userType === "acompanante" ? formData.nombre : formData.nombreAgencia}
+                  onChange={handleInputChange}
                   className={`form-control ${
-                    (userType === "acompanante" ? nombre : nombreAgencia)
+                    (formData.userType === "acompanante" ? formData.nombre : formData.nombreAgencia)
                       ? "filled"
                       : ""
                   }`}
                 />
                 <label>
-                  {userType === "acompanante"
+                  {formData.userType === "acompanante"
                     ? "Nombre de Perfil:"
                     : "Nombre de la Agencia:"}
                 </label>
-                {userType === "acompanante" ? (
+                {formData.userType === "acompanante" ? (
                   <FaUser className="input-icon" aria-hidden="true" />
                 ) : (
                   <FaBuilding className="input-icon" aria-hidden="true" />
@@ -437,8 +429,10 @@ const Registro = (props) => {
                 <label className="registro-select-label">País:</label>
                 <FaGlobe className="registro-select-icon" aria-hidden="true" />
                 <Select
-                  value={pais}
-                  onChange={setPais}
+                  value={formData.pais}
+                  onChange={(selected) => 
+                    setFormData(prev => ({ ...prev, pais: selected }))
+                  }
                   options={countries}
                   placeholder="Seleccione su país"
                   className="registro-custom-select"
@@ -452,30 +446,32 @@ const Registro = (props) => {
               <div className="registro-input-box">
                 <input
                   type="text"
-                  required={userType === "agencia"}
-                  value={ciudad}
-                  onChange={(e) => setCiudad(e.target.value)}
-                  className={`form-control ${ciudad ? "filled" : ""}`}
+                  name="ciudad"
+                  required={formData.userType === "agencia"}
+                  value={formData.ciudad}
+                  onChange={handleInputChange}
+                  className={`form-control ${formData.ciudad ? "filled" : ""}`}
                 />
                 <label>Ciudad:</label>
                 <FaCity className="input-icon" aria-hidden="true" />
               </div>
 
-              {userType === "acompanante" && (
+              {/* Campos específicos para ACOMPAÑANTE */}
+              {formData.userType === "acompanante" && (
                 <>
                   {/* Teléfono */}
                   <div className="registro-phone-container">
-                    <label className="registro-phone-label">
-                      Número de teléfono:
-                    </label>
+                    <label className="registro-phone-label">Número de teléfono:</label>
                     <FaPhoneAlt
                       className="registro-phone-icon"
                       aria-hidden="true"
                     />
                     <PhoneInput
                       country={"es"}
-                      value={phone}
-                      onChange={setPhone}
+                      value={formData.phone}
+                      onChange={(value) => 
+                        setFormData(prev => ({ ...prev, phone: value }))
+                      }
                       inputClass="registro-phone-input"
                       containerClass="registro-phone-wrapper"
                       buttonClass="registro-phone-dropdown"
@@ -491,8 +487,10 @@ const Registro = (props) => {
                       aria-hidden="true"
                     />
                     <Select
-                      value={genero}
-                      onChange={setGenero}
+                      value={formData.genero}
+                      onChange={(selected) => 
+                        setFormData(prev => ({ ...prev, genero: selected }))
+                      }
                       options={genderOptions}
                       placeholder="Seleccione su género"
                       className="registro-custom-select"
@@ -508,10 +506,11 @@ const Registro = (props) => {
                   <div className="registro-input-box">
                     <input
                       type="number"
+                      name="edad"
                       required
-                      value={edad}
-                      onChange={(e) => setEdad(e.target.value)}
-                      className={`form-control ${edad ? "filled" : ""}`}
+                      value={formData.edad}
+                      onChange={handleInputChange}
+                      className={`form-control ${formData.edad ? "filled" : ""}`}
                       min="18"
                       max="99"
                     />
@@ -521,16 +520,18 @@ const Registro = (props) => {
                 </>
               )}
 
-              {userType === "agencia" && (
+              {/* Campos específicos para AGENCIA */}
+              {formData.userType === "agencia" && (
                 <>
                   {/* Descripción */}
                   <div className="registro-input-box">
                     <input
                       type="text"
+                      name="descripcion"
                       required
-                      value={descripcion}
-                      onChange={(e) => setDescripcion(e.target.value)}
-                      className={`form-control ${descripcion ? "filled" : ""}`}
+                      value={formData.descripcion}
+                      onChange={handleInputChange}
+                      className={`form-control ${formData.descripcion ? "filled" : ""}`}
                     />
                     <label>Descripción:</label>
                     <FaInfoCircle className="input-icon" aria-hidden="true" />
@@ -540,10 +541,11 @@ const Registro = (props) => {
                   <div className="registro-input-box">
                     <input
                       type="text"
+                      name="direccion"
                       required
-                      value={direccion}
-                      onChange={(e) => setDireccion(e.target.value)}
-                      className={`form-control ${direccion ? "filled" : ""}`}
+                      value={formData.direccion}
+                      onChange={handleInputChange}
+                      className={`form-control ${formData.direccion ? "filled" : ""}`}
                     />
                     <label>Dirección:</label>
                     <FaMapMarkerAlt className="input-icon" aria-hidden="true" />
@@ -553,14 +555,15 @@ const Registro = (props) => {
             </>
           )}
 
-          {/* Password */}
+          {/* Password - Común para todos */}
           <div className="registro-input-box">
             <input
               type="password"
+              name="password"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`form-control ${password ? "filled" : ""}`}
+              value={formData.password}
+              onChange={handleInputChange}
+              className={`form-control ${formData.password ? "filled" : ""}`}
             />
             <label>Contraseña:</label>
             <FaLock className="input-icon" aria-hidden="true" />
@@ -580,7 +583,7 @@ const Registro = (props) => {
 
           <div className="registro-footer">
             ¿Ya tienes cuenta?
-            <button type="button" onClick={() => props.setMenu("login")}>
+            <button type="button" onClick={() => setMenu("login")}>
               Inicia Sesión
             </button>
           </div>

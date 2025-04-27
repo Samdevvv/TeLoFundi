@@ -1,13 +1,24 @@
 import React from 'react';
-import { FaSearch, FaUser } from 'react-icons/fa';
+import { FaUser, FaSignOutAlt } from 'react-icons/fa';
 import '../estilos/Header.css';
-import loginImage from '../assets/logo png.png'; // Asegúrate de que la ruta sea correcta
+import loginImage from '../assets/logo png.png';
 
-const Header = ({ onNavigate, userLoggedIn = false }) => {
-  // Esta función manejaría la navegación entre páginas
+const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
   const handleNavigation = (page) => {
     if (onNavigate) {
       onNavigate(page);
+    }
+  };
+
+  const handleProfileNavigation = () => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const tipoUsuario = user.tipoUsuario || "cliente";
+    if (tipoUsuario === "cliente") {
+      handleNavigation("perfilCliente");
+    } else if (tipoUsuario === "agencia") {
+      handleNavigation("perfilAgencia");
+    } else if (tipoUsuario === "acompanante") {
+      handleNavigation("perfilAcompanante");
     }
   };
 
@@ -25,7 +36,7 @@ const Header = ({ onNavigate, userLoggedIn = false }) => {
                 href="#" 
                 onClick={(e) => {
                   e.preventDefault();
-                  handleNavigation('home');
+                  handleNavigation('mainpage');
                 }}
               >
                 Inicio
@@ -36,10 +47,10 @@ const Header = ({ onNavigate, userLoggedIn = false }) => {
                 href="#" 
                 onClick={(e) => {
                   e.preventDefault();
-                  handleNavigation('acompanantes');
+                  handleNavigation('homepage');
                 }}
               >
-                Acompañantes
+                Explorar
               </a>
             </li>
             <li>
@@ -69,16 +80,21 @@ const Header = ({ onNavigate, userLoggedIn = false }) => {
         
         <div className="auth-buttons">
           {userLoggedIn ? (
-            <div className="user-profile-icon">
-              <a 
-                href="#" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigation('profile');
-                }}
+            <div className="user-profile-actions">
+              <button 
+                className="profile-button"
+                onClick={handleProfileNavigation}
+                title="Ver Perfil"
               >
                 <FaUser size={20} />
-              </a>
+              </button>
+              <button 
+                className="logout-button"
+                onClick={handleLogout}
+                title="Cerrar Sesión"
+              >
+                <FaSignOutAlt size={20} />
+              </button>
             </div>
           ) : (
             <>
