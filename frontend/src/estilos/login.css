@@ -57,7 +57,7 @@ body {
 /* Columna izquierda con logo y fondo de color */
 .login-left {
   width: 45%;
-  background: #962614; 
+  background: hsl(8, 98%, 23%); 
    padding: 3rem 1.5rem;
   display: flex;
   flex-direction: column;
@@ -122,7 +122,7 @@ body {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: white;
+  background: rgb(245, 33, 33);
 }
 
 .shape-2 {
@@ -337,7 +337,7 @@ body {
 
 .registro-button {
   position: relative;
-  background:#962614;;
+  background:#c13722;;
   color: white;
   font-weight: 600;
   font-size: 0.95rem;
@@ -1015,4 +1015,401 @@ body {
   .input-box input, .login-right-form button {
     -webkit-tap-highlight-color: transparent; /* Eliminar highlight al tocar */
   }
+}/* Modificar el tamaño de la card principal */
+.login-form {
+  display: flex;
+  max-width: 700px; /* Reducido de 800px */
+  width: 100%;
+  pointer-events: auto;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.4s ease;
+}
+
+/* Reducir el logo */
+.login-title-image {
+  width: 250px; /* Reducido de 320px */
+  height: 250px; /* Reducido de 320px */
+  max-width: 100%;
+  max-height: none;
+  object-fit: contain;
+  margin-bottom: 0.5rem; /* Reducido de 1rem */
+  animation: logoFloat 6s ease-in-out infinite;
+}
+
+/* Reducir padding en ambas columnas */
+.login-left {
+  width: 45%;
+  background: hsl(8, 98%, 23%);
+  padding: 2rem 1.2rem; /* Reducido de 3rem 1.5rem */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-right-form {
+  width: 55%;
+  background: #121212;
+  padding: 2rem 1.5rem; /* Reducido de 3rem 2rem */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Reducir espaciado entre elementos */
+.form-title {
+  margin-bottom: 1.5rem; /* Reducido de 2rem */
+  color: #ffffff;
+}
+
+.input-box {
+  position: relative;
+  width: 100%;
+  height: 45px; /* Reducido de 50px */
+  margin: 14px 0; /* Reducido de 16px */
+}
+
+/* Ajustar el texto de bienvenida */
+.login-welcome h2 {
+  font-size: 1.6rem; /* Reducido de 1.8rem */
+  margin-bottom: 0.7rem; /* Reducido de 1rem */
+  font-weight: 600;
+}
+
+.login-welcome p {
+  font-size: 0.9rem; /* Reducido de 0.95rem */
+  opacity: 0.95;
+  line-height: 1.5; /* Reducido de 1.6 */
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+/* Ajustar tamaño del texto del formulario */
+.form-title h2 {
+  font-size: 1.6rem; /* Reducido de 1.8rem */
+  margin-bottom: 0.3rem; /* Reducido de 0.5rem */
+  font-weight: 600;
+}
+
+.form-title p {
+  color: #aaaaaa;
+  font-size: 0.85rem; /* Reducido de 0.9rem */
+}
+
+/* Reducir inputs */
+.input-box input {
+  padding-left: 38px; /* Reducido de 40px */
+  font-size: 0.9rem; /* Reducido de 0.95rem */
+  border-radius: 10px; /* Reducido de 12px */
+}
+
+.input-box label {
+  font-size: 0.85rem; /* Reducido de 0.9rem */
+  left: 38px; /* Reducido de 40px */
+}
+
+/* Ajustar botón de Google */
+.google-button-container {
+  margin: 8px 0 12px; /* Reducido de 10px 0 15px */
+}
+
+.google-button {
+  padding: 10px 0; /* Reducido de 12px 0 */
+  font-size: 0.9rem; /* Reducido de 0.95rem */
+  border-radius: 10px; /* Reducido de 12px */
+}
+
+.or-divider {
+  margin: 15px 0; /* Reducido de 20px 0 */
+  font-size: 0.75rem; /* Reducido de 0.8rem */
+}
+
+/* Ajustar otros elementos */
+.remember-me {
+  margin-top: 3px; /* Reducido de 5px */
+  margin-bottom: 12px; /* Reducido de 15px */
+}
+
+.remember-me label {
+  font-size: 0.75rem; /* Reducido de 0.8rem */
+}
+
+.forgot-password button {
+  font-size: 0.75rem; /* Reducido de 0.8rem */
+}
+
+.registro-button {
+  padding: 10px 0; /* Reducido de 12px 0 */
+  font-size: 0.9rem; /* Reducido de 0.95rem */
+  border-radius: 10px; /* Reducido de 12px */
+}
+
+.login-footer {
+  margin-top: 1.2rem; /* Reducido de 1.5rem */
+  font-size: 0.85rem; /* Reducido de 0.9rem */
+}
+
+/* Reducir tamaño de los elementos decorativos */
+.shape-1 {
+  width: 70px; /* Reducido de 80px */
+  height: 70px; /* Reducido de 80px */
+}
+
+.shape-2 {
+  width: 120px; /* Reducido de 150px */
+  height: 120px; /* Reducido de 150px */
+}
+
+.shape-3 {
+  width: 35px; /* Reducido de 40px */
+  height: 35px; /* Reducido de 40px */
+}
+
+/* Ajustes responsivos adicionales para la versión más compacta */
+@media (min-width: 1600px) {
+  .login-form {
+    max-width: 800px; /* Reducido de 900px */
+  }
+  .login-title-image {
+    max-width: 280px; /* Reducido de 350px */
+  }
+}
+
+@media (max-width: 1024px) {
+  .login-form {
+    max-width: 650px; /* Reducido de 700px */
+  }
+  .login-title-image {
+    width: 220px; /* Reducido de 300px */
+    height: 220px; /* Reducido de 300px */
+  }
+}
+
+@media (max-width: 768px) {
+  .login-form {
+    max-width: 420px; /* Reducido de 450px */
+  }
+  .login-title-image {
+    width: 170px; /* Reducido de 200px */
+    height: 170px; /* Reducido de 200px */
+  }
+  .login-left, .login-right-form {
+    padding: 1.2rem; /* Reducido de 1.5rem */
+  }
+}
+
+@media (max-width: 576px) {
+  .login-title-image {
+    width: 140px; /* Reducido de 150px */
+    height: 140px; /* Reducido de 150px */
+  }
+  .login-left {
+    padding: 0.8rem 0.6rem; /* Reducido de 1rem 0.75rem */
+  }
+  .login-right-form {
+    padding: 0.8rem 0.6rem; /* Reducido de 1rem 0.75rem */
+  }
+}
+
+@media (max-width: 380px) {
+  .login-title-image {
+    width: 110px; /* Reducido de 130px */
+    height: 110px; /* Reducido de 130px */
+  }
+}
+
+/* Ajuste al botón de Google para hacerlo más ancho */
+.google-button-container {
+  width: 100%;
+  margin: 8px 0 12px; /* Mantenemos el margen reducido */
+  position: relative;
+  display: flex; /* Añadimos para asegurar alineación correcta */
+  justify-content: center; /* Centramos el botón */
+}
+
+.google-button {
+  position: relative;
+  width: 100%; /* Aseguramos que tome el 100% del ancho disponible */
+  padding: 10px 0; /* Mantenemos el padding vertical reducido */
+  background: #121212;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  max-width: none; /* Eliminamos cualquier max-width que pudiera existir */
+  min-width: 100%; /* Forzamos ancho mínimo del 100% */
+}
+
+/* Aseguramos que el contenedor del botón ocupe todo el ancho disponible */
+.login-right-form .google-button-container {
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Mejorar la apariencia del botón en pantallas más pequeñas */
+@media (max-width: 576px) {
+  .google-button {
+    width: 100%;
+    min-width: 100%;
+    /* Mantenemos padding vertical pero extendemos horizontal para ocupar más espacio */
+    padding: 9px 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .google-button {
+    width: 100%;
+    min-width: 100%;
+    /* Ajustamos para pantallas muy pequeñas */
+    padding: 8px 0;
+  }
+}/* Asegurarse de que el modal siempre esté por encima de todo */
+#modal-root {
+  position: relative;
+  z-index: 9999;
+}
+
+/* Contenedor principal completamente transparente */
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent; /* Fondo completamente transparente */
+  backdrop-filter: none; /* Sin efecto blur */
+  -webkit-backdrop-filter: none; /* Sin efecto blur para Safari */
+  pointer-events: auto; /* Captura eventos */
+}
+
+/* Eliminamos la animación del fondo ya que ahora es transparente */
+/* Aseguramos que el login-container capture eventos solo cuando se hace clic en él,
+   pero deja pasar los eventos a través de las áreas vacías */
+.login-container {
+  pointer-events: none; /* No captura eventos por defecto */
+}
+
+.login-right {
+  pointer-events: auto; /* Pero el contenido del modal sí captura eventos */
+}
+
+/* Mejoramos el contraste y la visibilidad del modal */
+.login-form {
+  animation: modalEnter 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  z-index: 1001;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4); /* Sombra más pronunciada */
+  border-radius: 20px;
+  overflow: hidden;
+  max-width: 800px;
+  width: 100%;
+  display: flex;
+}
+
+/* Aseguramos que el modal tenga un buen contraste con el fondo */
+.login-left {
+  background: hsl(8, 98%, 23%);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.login-right-form {
+  background: #121212;
+}
+
+.login-right {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: auto;
+  padding: 15px;
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Animación de salida para el modal */
+.login-form.exit {
+  animation: modalExit 0.3s ease forwards;
+}
+
+@keyframes modalExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+}
+
+/* Aseguramos que el scroll del body se desactive cuando el modal está activo 
+   pero preservamos la posición visual */
+body.modal-open {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* Prevenimos que el foco se vea afectado en dispositivos móviles */
+.login-form input:focus {
+  font-size: 16px; /* Previene el zoom en iOS */
+}
+
+/* Aseguramos que el modal sea visible en pantallas extremadamente pequeñas */
+@media (max-width: 320px) {
+  .login-form {
+    width: 95%;
+    margin: 0;
+    border-radius: 8px;
+  }
+  
+  /* Reducimos aún más los elementos para pantallas muy pequeñas */
+  .login-left, .login-right-form {
+    padding: 0.5rem;
+  }
+}
+
+/* Fix para dispositivos iOS que pueden tener problemas con position:fixed */
+@supports (-webkit-touch-callout: none) {
+  .login-container {
+    position: absolute;
+    height: 100vh;
+    /* Altura fallback para iOS */
+    height: -webkit-fill-available;
+  }
+}
+
+/* Soporte para navegadores que no soportan backdrop-filter - ya no es necesario */
+
+/* Aseguramos que el portal modal esté siempre por encima */
+#modal-root {
+  isolation: isolate;
 }

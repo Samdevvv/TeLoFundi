@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { FaUser, FaSignOutAlt, FaBars, FaTimes } from 'react-icons/fa';
+import { FaUser, FaSignOutAlt } from 'react-icons/fa';
 import '../estilos/Header.css';
 import loginImage from '../assets/logo png.png';
 
@@ -13,7 +14,7 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
   const handleNavigation = (page) => {
     if (onNavigate) {
       onNavigate(page);
-      setMenuOpen(false); // Cerrar menú al navegar
+      setMenuOpen(false);
     }
   };
 
@@ -30,39 +31,8 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
     }
   };
   
-  const headerStyle = {
-    background: 'transparent',
-    backgroundColor: 'transparent',
-    boxShadow: 'none',
-    borderBottom: 'none',
-    zIndex: 1000
-  };
-  
-  const toggleButtonStyle = {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '5px',
-    padding: '8px',
-    cursor: 'pointer',
-    zIndex: 1200,
-    outline: '1px solid rgba(255, 255, 255, 0.3)'
-  };
-  
-  const iconStyle = {
-    color: '#ffffff',
-    fill: '#ffffff',
-    stroke: '#ffffff',
-    strokeWidth: '1px',
-    width: '24px',
-    height: '24px'
-  };
-  
   return (
-    <header className="header" style={headerStyle}>
-      {/* Logo */}
+    <header className="header">
       <div className="logo">
         <img
           src={loginImage}
@@ -71,22 +41,16 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
         />
       </div>
       
-      {/* Botón de hamburguesa para móvil */}
-      <button 
-        className="menu-toggle" 
+      <div 
+        className={`hamburger-button ${menuOpen ? 'active' : ''}`} 
         onClick={toggleMenu}
-        aria-label="Menú"
-        style={toggleButtonStyle}
       >
-        {menuOpen ? 
-          <FaTimes size={24} style={iconStyle} /> : 
-          <FaBars size={24} style={iconStyle} />
-        }
-      </button>
+        <span className="hamburger-line"></span>
+        <span className="hamburger-line"></span>
+        <span className="hamburger-line"></span>
+      </div>
       
-      {/* Contenedor de navegación + botones */}
       <div className={`nav-container ${menuOpen ? 'active' : ''}`}>
-        {/* Navegación */}
         <nav className="nav">
           <ul>
             <li>
@@ -116,7 +80,7 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
                 href="#" 
                 onClick={(e) => {
                   e.preventDefault();
-                  handleNavigation('listadoAgencias'); // Cambiado de 'agencias' a 'listadoAgencias'
+                  handleNavigation('listadoAgencias');
                 }}
               >
                 Agencias
@@ -147,7 +111,6 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
           </ul>
         </nav>
         
-        {/* Botones de autenticación */}
         <div className="auth-buttons">
           {userLoggedIn ? (
             <div className="user-profile-actions">
@@ -185,7 +148,6 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
         </div>
       </div>
       
-      {/* Overlay para cerrar el menú en móvil */}
       {menuOpen && (
         <div 
           className={`menu-overlay ${menuOpen ? 'active' : ''}`}

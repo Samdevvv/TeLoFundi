@@ -2,15 +2,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 :root {
-  --primary-color: #31110b; /* Naranja oscuro base */
-  --secondary-color: #7d2010; /* Versión más oscura del naranja */
-  --dark-color: #000000; /* Color oscuro para fondos */
-  --darker-color: #000000; /* Color más oscuro para algunos elementos */
-  --text-light: #f0f0f0; /* Color claro para texto sobre fondos oscuros */
-  --text-dark: #000000; /* Color oscuro para texto sobre fondos claros */
-  --accent-color: #b63a1e; /* Color de acento para algunos elementos */
-  --gradient-primary: linear-gradient(to right, #c25537, #ac4526); /* Gradient más oscuro */
-  --prncipal-color:  #d35032;
+  /* Paleta de colores elegante */
+  --primary-dark: #1A1A1A; /* Fondo principal oscuro */
+  --secondary-dark: #252525; /* Fondos secundarios */
+  --tertiary-dark: #2E2E2E; /* Fondos terciarios */
+  --card-border: #3A3A3A; /* Bordes de tarjetas */
+  
+  /* Paleta de acentos dorados y rojos */
+  --primary-gold: #D4A017; /* Dorado primario */
+  --secondary-gold: #B8860B; /* Dorado oscuro */
+  --accent-red: #8B0000; /* Rojo discreto */
+  --muted-red: #A0522D; /* Rojo apagado */
+  
+  /* Paleta de textos */
+  --text-primary: #F5F5F5; /* Texto principal */
+  --text-secondary: #B0B0B0; /* Texto secundario */
+  --text-tertiary: #808080; /* Texto terciario */
+  
+  /* Gradientes */
+  --gradient-primary: linear-gradient(45deg, #8B0000, #aa8422); /* Gradiente principal */
+  --gradient-card: linear-gradient(145deg, #1A1A1A, #252525); /* Gradiente tarjetas */
+  --gradient-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 60%, rgba(0, 0, 0, 0.25) 100%); /* Overlay imágenes */
+  
+  /* Sombras */
+  --shadow-sm: 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 12px 24px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.3);
+  --shadow-accent: 0 15px 30px rgba(216, 160, 23, 0.3);
 }
 * {
   margin: 0; 
@@ -1447,5 +1465,33 @@ html, body {
  
 #sasa{
   padding-right: 22px !important;
+
+}
+/* Pantallas grandes (Full HD y más) */
+@media (min-width: 1200px) {
+ .services-container{
+ position: relative;
+ left: 190px !important;
+
+ }
+
+}
+
+
+/* Pantallas medianas (laptops, 1024px - 1199px) */
+@media (min-width: 1024px) and (max-width: 1199px) {
+ 
+
+}
+
+/* Pantallas pequeñas (notebooks, 768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+ 
+
+}
+
+/* Pantallas extra grandes (2K, 4K) */
+@media (min-width: 1600px) {
+ 
 
 }

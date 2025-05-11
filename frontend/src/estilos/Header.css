@@ -1,8 +1,6 @@
 /* Importando fuentes */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
 
-
-
 /* Reset básico */
 * {
   margin: 0;
@@ -43,121 +41,161 @@
   width: auto;
   object-fit: contain;
   position: absolute;
-  top: -42px;
+  top: -30px;
   left: 0;
   cursor: pointer;
 }
 
-/* Botón de menú para móvil - OCULTO EN DESKTOP */
-.menu-toggle {
-  display: none; /* Oculto por defecto en todas las pantallas */
-  background: transparent;
-  border: none;
-  color: #ffffff;
-  font-size: 24px;
-  cursor: pointer;
-  z-index: 1200;
+/* BOTÓN HAMBURGUESA SIMPLIFICADO */
+.hamburger-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  align-items: center;
+  background-color: transparent !important;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
-  transition: transform 0.3s ease, color 0.3s ease;
-  opacity: 1;
-}
-
-/* Asegurar que los iconos dentro del botón sean visibles */
-.menu-toggle svg {
-  fill: #ffffff !important; /* Forzar color blanco para el icono */
-  opacity: 1 !important; /* Asegurar que el icono no sea transparente */
-  color: #ffffff !important; /* Color del SVG */
-  stroke: #ffffff !important; /* Agregaremos stroke para mayor visibilidad */
-  stroke-width: 1px; /* Grosor del stroke */
-}
-
-/* Contenedor nav + botones */
-.nav-container {
-  display: flex;
   align-items: center;
-  gap: 30px;
-  margin-left: auto;
+  gap: 5px;
+  z-index: 1200;
+  padding: 8px;
 }
 
-/* Navegación */
+.hamburger-line {
+  width: 100%;
+  height: 2px;
+  background-color: #fff;
+}
+
+/* Animación simple para el botón hamburguesa */
+.hamburger-button.active .hamburger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger-button.active .hamburger-line:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-button.active .hamburger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Contenedor nav + botones SIEMPRE EN MODO LATERAL - CORREGIDO */
+.nav-container {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 300px; /* Ancho fijo en todas las pantallas */
+  max-width: 80%; /* Para dispositivos muy pequeños */
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.95) !important;
+  display: flex; /* Añadido para asegurar que muestre como flex */
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 80px 20px 20px;
+  transition: right 0.3s ease;
+  z-index: 1000;
+  overflow-y: auto;
+  margin-left: 0;
+  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.5);
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.nav-container.active {
+  right: 0;
+}
+
+/* Modificar la navegación */
+.nav {
+  width: 100%;
+}
+
 .nav ul {
-  display: flex;
+  display: flex; /* Añadido para asegurar visualización correcta */
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
   list-style: none;
-  gap: 30px;
+}
+
+.nav ul li {
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav ul li:last-child {
+  border-bottom: none;
 }
 
 .nav ul li a {
-  text-decoration: none;
-  color: var(--text-light);
-  font-weight: 600;
-  font-size: 1rem;
+  display: block;
+  font-size: 1.2rem;
+  padding: 15px;
+  width: 100%;
   transition: all 0.3s;
+  text-decoration: none;
+  color: #f0f0f0;
+  font-weight: 600;
   position: relative;
-  padding: 8px 4px;
   font-family: 'Poppins', sans-serif;
   letter-spacing: 0.5px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .nav ul li a:hover {
-  color: var(--primary-color);
-  transform: translateY(-2px);
+  background-color: rgba(159, 41, 16, 0.2);
+  padding-left: 20px;
+  transform: translateY(0);
+  color: #b63a1e;
 }
 
 .nav ul li a:after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background-color: var(--primary-color);
-  transition: width 0.3s ease;
-  box-shadow: 0 1px 3px rgba(159, 41, 16, 0.5);
-}
-
-.nav ul li a:hover:after {
-  width: 100%;
+  display: none;
 }
 
 /* Botones de autenticación */
 .auth-buttons {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  margin-top: 30px;
+  display: flex; /* Añadido para asegurar visualización correcta */
+  flex-direction: column;
+  width: 100%;
+  gap: 15px;
 }
 
 .auth-buttons button {
-  padding: 10px 20px;
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  padding: 12px;
   border: none;
   cursor: pointer;
-  border-radius: 30px;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1rem;
   transition: all 0.3s;
   letter-spacing: 0.5px;
   font-family: 'Poppins', sans-serif;
 }
 
-/* Botones con fondo */
 .login {
   background-color: rgba(0, 0, 0, 0.6) !important;
-  color: var(--text-light);
-  border: 1px solid var(--text-light) !important;
+  color: #f0f0f0;
+  border: 1px solid #f0f0f0 !important;
 }
 
 .login:hover {
-  background-color: var(--primary-color) !important;
+  background-color: #b63a1e !important;
   color: white;
-  border-color: var(--primary-color) !important;
+  border-color: #b63a1e !important;
 }
 
 .signup {
-  background: var(--accent-color) !important;
+  background: #b63a1e !important;
   color: white;
   box-shadow: 0 4px 15px rgba(159, 41, 16, 0.4);
 }
@@ -169,17 +207,19 @@
 
 /* Perfil de usuario */
 .user-profile-actions {
+  width: 100%;
   display: flex;
-  gap: 15px;
+  justify-content: space-around;
+  margin-top: 30px;
 }
 
 .profile-button,
 .logout-button {
   background: none;
   border: none;
-  color: var(--text-light);
-  width: 42px;
-  height: 42px;
+  color: #f0f0f0;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -190,13 +230,13 @@
 }
 
 .profile-button {
-  background-color: var(--primary-color) !important;
+  background-color: #b63a1e !important;
   box-shadow: 0 3px 10px rgba(159, 41, 16, 0.5);
 }
 
 .logout-button {
   background-color: rgba(0, 0, 0, 0.5) !important;
-  border: 1px solid var(--text-light) !important;
+  border: 1px solid #f0f0f0 !important;
 }
 
 .profile-button:hover,
@@ -208,7 +248,7 @@
   background-color: #333 !important;
 }
 
-/* Overlay para el menú móvil */
+/* Overlay para el menú */
 .menu-overlay {
   display: none;
   position: fixed;
@@ -221,186 +261,54 @@
   backdrop-filter: blur(4px);
 }
 
-/* Responsividad */
-@media (max-width: 768px) {
-  .header {
-    padding: 0 15px;
-    height: 70px; /* Ajustar altura para móviles */
-  }
-  
-  .logo {
-    width: 140px; /* Reservar espacio para el logo */
-  }
-  
-  .logo img {
-    height: 140px; /* LOGO GRANDE para móviles/tablets */
-    top: -15px;
-    left: -15px; /* Ajustar posición a la izquierda */
-  }
-  
-  /* Mostrar botón de menú SÓLO EN MÓVIL */
-  .menu-toggle {
-    display: flex !important; /* IMPORTANTE: Mostrar SÓLO en móvil - esta regla sólo aplica dentro del media query */
-    margin-left: auto;
-    background: rgba(0, 0, 0, 0.5) !important; /* Agregar un fondo con transparencia */
-    color: #ffffff !important; /* Icono blanco puro */
-    width: 40px;
-    height: 40px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    font-size: 24px;
-    opacity: 1 !important; /* Forzar visibilidad */
-    transition: transform 0.3s ease, color 0.3s ease;
-    z-index: 1200; /* Asegurar que esté encima de otros elementos */
-    position: relative; /* Agregamos posicionamiento */
-    outline: 1px solid rgba(255, 255, 255, 0.3); /* Borde sutil */
-  }
-  
-  .menu-toggle:hover {
-    background: rgba(159, 41, 16, 0.7) !important; /* Fondo con color de marca al hover */
-    color: #ffffff !important; /* Mantener icono blanco */
-    transform: scale(1.1); /* Efecto de escala al pasar el ratón */
-  }
-  
-  /* Asegurar que los iconos dentro del botón sean visibles */
-  .menu-toggle svg {
-    fill: #ffffff !important; /* Forzar color blanco para el icono */
-    color: #ffffff !important; /* Color del icono */
-    opacity: 1 !important; /* Asegurar que el icono no sea transparente */
-    stroke: #ffffff !important; /* Agregar contorno */
-    stroke-width: 1px; /* Grosor del contorno */
-    width: 24px !important; /* Forzar ancho */
-    height: 24px !important; /* Forzar alto */
-  }
-  
-  /* Modificar el contenedor nav para móvil */
-  .nav-container {
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: 70%;
-    max-width: 300px;
-    height: 100%;
-    background-color: rgba(20, 20, 20, 0.95) !important; /* Dar un fondo oscuro al menú */
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    padding: 80px 20px 20px;
-    transition: right 0.3s ease;
-    z-index: 1000;
-    overflow-y: auto;
-    margin-left: 0; /* Resetear margen */
-    box-shadow: -5px 0 25px rgba(0, 0, 0, 0.5);
-    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-  }
-  
-  .nav-container.active {
-    right: 0;
-  }
-  
-  /* Modificar la navegación */
-  .nav {
-    width: 100%;
-  }
-  
-  .nav ul {
-    flex-direction: column;
-    gap: 0; /* Eliminar espacio entre elementos */
-    width: 100%;
-  }
-  
-  .nav ul li {
-    width: 100%;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  
-  .nav ul li:last-child {
-    border-bottom: none;
-  }
-  
-  .nav ul li a {
-    display: block;
-    font-size: 1.2rem;
-    padding: 15px;
-    width: 100%;
-    transition: all 0.3s;
-  }
-  
-  .nav ul li a:hover {
-    background-color: rgba(159, 41, 16, 0.2);
-    padding-left: 20px;
-    transform: translateY(0);
-  }
-  
-  .nav ul li a:after {
-    display: none; /* Ocultar línea de subrayado en móvil */
-  }
-  
-  /* Botones de autenticación */
-  .auth-buttons {
-    margin-top: 30px;
-    flex-direction: column;
-    width: 100%;
-    gap: 15px;
-  }
-  
-  .auth-buttons button {
-    width: 100%;
-    margin: 0;
-    text-align: center;
-    padding: 12px;
-  }
-  
-  .login, .signup {
-    border-radius: 8px;
-    font-size: 1rem;
-  }
-  
-  .user-profile-actions {
-    width: 100%;
-    justify-content: space-around;
-    margin-top: 30px;
-  }
-  
-  .profile-button,
-  .logout-button {
-    width: 48px;
-    height: 48px;
-  }
-  
-  /* Mostrar overlay */
-  .menu-overlay.active {
-    display: block;
-  }
+.menu-overlay.active {
+  display: block;
 }
 
+/* Ajuste específico para reposicionar el botón X en la cabecera móvil */
+.close-menu-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1300;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+/* Ajustes específicos para dispositivos pequeños */
 @media (max-width: 480px) {
   .header {
     height: 60px;
-  }
-  
-  .logo {
-    width: 110px; /* Reducir espacio para el logo */
+    padding: 0 15px;
   }
   
   .logo img {
-    height: 120px; /* LOGO GRANDE para móviles pequeños */
+    height: 120px;
     top: -12px;
     left: -10px;
   }
   
-  /* Aumentar tamaño del botón de menú para dispositivos más pequeños */
-  .menu-toggle {
-    width: 44px !important;
-    height: 44px !important;
-    background: rgba(0, 0, 0, 0.6) !important; /* Fondo más oscuro para mayor contraste */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3) !important; /* Sombra para resaltar */
+  .hamburger-button {
+    width: 35px;
+    height: 35px;
+    top: 12px;
+    right: 15px;
+    padding: 7px;
   }
   
-  .menu-toggle svg {
-    width: 26px !important;
-    height: 26px !important;
+  .hamburger-line {
+    height: 2px;
+  }
+  
+  .hamburger-button.active .hamburger-line:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+  
+  .hamburger-button.active .hamburger-line:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
   }
   
   .nav-container {

@@ -27,6 +27,7 @@ function App() {
   const [prevMenu, setPrevMenu] = useState(null);
   const [user, setUser] = useState(JSON.parse(localStorage.getItem("user")) || null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Efecto para manejar la transición entre componentes
   useEffect(() => {
@@ -41,13 +42,29 @@ function App() {
 
   // Función modificada para controlar las transiciones
   const handleMenuChange = (newMenu) => {
+    // Si es el login o registro, mostramos el modal en lugar de cambiar de página
+    if (newMenu === "login") {
+      setShowLoginModal(true);
+      return;
+    } else if (newMenu === "registro") {
+      setPrevMenu(menu);
+      setMenu(newMenu);
+      return;
+    }
+    
+    // Para otras páginas, funcionamiento normal
     setPrevMenu(menu);
     setMenu(newMenu);
   };
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    handleMenuChange("homepage");
+    setShowLoginModal(false); // Cerrar el modal de login
+    handleMenuChange("homepage"); // Navegar a homepage
+  };
+
+  const handleCloseLogin = () => {
+    setShowLoginModal(false);
   };
 
   const handleLogout = () => {
@@ -78,16 +95,25 @@ function App() {
   return (
     <div className={`app-container ${getTransitionClass()}`}>
       {menu === "mainpage" && (
-        <MainPage setMenu={handleMenuChange} userLoggedIn={!!user} handleLogout={handleLogout} />
+        <MainPage 
+          setMenu={handleMenuChange} 
+          userLoggedIn={!!user} 
+          handleLogout={handleLogout} 
+        />
       )}
       {menu === "homepage" && (
         <HomePage setMenu={handleMenuChange} userLoggedIn={!!user} handleLogout={handleLogout} />
       )}
-      {menu === "login" && (
-        <div className="modal-overlay">
-          <Login setMenu={handleMenuChange} onLoginSuccess={handleLoginSuccess} />
-        </div>
+      
+      {/* Login modal (renderizado condicional) */}
+      {showLoginModal && (
+        <Login 
+          setMenu={handleMenuChange} 
+          onLoginSuccess={handleLoginSuccess} 
+          onClose={handleCloseLogin}
+        />
       )}
+      
       {menu === "registro" && (
         <div className="modal-overlay">
           <Registro setMenu={handleMenuChange} />
