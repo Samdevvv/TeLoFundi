@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import "../estilos/Mainpage.css";
 import "../estilos/Terminos.css";
 import "../estilos/AgeVerificationModal.css";
-import heroImage from "../assets/heroimage2.avif";
+import heroImage from "../assets/heronosotros.avif";
 import logoImage from "../assets/logo png.png";
 import '../estilos/Header.css';
 import Header from './Header';

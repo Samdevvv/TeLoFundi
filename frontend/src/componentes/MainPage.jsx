@@ -11,7 +11,7 @@ import massageServiceImg from "../assets/masaje.jpg";
 import logoImage from "../assets/logo png.png";
 import '../estilos/Header.css';
 import Header from './Header';
-import { FaSearch, FaTimes } from 'react-icons/fa';
+import { FaSearch, FaTimes, FaGem, FaMask, FaGlassMartiniAlt, FaRegKissWinkHeart, FaUserTie, FaRegHandshake, FaCalendarAlt } from 'react-icons/fa';
 
 const MainPage = ({ setMenu, userLoggedIn, handleLogout }) => {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -104,42 +104,56 @@ const MainPage = ({ setMenu, userLoggedIn, handleLogout }) => {
       title: 'Escorts Femeninas',
       description: 'Acompañantes femeninas de alta calidad para momentos especiales',
       image: femaleServiceImg,
-      featured: true
+      featured: true,
+      icon: <FaRegKissWinkHeart />
     },
     {
       id: 'trans',
       title: 'Trans y Travestis',
       description: 'Escorts trans y travestis para experiencias únicas',
       image: transServiceImg,
-      featured: true
+      featured: true,
+      icon: <FaMask />
     },
     {
       id: 'male',
       title: 'Escorts Masculinos',
       description: 'Acompañantes masculinos para satisfacer tus deseos',
       image: maleServiceImg,
-      featured: true
+      featured: true,
+      icon: <FaUserTie />
     },
     {
       id: 'vip',
       title: 'Servicio VIP',
       description: 'Experiencias premium con nuestras/os mejores acompañantes',
       image: vipServiceImg,
-      featured: false
+      featured: false,
+      icon: <FaGem />
     },
     {
       id: 'companion',
       title: 'Servicio de Compañía',
       description: 'Compañía de calidad para eventos, cenas o viajes',
       image: companionServiceImg,
-      featured: false
+      featured: false,
+      icon: <FaRegHandshake />
     },
     {
       id: 'massage',
       title: 'Masajes Eróticos',
       description: 'Masajes relajantes y eróticos con final feliz',
       image: massageServiceImg,
-      featured: false
+      featured: false,
+      icon: <FaGlassMartiniAlt />
+    },
+    {
+      id: 'eventos',
+      title: 'Eventos',
+      description: 'Acompañantes para ocasiones exclusivas y especiales',
+      image: companionServiceImg,
+      featured: false,
+      icon: <FaCalendarAlt />
     }
   ];
 
@@ -268,21 +282,31 @@ const MainPage = ({ setMenu, userLoggedIn, handleLogout }) => {
         </div>
       </section>
 
-      {/* Servicios populares - con mejor adaptación móvil */}
-      <section className="popular-services">
+      {/* SECCIÓN MEJORADA: Servicios populares con nueva estética e iconos refinados */}
+      <section className="popular-services-enhanced">
         <div className="container">
-          <div className="section-header">
+          <div className="enhanced-section-header">
             <h2>¿Qué estás buscando?</h2>
+            <div className="enhanced-header-line"></div>
+            <p className="enhanced-subtitle">Servicios discretos y exclusivos para las experiencias más intensas</p>
           </div>
-          <div className="services-tags">
-            {/* Reducir texto en móviles para etiquetas largas */}
-            <span className="service-tag">Masajes</span>
-            <span className="service-tag">Scorts VIP</span>
-            <span className="service-tag">{isMobile ? "Femeninas" : "Escorts Femeninas"}</span>
-            <span className="service-tag">{isMobile ? "Trans" : "Trans y Travestis"}</span>
-            <span id='sasa' className="service-tag">{isMobile ? "Masculinos" : "Escorts Masculinos"}</span>
-            <span className="service-tag">Compañia</span>
-            <span className="service-tag">Eventos</span>
+          
+          <div className="enhanced-services-grid">
+            {services.map(service => (
+              <div key={service.id} className="enhanced-service-card">
+                <div className="enhanced-service-bg"></div>
+                <div className="enhanced-service-content">
+                  <div className="enhanced-service-icon">{service.icon}</div>
+                  <h3 className="enhanced-service-title">{service.title.replace('Escorts ', '').replace('Servicio de ', '')}</h3>
+                  <p className="enhanced-service-desc">{service.description.split(' ').slice(0, 3).join(' ')}</p>
+                  <div className="enhanced-service-button">
+                    <FaSearch className="enhanced-icon-small" />
+                    <span>Ver servicios</span>
+                  </div>
+                </div>
+                <div className="enhanced-service-shine"></div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

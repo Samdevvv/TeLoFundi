@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FaArrowLeft,
   FaEnvelope,
   FaLock,
+  FaUser
 } from "react-icons/fa";
 import { createPortal } from "react-dom";
 import "../estilos/registr.css";
 import loginImage from "../assets/logo png.png";
+import googleAuthService from "./googleAuthService";
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20">
@@ -29,8 +31,9 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const Registro = ({ setMenu, onClose, transitionDirection }) => {
+const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => {
   const [formData, setFormData] = useState({
+    username: "",
     email: "",
     password: "",
     userType: "acompanante",
@@ -39,6 +42,35 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [shouldAnimate, setShouldAnimate] = useState(!transitionDirection);
+  const googleButtonRef = useRef(null);
+  const [googleButtonMode, setGoogleButtonMode] = useState('custom'); // 'custom', 'rendered', o 'redirect'
+  const googleButtonContainerRef = useRef(null);
+
+  useEffect(() => {
+    // Inicializar el servicio de Google Auth
+    const initGoogleAuth = async () => {
+      try {
+        await googleAuthService.initialize();
+        console.log("Google Auth inicializado correctamente");
+        
+        // Si el modo es 'rendered', intentar usar el botón renderizado por Google
+        if (googleButtonMode === 'rendered' && googleButtonContainerRef.current) {
+          try {
+            await googleAuthService.signInWithOneTap();
+          } catch (err) {
+            console.warn("No se pudo inicializar One Tap, usando botón personalizado", err);
+            setGoogleButtonMode('custom');
+          }
+        }
+      } catch (err) {
+        console.error("Error al inicializar Google Auth:", err);
+        // Si falla la inicialización, cambiar al modo de redirección
+        setGoogleButtonMode('redirect');
+      }
+    };
+
+    initGoogleAuth();
+  }, [googleButtonMode]);
 
   useEffect(() => {
     if (!document.getElementById("modal-root")) {
@@ -47,7 +79,7 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
       document.body.appendChild(modalRoot);
     }
     if (!transitionDirection) {
-      setTimeout(() => setShouldAnimate(true), 100);
+      setTimeout(() => setShouldAnimate(true), 50);
     }
     return () => setShouldAnimate(false);
   }, [transitionDirection]);
@@ -77,18 +109,22 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
 
   useEffect(() => {
     createFireParticles();
+    // Recrear partículas cada 5 segundos para mantener el efecto
+    const interval = setInterval(createFireParticles, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const createFireParticles = () => {
     const fireContainer = document.getElementById("registro-fire-particles");
     if (fireContainer) {
       fireContainer.innerHTML = "";
-      for (let i = 0; i < 25; i++) {
+      for (let i = 0; i < 30; i++) {
         const particle = document.createElement("div");
         particle.className = "registro-particle";
         particle.style.left = `${Math.random() * 100}%`;
         particle.style.animationDelay = `${Math.random() * 2}s`;
         particle.style.animationDuration = `${1.5 + Math.random()}s`;
+        particle.style.opacity = `${0.5 + Math.random() * 0.5}`;
         fireContainer.appendChild(particle);
       }
     }
@@ -113,7 +149,7 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
         } else if (setMenu) {
           setMenu("mainpage");
         }
-      }, 300);
+      }, 280);
     } else {
       if (onClose) {
         onClose();
@@ -130,22 +166,134 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
   };
 
   const validateForm = () => {
-    const { email, password } = formData;
+    const { username, email, password } = formData;
+    
+    if (!username || username.trim().length < 3) {
+      return "El nombre de usuario debe tener al menos 3 caracteres.";
+    }
+    
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!email || !emailRegex.test(email.trim())) {
       return "Por favor, ingrese un correo electrónico válido (ejemplo: user@domain.com).";
     }
+    
     if (!password || password.trim().length < 6) {
       return "La contraseña debe tener al menos 6 caracteres.";
     }
+    
     return null;
   };
 
-  const handleGoogleLogin = () => {
-    setError({
-      title: "Función en Desarrollo",
-      message: "El registro con Google estará disponible próximamente.",
-    });
+  const handleGoogleLogin = async () => {
+    if (loading) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Iniciando registro con Google...");
+      
+      let googleResponse;
+      
+      // Usar el método apropiado según el modo
+      if (googleButtonMode === 'redirect') {
+        // Usar el método de redirección (no devuelve respuesta)
+        googleAuthService.signInWithRedirect();
+        return; // Terminar aquí ya que redireccionará
+      } else {
+        // Usar el método principal con popup
+        googleResponse = await googleAuthService.signIn();
+      }
+      
+      console.log("Respuesta de Google:", googleResponse);
+      
+      // Autenticar con el backend (simulado) especificando el tipo de usuario seleccionado
+      const authResponse = await googleAuthService.authenticateWithBackend(
+        googleResponse.tokenId, 
+        formData.userType
+      );
+      
+      if (authResponse.success) {
+        if (authResponse.status === "new_user") {
+          // Se creó un nuevo usuario con Google
+          setError({
+            title: "Registro Exitoso",
+            message: `Te has registrado con éxito como ${formData.userType} usando Google. ¡Bienvenido!`,
+          });
+          
+          // Guardar tokens y datos del usuario para iniciar sesión inmediatamente
+          localStorage.setItem("accessToken", authResponse.accessToken);
+          localStorage.setItem("refreshToken", authResponse.refreshToken);
+          
+          const userData = {
+            id: authResponse.userId,
+            email: googleResponse.user.email,
+            name: googleResponse.user.name,
+            profileImage: googleResponse.user.picture,
+            tipoUsuario: authResponse.tipoUsuario,
+            googleAuth: true
+          };
+          
+          localStorage.setItem("user", JSON.stringify(userData));
+          
+          // Si hay una función de inicio de sesión exitoso, la llamamos
+          if (onLoginSuccess) {
+            onLoginSuccess(userData);
+          }
+        } else {
+          // El usuario ya existía, solo se inició sesión
+          localStorage.setItem("accessToken", authResponse.accessToken);
+          localStorage.setItem("refreshToken", authResponse.refreshToken);
+          
+          const userData = {
+            id: authResponse.userId,
+            email: googleResponse.user.email,
+            name: googleResponse.user.name,
+            profileImage: googleResponse.user.picture,
+            tipoUsuario: authResponse.tipoUsuario,
+            googleAuth: true
+          };
+          
+          localStorage.setItem("user", JSON.stringify(userData));
+          
+          // Si hay una función de inicio de sesión exitoso, la llamamos
+          if (onLoginSuccess) {
+            onLoginSuccess(userData);
+          }
+          
+          setError({
+            title: "Inicio de Sesión",
+            message: "Ya tenías una cuenta con este correo electrónico. Has iniciado sesión correctamente.",
+          });
+        }
+      } else {
+        throw new Error("Error en la autenticación con el servidor.");
+      }
+    } catch (err) {
+      console.error("Google registro error:", err);
+      let errorMessage = "Error al registrarse con Google";
+      
+      if (err.message && err.message.includes("popup")) {
+        errorMessage = "La ventana emergente fue bloqueada. Por favor, permite las ventanas emergentes para este sitio.";
+        // Cambiar al modo de redirección después de un error de popup
+        setGoogleButtonMode('redirect');
+      } else if (err.message && err.message.includes("OAuth")) {
+        errorMessage = "Error en la autenticación de Google. Intenta con el método alternativo.";
+        setGoogleButtonMode('redirect');
+      } else if (err.message && err.message.includes("disponible")) {
+        errorMessage = "El servicio de Google no está disponible. Intenta con el método alternativo.";
+        setGoogleButtonMode('redirect');
+      }
+      
+      setError({
+        title: "Error de Registro",
+        message: errorMessage,
+        retry: false,
+        useAlternative: googleButtonMode !== 'redirect'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -165,6 +313,7 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
 
     try {
       const payload = {
+        Username: formData.username.trim(),
         Email: formData.email.trim(),
         Password: formData.password.trim(),
       };
@@ -199,7 +348,7 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
             "Datos de registro inválidos. Verifique los campos obligatorios."
           );
         } else if (response.status === 409) {
-          throw new Error("El correo electrónico ya está registrado.");
+          throw new Error("El correo electrónico o nombre de usuario ya está registrado.");
         } else if (response.status === 500) {
           throw new Error(
             "Error interno del servidor. Por favor, intenta de nuevo más tarde."
@@ -245,7 +394,11 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
 
   const closeModal = () => {
     if (!error?.title.includes("Error")) {
-      if (formData.userType === "agencia") {
+      if (error?.title === "Inicio de Sesión" || error?.title === "Registro Exitoso") {
+        // Si se registró e inició sesión con Google o solo inició sesión, ir a homepage
+        if (setMenu) setMenu("homepage");
+        else if (onClose) onClose();
+      } else if (formData.userType === "agencia") {
         if (setMenu) setMenu("mainpage");
         else if (onClose) onClose();
       } else {
@@ -257,7 +410,24 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
   };
 
   const retrySubmit = () => {
-    handleSubmit({ preventDefault: () => {} });
+    if (error?.title === "Error de Registro" && error?.message?.includes("Google")) {
+      handleGoogleLogin();
+    } else {
+      handleSubmit({ preventDefault: () => {} });
+    }
+  };
+
+  const useAlternativeMethod = () => {
+    try {
+      setGoogleButtonMode('redirect');
+      googleAuthService.signInWithRedirect();
+    } catch (err) {
+      console.error("Error en redirección de Google:", err);
+      setError({
+        title: "Error de Redirección",
+        message: "No se pudo iniciar el proceso de autenticación con Google.",
+      });
+    }
   };
 
   const containerClass = `registro-container ${transitionDirection || ''}`;
@@ -301,17 +471,39 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
               </div>
             </div>
             <div className="registro-fields-container">
-              <div className="google-button-container">
-                <button
-                  type="button"
-                  className="google-button"
-                  onClick={handleGoogleLogin}
-                >
-                  <GoogleIcon />
-                  Continuar con Google
-                </button>
-              </div>
+              {googleButtonMode === 'rendered' ? (
+                <div id="google-button-container" ref={googleButtonContainerRef} className="google-button-container"></div>
+              ) : (
+                <div className="google-button-container">
+                  <button
+                    type="button"
+                    className="google-button"
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    ref={googleButtonRef}
+                  >
+                    <GoogleIcon />
+                    {googleButtonMode === 'redirect' ? "Continuar con Google (Redirección)" : "Continuar con Google"}
+                  </button>
+                </div>
+              )}
+              
               <div className="or-divider">o</div>
+              
+              <div className="registro-input-box">
+                <input
+                  type="text"
+                  name="username"
+                  required
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  className={`form-control ${formData.username ? "filled" : ""}`}
+                  disabled={loading}
+                />
+                <label>Nombre de Usuario</label>
+                <FaUser className="input-icon" aria-hidden="true" />
+              </div>
+              
               <div className="registro-input-box">
                 <input
                   type="email"
@@ -383,6 +575,11 @@ const Registro = ({ setMenu, onClose, transitionDirection }) => {
                 {error.retry && (
                   <button onClick={retrySubmit} className="registro-modal-button">
                     Reintentar
+                  </button>
+                )}
+                {error.useAlternative && (
+                  <button onClick={useAlternativeMethod} className="registro-modal-button">
+                    Método alternativo
                   </button>
                 )}
                 <button onClick={closeModal} className="registro-modal-button">

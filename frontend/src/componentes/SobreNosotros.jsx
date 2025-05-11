@@ -3,7 +3,7 @@ import "../estilos/SobreNosotros.css";
 import "../estilos/AgeVerificationModal.css";
 import "../estilos/Header.css";
 import logoImage from "../assets/logo png.png";
-import heroImage from "../assets/heroimage2.avif"; // Asegúrate de que esta ruta sea correcta
+import heroImage from "../assets/heroterminos.avif"; // Asegúrate de que esta ruta sea correcta
 import Header from './Header';
 import { 
   FaHeart, 

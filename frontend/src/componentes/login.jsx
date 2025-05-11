@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "../estilos/login.css";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft } from "react-icons/fa";
 import loginImage from "../assets/logo png.png";
 import { createPortal } from "react-dom";
+import googleAuthService from "./googleAuthService";
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20">
@@ -32,8 +33,37 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(!transitionDirection);
+  const googleButtonContainerRef = useRef(null);
+  const [googleButtonMode, setGoogleButtonMode] = useState('custom'); // 'custom', 'rendered', o 'redirect'
+
+  // Inicializar Google Auth cuando se monta el componente
+  useEffect(() => {
+    const initGoogleAuth = async () => {
+      try {
+        await googleAuthService.initialize();
+        console.log("Google Auth inicializado correctamente");
+        
+        // Si el modo es 'rendered', intentar usar el botón renderizado por Google
+        if (googleButtonMode === 'rendered' && googleButtonContainerRef.current) {
+          try {
+            await googleAuthService.signInWithOneTap();
+          } catch (err) {
+            console.warn("No se pudo inicializar One Tap, usando botón personalizado", err);
+            setGoogleButtonMode('custom');
+          }
+        }
+      } catch (err) {
+        console.error("Error al inicializar Google Auth:", err);
+        // Si falla la inicialización, cambiar al modo de redirección
+        setGoogleButtonMode('redirect');
+      }
+    };
+
+    initGoogleAuth();
+  }, [googleButtonMode]);
 
   useEffect(() => {
     if (!document.getElementById("modal-root")) {
@@ -225,11 +255,107 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    setError({
-      title: "Función en Desarrollo",
-      message: "El inicio de sesión con Google estará disponible próximamente.",
-    });
+  // Función principal para manejar el inicio de sesión con Google
+  const handleGoogleLogin = async () => {
+    // Evitar múltiples clics
+    if (googleLoading) return;
+    
+    try {
+      setGoogleLoading(true);
+      setError(null);
+      
+      console.log("Iniciando sesión con Google...");
+
+      let googleResponse;
+      
+      // Usar el método apropiado según el modo
+      if (googleButtonMode === 'redirect') {
+        // Usar el método de redirección (no devuelve respuesta)
+        googleAuthService.signInWithRedirect();
+        return; // Terminar aquí ya que redireccionará
+      } else {
+        // Usar el método principal con popup
+        googleResponse = await googleAuthService.signIn();
+      }
+      
+      console.log("Respuesta de Google:", googleResponse);
+      
+      // Simular autenticación con backend
+      const authResponse = await googleAuthService.authenticateWithBackend(
+        googleResponse.tokenId, 
+        "cliente" // Por defecto para login
+      );
+      
+      // Si la autenticación es exitosa
+      if (authResponse.success) {
+        // Guardar tokens y datos del usuario
+        localStorage.setItem("accessToken", authResponse.accessToken);
+        localStorage.setItem("refreshToken", authResponse.refreshToken);
+        
+        // Crear objeto de usuario con los datos de Google
+        const userData = {
+          id: authResponse.userId,
+          email: googleResponse.user.email,
+          name: googleResponse.user.name,
+          profileImage: googleResponse.user.picture,
+          tipoUsuario: authResponse.tipoUsuario,
+          googleAuth: true
+        };
+        
+        localStorage.setItem("user", JSON.stringify(userData));
+        
+        // Notificar al componente padre
+        if (onLoginSuccess) {
+          onLoginSuccess(userData);
+        }
+        
+        setError({
+          title: "Bienvenido",
+          message: "Inicio de sesión con Google exitoso. ¡Bienvenido de vuelta!",
+        });
+      } else {
+        throw new Error("Error en la autenticación con el servidor.");
+      }
+    } catch (err) {
+      console.error("Error en inicio de sesión con Google:", err);
+      
+      let errorMessage = "Error al iniciar sesión con Google.";
+      if (err.message && err.message.includes("popup")) {
+        errorMessage = "La ventana emergente fue bloqueada. Por favor, permite las ventanas emergentes para este sitio.";
+        // Cambiar al modo de redirección después de un error de popup
+        setGoogleButtonMode('redirect');
+      } else if (err.message && err.message.includes("OAuth")) {
+        errorMessage = "Error en la autenticación de Google. Intenta con el método alternativo.";
+        setGoogleButtonMode('redirect');
+      } else if (err.message && err.message.includes("disponible")) {
+        errorMessage = "El servicio de Google no está disponible. Intenta con el método alternativo.";
+        setGoogleButtonMode('redirect');
+      }
+      
+      setError({
+        title: "Error de Inicio de Sesión",
+        message: errorMessage,
+        retry: false,
+        useAlternative: googleButtonMode !== 'redirect'
+      });
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+  
+  // Método alternativo de autenticación con Google
+  const handleGoogleRedirect = () => {
+    try {
+      setGoogleButtonMode('redirect');
+      googleAuthService.signInWithRedirect();
+      // No hacer nada después porque redireccionará
+    } catch (err) {
+      console.error("Error en redirección de Google:", err);
+      setError({
+        title: "Error de Redirección",
+        message: "No se pudo iniciar el proceso de autenticación con Google.",
+      });
+    }
   };
 
   const closeModal = () => {
@@ -244,7 +370,15 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
   };
 
   const retrySubmit = () => {
-    handleSubmit({ preventDefault: () => {} });
+    if (error?.useAlternative) {
+      handleGoogleLogin();
+    } else {
+      handleSubmit({ preventDefault: () => {} });
+    }
+  };
+
+  const useAlternativeMethod = () => {
+    handleGoogleRedirect();
   };
 
   const containerClass = `login-container ${transitionDirection || ''}`;
@@ -277,16 +411,24 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
               <h2>Iniciar Sesión</h2>
               <p>Completa los datos para acceder a tu cuenta</p>
             </div>
-            <div className="google-button-container">
-              <button
-                type="button"
-                className="google-button"
-                onClick={handleGoogleLogin}
-              >
-                <GoogleIcon />
-                Continuar con Google
-              </button>
-            </div>
+            
+            {googleButtonMode === 'rendered' ? (
+              <div id="google-button-container" ref={googleButtonContainerRef} className="google-button-container"></div>
+            ) : (
+              <div className="google-button-container">
+                <button
+                  type="button"
+                  className="google-button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading || googleLoading}
+                >
+                  <GoogleIcon />
+                  {googleLoading ? "Procesando..." : 
+                   googleButtonMode === 'redirect' ? "Continuar con Google (Redirección)" : "Continuar con Google"}
+                </button>
+              </div>
+            )}
+            
             <div className="or-divider">o</div>
             <div className="input-box">
               <input
@@ -369,6 +511,11 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
                 {error.retry && (
                   <button onClick={retrySubmit} className="registro-modal-button">
                     Reintentar
+                  </button>
+                )}
+                {error.useAlternative && (
+                  <button onClick={useAlternativeMethod} className="registro-modal-button">
+                    Método alternativo
                   </button>
                 )}
                 <button onClick={closeModal} className="registro-modal-button">

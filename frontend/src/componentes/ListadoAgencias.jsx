@@ -3,7 +3,19 @@ import "../estilos/ListadoAgencias.css";
 import "../estilos/Header.css";
 import "../estilos/AgeVerificationModal.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMapMarkerAlt, faPhone, faEnvelope, faGlobe, faFire, faGem, faStar } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faMapMarkerAlt, 
+  faPhone, 
+  faEnvelope, 
+  faGlobe, 
+  faFire, 
+  faGem, 
+  faStar,
+  faShieldAlt,
+  faUserCheck,
+  faMapMarkedAlt,
+  faClock
+} from '@fortawesome/free-solid-svg-icons';
 import { faFacebook, faTwitter, faInstagram, faTiktok, faSnapchat } from '@fortawesome/free-brands-svg-icons';
 import { FaSearch, FaTimes, FaHeart } from 'react-icons/fa';
 import Header from './Header';
@@ -328,22 +340,55 @@ const ListadoAgencias = ({ setMenu, userLoggedIn, handleLogout }) => {
         </div>
       </section>
       
-      {/* Sección de estadísticas */}
+      {/* Sección de estadísticas actualizada con 6 ítems */}
       <section className="stats-section">
         <div className="container">
           <div className="stats-container">
             <div className="stat-item">
               <FontAwesomeIcon icon={faGem} className="stat-icon" />
               <div className="stat-info">
-                <h3>120+</h3>
-                <p>Escorts Premium</p>
+                <h3>50+</h3>
+                <p>Agencias Verificadas</p>
               </div>
             </div>
+            
             <div className="stat-item">
-              <FontAwesomeIcon icon={faFire} className="stat-icon" />
+              <FontAwesomeIcon icon={faShieldAlt} className="stat-icon" />
               <div className="stat-info">
-                <h3>25+</h3>
-                <p>Agencias Exclusivas</p>
+                <h3>100%</h3>
+                <p>Confidencialidad</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <FontAwesomeIcon icon={faUserCheck} className="stat-icon" />
+              <div className="stat-info">
+                <h3>1000+</h3>
+                <p>Clientes Satisfechos</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <FontAwesomeIcon icon={faMapMarkedAlt} className="stat-icon" />
+              <div className="stat-info">
+                <h3>15+</h3>
+                <p>Ciudades Cubiertas</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <FontAwesomeIcon icon={faStar} className="stat-icon" />
+              <div className="stat-info">
+                <h3>4.9</h3>
+                <p>Valoración Promedio</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <FontAwesomeIcon icon={faClock} className="stat-icon" />
+              <div className="stat-info">
+                <h3>24/7</h3>
+                <p>Servicio Disponible</p>
               </div>
             </div>
           </div>
