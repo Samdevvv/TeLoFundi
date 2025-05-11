@@ -608,7 +608,7 @@ const Registro = ({ setMenu }) => {
                 </button>
               )}
               <button onClick={closeModal} className="registro-modal-button">
-                Cerrar
+                Cerrars
               </button>
             </div>
           </div>
