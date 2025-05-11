@@ -28,43 +28,78 @@ function App() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem("user")) || null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegistroModal, setShowRegistroModal] = useState(false);
+  const [transitionDirection, setTransitionDirection] = useState(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Efecto para manejar la transición entre componentes
   useEffect(() => {
     if (prevMenu !== menu) {
       setIsAnimating(true);
       const timer = setTimeout(() => {
         setIsAnimating(false);
-      }, 600); // Tiempo suficiente para que termine la animación
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [menu, prevMenu]);
 
-  // Función modificada para controlar las transiciones
   const handleMenuChange = (newMenu) => {
-    // Si es el login o registro, mostramos el modal en lugar de cambiar de página
-    if (newMenu === "login") {
+    if (isTransitioning) return; // Evitar múltiples transiciones simultáneas
+    setIsTransitioning(true);
+
+    if (newMenu === "login" && showRegistroModal) {
+      setTransitionDirection("registro-to-login");
+      setTimeout(() => {
+        setShowRegistroModal(false);
+        setShowLoginModal(true);
+        setTransitionDirection(null);
+        setIsTransitioning(false);
+      }, 600);
+    } else if (newMenu === "registro" && showLoginModal) {
+      setTransitionDirection("login-to-registro");
+      setTimeout(() => {
+        setShowLoginModal(false);
+        setShowRegistroModal(true);
+        setTransitionDirection(null);
+        setIsTransitioning(false);
+      }, 600);
+    } else if (newMenu === "login") {
+      setShowRegistroModal(false);
       setShowLoginModal(true);
-      return;
+      setTransitionDirection(null);
+      setIsTransitioning(false);
     } else if (newMenu === "registro") {
+      setShowLoginModal(false);
+      setShowRegistroModal(true);
+      setTransitionDirection(null);
+      setIsTransitioning(false);
+    } else {
       setPrevMenu(menu);
       setMenu(newMenu);
-      return;
+      setShowLoginModal(false);
+      setShowRegistroModal(false);
+      setTransitionDirection(null);
+      setIsTransitioning(false);
     }
-    
-    // Para otras páginas, funcionamiento normal
-    setPrevMenu(menu);
-    setMenu(newMenu);
   };
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    setShowLoginModal(false); // Cerrar el modal de login
-    handleMenuChange("homepage"); // Navegar a homepage
+    setShowLoginModal(false);
+    setTransitionDirection(null);
+    setIsTransitioning(false);
+    handleMenuChange("homepage");
   };
 
   const handleCloseLogin = () => {
     setShowLoginModal(false);
+    setTransitionDirection(null);
+    setIsTransitioning(false);
+  };
+
+  const handleCloseRegistro = () => {
+    setShowRegistroModal(false);
+    setTransitionDirection(null);
+    setIsTransitioning(false);
   };
 
   const handleLogout = () => {
@@ -75,20 +110,14 @@ function App() {
     handleMenuChange("mainpage");
   };
 
-  // Clase CSS para la animación de transición basada en los componentes
   const getTransitionClass = () => {
     if (!isAnimating) return "";
-    
-    // Si cambiamos entre login, registro y recuperar contraseña
     if (
-      (prevMenu === "login" && menu === "registro") || 
-      (prevMenu === "login" && menu === "recuperar") ||
-      (prevMenu === "registro" && menu === "login") ||
-      (prevMenu === "recuperar" && menu === "login")
+      (prevMenu === "recuperar" && menu === "login") ||
+      (prevMenu === "login" && menu === "recuperar")
     ) {
       return "page-transition";
     }
-    
     return "";
   };
 
@@ -104,25 +133,23 @@ function App() {
       {menu === "homepage" && (
         <HomePage setMenu={handleMenuChange} userLoggedIn={!!user} handleLogout={handleLogout} />
       )}
-      
-      {/* Login modal (renderizado condicional) */}
       {showLoginModal && (
         <Login 
           setMenu={handleMenuChange} 
           onLoginSuccess={handleLoginSuccess} 
           onClose={handleCloseLogin}
+          transitionDirection={transitionDirection}
         />
       )}
-      
-      {menu === "registro" && (
-        <div className="modal-overlay">
-          <Registro setMenu={handleMenuChange} />
-        </div>
+      {showRegistroModal && (
+        <Registro 
+          setMenu={handleMenuChange} 
+          onClose={handleCloseRegistro}
+          transitionDirection={transitionDirection}
+        />
       )}
       {menu === "recuperar" && (
-        <div className="modal-overlay">
-          <ForgetPsw setMenu={handleMenuChange} />
-        </div>
+        <ForgetPsw setMenu={handleMenuChange} />
       )}
       {menu === "perfilCliente" && <PerfilClientePropio setMenu={handleMenuChange} />}
       {menu === "perfilAgencia" && <PerfilAgenciaPropio setMenu={handleMenuChange} />}

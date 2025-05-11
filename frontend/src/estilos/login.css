@@ -7,64 +7,115 @@ body {
   box-sizing: border-box;
 }
 
-/* Contenedor principal completamente transparente */
 .login-container {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 1000;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: rgba(0, 0, 0, 0);
+  background: transparent;
   pointer-events: none;
 }
 
 .login-right {
   width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  pointer-events: none;
+  pointer-events: auto;
   padding: 15px;
 }
 
-/* Card principal con dos columnas */
 .login-form {
   display: flex;
-  max-width: 800px;
+  max-width: 700px;
   width: 100%;
   pointer-events: auto;
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  animation: fadeIn 0.4s ease;
+  gap: 0; /* Eliminar cualquier espacio entre secciones */
 }
 
-@keyframes fadeIn {
+.login-form.no-enter-exit {
+  animation: none;
+}
+
+@keyframes modalEnter {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(40px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-/* Columna izquierda con logo y fondo de color */
+.login-form.exit {
+  animation: modalExit 0.3s ease forwards;
+}
+
+@keyframes modalExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+}
+
 .login-left {
   width: 45%;
-  background: hsl(8, 98%, 23%); 
-   padding: 3rem 1.5rem;
+  background: hsl(8, 98%, 23%);
+  padding: 2rem 1.2rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.6s ease;
+  margin: 0; /* Asegurar no margen */
+  border-top-left-radius: 20px;
+  border-bottom-left-radius: 20px;
+}
+
+.login-right-form {
+  width: 55%;
+  background: #121212;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: transform 0.6s ease;
+  margin: 0; /* Asegurar no margen */
+  border-top-right-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
+
+.login-container.login-to-registro .login-left {
+  transform: translateX(122.22%);
+}
+
+.login-container.login-to-registro .login-right-form {
+  transform: translateX(-81.82%);
+}
+
+.login-container.registro-to-login .login-left {
+  transform: translateX(0);
+}
+
+.login-container.registro-to-login .login-right-form {
+  transform: translateX(0);
 }
 
 .login-welcome {
@@ -76,27 +127,26 @@ body {
 }
 
 .login-welcome h2 {
-  font-size: 1.8rem;
-  margin-bottom: 1rem;
+  font-size: 1.6rem;
+  margin-bottom: 0.7rem;
   font-weight: 600;
 }
 
 .login-welcome p {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   opacity: 0.95;
-  line-height: 1.6;
+  line-height: 1.5;
   max-width: 90%;
   margin: 0 auto;
 }
 
-/* Logo más grande, igual que en olvidar contraseña */
 .login-title-image {
-  width: 320px;
-  height: 320px;
+  width: 250px;
+  height: 250px;
   max-width: 100%;
   max-height: none;
   object-fit: contain;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   animation: logoFloat 6s ease-in-out infinite;
 }
 
@@ -109,7 +159,6 @@ body {
   }
 }
 
-/* Elementos decorativos para el lado izquierdo */
 .shape {
   position: absolute;
   opacity: 0.15;
@@ -119,8 +168,8 @@ body {
 .shape-1 {
   top: 15%;
   left: 10%;
-  width: 80px;
-  height: 80px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   background: rgb(245, 33, 33);
 }
@@ -128,8 +177,8 @@ body {
 .shape-2 {
   bottom: 15%;
   right: 10%;
-  width: 150px;
-  height: 150px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   background: white;
 }
@@ -137,45 +186,35 @@ body {
 .shape-3 {
   top: 45%;
   left: 20%;
-  width: 40px;
-  height: 40px;
+  width: 35px;
+  height: 35px;
   border-radius: 8px;
   background: white;
   transform: rotate(45deg);
 }
 
-/* Columna derecha con formulario - versión oscura */
-.login-right-form {
-  width: 55%;
-  background: #121212;
-  padding: 3rem 2rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
 .form-title {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   color: #ffffff;
+  text-align: center;
 }
 
 .form-title h2 {
-  font-size: 1.8rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.6rem;
+  margin-bottom: 0.3rem;
   font-weight: 600;
 }
 
 .form-title p {
   color: #aaaaaa;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
-/* Grupos de input */
 .input-box {
   position: relative;
   width: 100%;
-  height: 50px;
-  margin: 16px 0;
+  height: 45px;
+  margin: 14px 0;
 }
 
 .input-box input {
@@ -185,12 +224,12 @@ body {
   border: none;
   outline: none;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  padding-left: 40px;
-  font-size: 0.95rem;
+  padding-left: 38px;
+  font-size: 0.9rem;
   color: #ffffff;
   font-weight: 400;
   transition: all 0.3s ease-in-out;
-  border-radius: 12px;
+  border-radius: 10px;
   font-family: 'Inter', sans-serif;
 }
 
@@ -203,9 +242,9 @@ body {
 .input-box label {
   position: absolute;
   top: 50%;
-  left: 40px;
+  left: 38px;
   transform: translateY(-50%);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.7);
   pointer-events: none;
   transition: 0.3s ease-in-out;
@@ -241,7 +280,6 @@ body {
   color: rgb(255, 99, 71);
 }
 
-/* Configuración para la contraseña */
 .password-box {
   position: relative;
   flex: 1;
@@ -252,7 +290,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 50px;
+  min-height: 45px;
 }
 
 .toggle-password {
@@ -287,12 +325,11 @@ body {
   z-index: 10;
 }
 
-/* Checkbox para recordar sesión */
 .remember-me {
   display: flex;
   align-items: center;
-  margin-top: 5px;
-  margin-bottom: 15px;
+  margin-top: 3px;
+  margin-bottom: 12px;
 }
 
 .remember-me input[type="checkbox"] {
@@ -301,15 +338,14 @@ body {
 }
 
 .remember-me label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* Configuración para olvidar contraseña */
 .forgot-password {
   text-align: right;
   margin-top: -8px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .forgot-password button {
@@ -319,7 +355,7 @@ body {
   font-weight: 500;
   cursor: pointer;
   padding: 0;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   transition: color 0.2s ease;
 }
 
@@ -328,7 +364,6 @@ body {
   text-decoration: underline;
 }
 
-/* Botón de inicio de sesión */
 .registro-button-container {
   position: relative;
   width: 100%;
@@ -337,15 +372,15 @@ body {
 
 .registro-button {
   position: relative;
-  background:#c13722;;
+  background: #c13722;
   color: white;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   border: none;
   width: 100%;
   display: block;
-  padding: 12px 0;
-  border-radius: 12px;
+  padding: 10px 0;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: none;
@@ -383,10 +418,9 @@ body {
   transform: translateY(0);
 }
 
-/* Footer del login */
 .login-footer {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
+  margin-top: 1.2rem;
+  font-size: 0.85rem;
   text-align: center;
   color: rgba(255, 255, 255, 0.7);
 }
@@ -407,7 +441,6 @@ body {
   text-decoration: underline;
 }
 
-/* Botón para volver (posicionado en el lado izquierdo) */
 .back-button {
   background: none;
   border: none;
@@ -433,7 +466,6 @@ body {
   transform: scale(0.95);
 }
 
-/* Modal estilizado - versión oscura */
 .registro-modal {
   position: fixed;
   top: 0;
@@ -501,740 +533,18 @@ body {
   transform: translateY(0);
 }
 
-/* Media queries para responsividad - MEJORADOS */
-@media (min-width: 1600px) {
-  .login-form {
-    max-width: 900px;
-  }
-  .login-title-image {
-    max-width: 350px;
-    max-height: none;
-  }
-}
-
-/* Desktop y tablets grandes */
-@media (max-width: 1024px) {
-  .login-form {
-    max-width: 700px;
-  }
-  .login-left, .login-right-form {
-    padding: 2.5rem 1.5rem;
-  }
-  .login-title-image {
-    width: 300px;
-    height: 300px;
-  }
-  .login-welcome h2 {
-    font-size: 1.6rem;
-  }
-  .form-title h2 {
-    font-size: 1.6rem;
-  }
-}
-
-/* Tablets */
-@media (max-width: 768px) {
-  .login-right {
-    padding: 15px;
-    align-items: center;
-  }
-  
-  .login-form {
-    flex-direction: column;
-    max-width: 450px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  
-  .login-left, .login-right-form {
-    width: 100%;
-    padding: 1.5rem;
-  }
-  
-  .login-left {
-    padding-bottom: 1rem;
-  }
-  
-  .login-right-form {
-    padding-top: 1.25rem;
-    padding-bottom: 1.5rem;
-  }
-  
-  .login-welcome h2 {
-    font-size: 1.4rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .login-welcome p {
-    font-size: 0.85rem;
-    max-width: 95%;
-    margin-bottom: 0;
-  }
-  
-  .form-title {
-    margin-bottom: 1.25rem;
-  }
-  
-  .form-title h2 {
-    font-size: 1.4rem;
-    margin-bottom: 0.3rem;
-  }
-  
-  .form-title p {
-    font-size: 0.8rem;
-  }
-  
-  .login-title-image {
-    width: 200px;
-    height: 200px;
-    margin-bottom: 0.5rem;
-  }
-  
-  .shape-1 {
-    width: 60px;
-    height: 60px;
-  }
-  
-  .shape-2 {
-    width: 100px;
-    height: 100px;
-  }
-  
-  .shape-3 {
-    width: 30px;
-    height: 30px;
-  }
-  
-  .input-box {
-    height: 45px;
-    margin: 12px 0;
-  }
-}
-
-/* Ajustes específicos para móviles - ULTRA COMPACTO */
-@media (max-width: 576px) {
-  .login-container {
-    align-items: flex-start;
-  }
-  
-  .login-right {
-    padding: 10px;
-    align-items: flex-start;
-    padding-top: 20px;
-    height: 100%;
-  }
-  
-  .login-form {
-    max-width: 100%;
-    width: 95%;
-    border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
-    margin-bottom: 0;
-    max-height: 95vh;
-    overflow-y: auto;
-  }
-  
-  /* Columna izquierda muy compacta */
-  .login-left {
-    padding: 1rem 0.75rem;
-  }
-  
-  .login-title-image {
-    width: 150px;  /* Logo mucho más pequeño */
-    height: 150px;
-    margin-bottom: 0;
-  }
-  
-  .login-welcome h2 {
-    font-size: 1.2rem;
-    margin-bottom: 0.3rem;
-  }
-  
-  .login-welcome p {
-    font-size: 0.8rem;
-    line-height: 1.3;
-    margin-bottom: 0;
-  }
-  
-  /* Formulario compacto */
-  .login-right-form {
-    padding: 1rem 0.75rem;
-  }
-  
-  .form-title {
-    margin-bottom: 1rem;
-  }
-  
-  .form-title h2 {
-    font-size: 1.2rem;
-    margin-bottom: 0.2rem;
-  }
-  
-  .form-title p {
-    font-size: 0.75rem;
-  }
-  
-  .input-box {
-    height: 40px;
-    margin: 10px 0;
-  }
-  
-  .input-box input {
-    font-size: 0.85rem;
-    padding-left: 35px;
-  }
-  
-  .input-box label {
-    font-size: 0.8rem;
-    left: 35px;
-  }
-  
-  .input-box .input-icon {
-    font-size: 0.9rem;
-  }
-  
-  .remember-me, .forgot-password {
-    margin-bottom: 10px;
-    margin-top: -5px;
-  }
-  
-  .remember-me label, .forgot-password button {
-    font-size: 0.7rem;
-  }
-  
-  .registro-button-container {
-    margin: 10px 0;
-  }
-  
-  .registro-button {
-    padding: 10px 0;
-    font-size: 0.9rem;
-  }
-  
-  .login-footer {
-    margin-top: 1rem;
-    font-size: 0.8rem;
-  }
-  
-  /* Modal más pequeño */
-  .registro-modal-content {
-    max-width: 90%;
-    width: 280px;
-    padding: 18px;
-  }
-  
-  .registro-modal-content h3 {
-    font-size: 1.1rem;
-  }
-  
-  .registro-modal-content p {
-    font-size: 0.85rem;
-    margin-bottom: 15px;
-  }
-  
-  .registro-modal-button {
-    padding: 8px 15px;
-    font-size: 0.8rem;
-  }
-}
-
-/* Móviles muy pequeños - versión ultra compacta */
-@media (max-width: 380px) {
-  .login-container {
-    align-items: flex-start;
-  }
-  
-  .login-right {
-    padding: 8px;
-    padding-top: 10px;
-  }
-  
-  .login-form {
-    width: 100%;
-    margin: 0;
-    border-radius: 10px;
-  }
-  
-  /* Columna izquierda mínima */
-  .login-left {
-    padding: 0.8rem 0.6rem;
-  }
-  
-  .login-title-image {
-    width: 130px;  /* Logo aún más pequeño */
-    height: 130px;
-    margin-bottom: 0;
-  }
-  
-  .login-welcome h2 {
-    font-size: 1.1rem;
-    margin-bottom: 0.2rem;
-  }
-  
-  .login-welcome p {
-    font-size: 0.75rem;
-    line-height: 1.2;
-    max-width: 100%;
-  }
-  
-  /* Ocultar formas decorativas en pantallas muy pequeñas */
-  .shape-2, .shape-3 {
-    display: none;
-  }
-  
-  .shape-1 {
-    width: 40px;
-    height: 40px;
-  }
-  
-  /* Formulario ultra compacto */
-  .login-right-form {
-    padding: 0.8rem 0.6rem;
-  }
-  
-  .form-title {
-    margin-bottom: 0.8rem;
-  }
-  
-  .form-title h2 {
-    font-size: 1.1rem;
-    margin-bottom: 0.1rem;
-  }
-  
-  .form-title p {
-    font-size: 0.7rem;
-  }
-  
-  .input-box {
-    height: 38px;
-    margin: 8px 0;
-  }
-  
-  .input-box input {
-    font-size: 0.8rem;
-    padding-left: 30px;
-    border-radius: 10px;
-  }
-  
-  .input-box label {
-    font-size: 0.75rem;
-    left: 30px;
-  }
-  
-  .input-box .input-icon {
-    font-size: 0.8rem;
-    left: 10px;
-  }
-  
-  .remember-me, .forgot-password {
-    margin-bottom: 8px;
-    margin-top: -4px;
-  }
-  
-  .remember-me label, .forgot-password button {
-    font-size: 0.65rem;
-  }
-  
-  .registro-button-container {
-    margin: 8px 0;
-  }
-  
-  .registro-button {
-    padding: 8px 0;
-    font-size: 0.85rem;
-    border-radius: 10px;
-  }
-  
-  .login-footer {
-    margin-top: 0.8rem;
-    font-size: 0.75rem;
-  }
-  
-  /* Modal mínimo */
-  .registro-modal-content {
-    width: 250px;
-    padding: 15px;
-  }
-  
-  .registro-modal-content h3 {
-    font-size: 1rem;
-  }
-  
-  .registro-modal-content p {
-    font-size: 0.8rem;
-    margin-bottom: 12px;
-  }
-  
-  .registro-modal-buttons {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .registro-modal-button {
-    width: 100%;
-    padding: 7px 0;
-    font-size: 0.75rem;
-  }
-}
-
-/* Orientación horizontal en dispositivos pequeños */
-@media (max-height: 600px) {
-  .login-container {
-    align-items: flex-start;
-  }
-  
-  .login-right {
-    padding-top: 10px;
-  }
-  
-  .login-form {
-    max-height: 95vh;
-    overflow-y: auto;
-  }
-}
-
-/* Ajustes específicos para pantallas muy pequeñas en altura */
-@media (max-height: 480px) {
-  .login-right {
-    padding: 5px;
-  }
-  
-  .login-form {
-    max-height: 98vh;
-  }
-  
-  .login-title-image {
-    width: 120px;
-    height: 120px;
-  }
-  
-  .login-welcome h2 {
-    font-size: 1rem;
-  }
-  
-  .login-welcome p {
-    display: none; /* Ocultar párrafo en pantallas muy pequeñas */
-  }
-}
-
-/* Ajustes específicos para iPhones SE y dispositivos muy pequeños */
-@media (max-width: 350px) and (max-height: 570px) {
-  .login-container {
-    align-items: flex-start;
-  }
-  
-  .login-right {
-    padding-top: 5px;
-  }
-  
-  .login-form {
-    border-radius: 8px;
-  }
-  
-  .login-left {
-    padding: 0.6rem 0.5rem;
-  }
-  
-  .login-title-image {
-    width: 100px;
-    height: 100px;
-  }
-  
-  .login-welcome h2 {
-    font-size: 0.9rem;
-    margin-bottom: 0;
-  }
-  
-  .login-welcome p {
-    display: none;
-  }
-  
-  .shape {
-    display: none;
-  }
-  
-  .login-right-form {
-    padding: 0.6rem 0.5rem;
-  }
-  
-  .form-title h2 {
-    font-size: 0.9rem;
-  }
-  
-  .form-title p {
-    font-size: 0.65rem;
-  }
-  
-  .input-box {
-    height: 35px;
-    margin: 6px 0;
-  }
-  
-  .remember-me, .forgot-password {
-    margin-bottom: 6px;
-  }
-  
-  .login-footer {
-    margin-top: 0.6rem;
-  }
-}
-
-/* Ajustes para pantallas táctiles */
-@media (hover: none) {
-  .registro-button:hover {
-    transform: none;
-    box-shadow: none;
-  }
-  
-  .back-button:hover {
-    transform: none;
-    background: none;
-  }
-  
-  .registro-modal-button:hover {
-    transform: none;
-    box-shadow: none;
-  }
-  
-  /* Aumentar áreas táctiles en móviles */
-  .back-button {
-    padding: 12px;
-  }
-  
-  .toggle-password {
-    padding: 10px;
-    right: 5px;
-  }
-  
-  /* Fix para inputs en dispositivos móviles */
-  .input-box input {
-    font-size: 16px; /* Tamaño mínimo para evitar zoom en iOS */
-  }
-  
-  .input-box input, .login-right-form button {
-    -webkit-tap-highlight-color: transparent; /* Eliminar highlight al tocar */
-  }
-}/* Modificar el tamaño de la card principal */
-.login-form {
-  display: flex;
-  max-width: 700px; /* Reducido de 800px */
-  width: 100%;
-  pointer-events: auto;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  animation: fadeIn 0.4s ease;
-}
-
-/* Reducir el logo */
-.login-title-image {
-  width: 250px; /* Reducido de 320px */
-  height: 250px; /* Reducido de 320px */
-  max-width: 100%;
-  max-height: none;
-  object-fit: contain;
-  margin-bottom: 0.5rem; /* Reducido de 1rem */
-  animation: logoFloat 6s ease-in-out infinite;
-}
-
-/* Reducir padding en ambas columnas */
-.login-left {
-  width: 45%;
-  background: hsl(8, 98%, 23%);
-  padding: 2rem 1.2rem; /* Reducido de 3rem 1.5rem */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.login-right-form {
-  width: 55%;
-  background: #121212;
-  padding: 2rem 1.5rem; /* Reducido de 3rem 2rem */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-/* Reducir espaciado entre elementos */
-.form-title {
-  margin-bottom: 1.5rem; /* Reducido de 2rem */
-  color: #ffffff;
-}
-
-.input-box {
-  position: relative;
-  width: 100%;
-  height: 45px; /* Reducido de 50px */
-  margin: 14px 0; /* Reducido de 16px */
-}
-
-/* Ajustar el texto de bienvenida */
-.login-welcome h2 {
-  font-size: 1.6rem; /* Reducido de 1.8rem */
-  margin-bottom: 0.7rem; /* Reducido de 1rem */
-  font-weight: 600;
-}
-
-.login-welcome p {
-  font-size: 0.9rem; /* Reducido de 0.95rem */
-  opacity: 0.95;
-  line-height: 1.5; /* Reducido de 1.6 */
-  max-width: 90%;
-  margin: 0 auto;
-}
-
-/* Ajustar tamaño del texto del formulario */
-.form-title h2 {
-  font-size: 1.6rem; /* Reducido de 1.8rem */
-  margin-bottom: 0.3rem; /* Reducido de 0.5rem */
-  font-weight: 600;
-}
-
-.form-title p {
-  color: #aaaaaa;
-  font-size: 0.85rem; /* Reducido de 0.9rem */
-}
-
-/* Reducir inputs */
-.input-box input {
-  padding-left: 38px; /* Reducido de 40px */
-  font-size: 0.9rem; /* Reducido de 0.95rem */
-  border-radius: 10px; /* Reducido de 12px */
-}
-
-.input-box label {
-  font-size: 0.85rem; /* Reducido de 0.9rem */
-  left: 38px; /* Reducido de 40px */
-}
-
-/* Ajustar botón de Google */
-.google-button-container {
-  margin: 8px 0 12px; /* Reducido de 10px 0 15px */
-}
-
-.google-button {
-  padding: 10px 0; /* Reducido de 12px 0 */
-  font-size: 0.9rem; /* Reducido de 0.95rem */
-  border-radius: 10px; /* Reducido de 12px */
-}
-
-.or-divider {
-  margin: 15px 0; /* Reducido de 20px 0 */
-  font-size: 0.75rem; /* Reducido de 0.8rem */
-}
-
-/* Ajustar otros elementos */
-.remember-me {
-  margin-top: 3px; /* Reducido de 5px */
-  margin-bottom: 12px; /* Reducido de 15px */
-}
-
-.remember-me label {
-  font-size: 0.75rem; /* Reducido de 0.8rem */
-}
-
-.forgot-password button {
-  font-size: 0.75rem; /* Reducido de 0.8rem */
-}
-
-.registro-button {
-  padding: 10px 0; /* Reducido de 12px 0 */
-  font-size: 0.9rem; /* Reducido de 0.95rem */
-  border-radius: 10px; /* Reducido de 12px */
-}
-
-.login-footer {
-  margin-top: 1.2rem; /* Reducido de 1.5rem */
-  font-size: 0.85rem; /* Reducido de 0.9rem */
-}
-
-/* Reducir tamaño de los elementos decorativos */
-.shape-1 {
-  width: 70px; /* Reducido de 80px */
-  height: 70px; /* Reducido de 80px */
-}
-
-.shape-2 {
-  width: 120px; /* Reducido de 150px */
-  height: 120px; /* Reducido de 150px */
-}
-
-.shape-3 {
-  width: 35px; /* Reducido de 40px */
-  height: 35px; /* Reducido de 40px */
-}
-
-/* Ajustes responsivos adicionales para la versión más compacta */
-@media (min-width: 1600px) {
-  .login-form {
-    max-width: 800px; /* Reducido de 900px */
-  }
-  .login-title-image {
-    max-width: 280px; /* Reducido de 350px */
-  }
-}
-
-@media (max-width: 1024px) {
-  .login-form {
-    max-width: 650px; /* Reducido de 700px */
-  }
-  .login-title-image {
-    width: 220px; /* Reducido de 300px */
-    height: 220px; /* Reducido de 300px */
-  }
-}
-
-@media (max-width: 768px) {
-  .login-form {
-    max-width: 420px; /* Reducido de 450px */
-  }
-  .login-title-image {
-    width: 170px; /* Reducido de 200px */
-    height: 170px; /* Reducido de 200px */
-  }
-  .login-left, .login-right-form {
-    padding: 1.2rem; /* Reducido de 1.5rem */
-  }
-}
-
-@media (max-width: 576px) {
-  .login-title-image {
-    width: 140px; /* Reducido de 150px */
-    height: 140px; /* Reducido de 150px */
-  }
-  .login-left {
-    padding: 0.8rem 0.6rem; /* Reducido de 1rem 0.75rem */
-  }
-  .login-right-form {
-    padding: 0.8rem 0.6rem; /* Reducido de 1rem 0.75rem */
-  }
-}
-
-@media (max-width: 380px) {
-  .login-title-image {
-    width: 110px; /* Reducido de 130px */
-    height: 110px; /* Reducido de 130px */
-  }
-}
-
-/* Ajuste al botón de Google para hacerlo más ancho */
 .google-button-container {
   width: 100%;
-  margin: 8px 0 12px; /* Mantenemos el margen reducido */
+  margin: 8px 0 12px;
   position: relative;
-  display: flex; /* Añadimos para asegurar alineación correcta */
-  justify-content: center; /* Centramos el botón */
+  display: flex;
+  justify-content: center;
 }
 
 .google-button {
   position: relative;
-  width: 100%; /* Aseguramos que tome el 100% del ancho disponible */
-  padding: 10px 0; /* Mantenemos el padding vertical reducido */
+  width: 100%;
+  padding: 10px 0;
   background: #121212;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
@@ -1247,169 +557,350 @@ body {
   justify-content: center;
   gap: 10px;
   transition: all 0.3s ease;
-  max-width: none; /* Eliminamos cualquier max-width que pudiera existir */
-  min-width: 100%; /* Forzamos ancho mínimo del 100% */
+  max-width: none;
+  min-width: 100%;
 }
 
-/* Aseguramos que el contenedor del botón ocupe todo el ancho disponible */
-.login-right-form .google-button-container {
-  padding-left: 0;
-  padding-right: 0;
-  box-sizing: border-box;
-  width: 100%;
+.or-divider {
+  margin: 8px 0;
+  font-size: 0.7rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.2;
 }
 
-/* Mejorar la apariencia del botón en pantallas más pequeñas */
-@media (max-width: 576px) {
-  .google-button {
+@media (min-width: 1600px) {
+  .login-form {
+    max-width: 800px;
+  }
+  .login-title-image {
+    max-width: 280px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .login-form {
+    max-width: 650px;
+  }
+  .login-title-image {
+    width: 220px;
+    height: 220px;
+  }
+  .login-left, .login-right-form {
+    padding: 1.2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    align-items: flex-start;
+  }
+  .login-right {
+    padding: 15px;
+    align-items: center;
+  }
+  .login-form {
+    flex-direction: column;
+    max-width: 420px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .login-left, .login-right-form {
     width: 100%;
-    min-width: 100%;
-    /* Mantenemos padding vertical pero extendemos horizontal para ocupar más espacio */
+    padding: 1.2rem;
+  }
+  .login-left {
+    order: -1;
+    padding-bottom: 0.5rem;
+    border-radius: 20px 20px 0 0;
+  }
+  .login-right-form {
+    padding-top: 0.5rem;
+    padding-bottom: 1.5rem;
+    border-radius: 0 0 20px 20px;
+  }
+  .login-welcome h2 {
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .login-welcome p {
+    font-size: 0.85rem;
+    max-width: 95%;
+    margin-bottom: 0;
+  }
+  .form-title {
+    margin-bottom: 1.25rem;
+  }
+  .form-title h2 {
+    display: none; /* Ocultar "Inicie Sesión" en responsive */
+  }
+  .form-title p {
+    font-size: 0.8rem;
+  }
+  .login-title-image {
+    width: 170px;
+    height: 170px;
+    margin-bottom: 0.5rem;
+  }
+  .shape-1 {
+    width: 60px;
+    height: 60px;
+  }
+  .shape-2 {
+    width: 100px;
+    height: 100px;
+  }
+  .shape-3 {
+    width: 30px;
+    height: 30px;
+  }
+  .input-box {
+    height: 40px;
+    margin: 10px 0;
+  }
+  .login-container.login-to-registro .login-left,
+  .login-container.login-to-registro .login-right-form,
+  .login-container.registro-to-login .login-left,
+  .login-container.registro-to-login .login-right-form {
+    transform: none;
+  }
+}
+
+@media (max-width: 576px) {
+  .login-right {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+  .login-form {
+    width: 95%;
+    border-radius: 12px;
+    max-height: 95vh;
+  }
+  .login-left {
+    padding: 0.8rem 0.6rem;
+  }
+  .login-right-form {
+    padding: 0.8rem 0.6rem;
+  }
+  .login-title-image {
+    width: 140px;
+    height: 140px;
+  }
+  .login-welcome h2 {
+    font-size: 1.2rem;
+    margin-bottom: 0.3rem;
+  }
+  .login-welcome p {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    margin-bottom: 0;
+  }
+  .form-title {
+    margin-bottom: 1rem;
+  }
+  .form-title p {
+    font-size: 0.75rem;
+  }
+  .input-box input {
+    font-size: 0.85rem;
+    padding-left: 35px;
+  }
+  .input-box label {
+    font-size: 0.8rem;
+    left: 35px;
+  }
+  .input-box .input-icon {
+    font-size: 0.9rem;
+  }
+  .remember-me, .forgot-password {
+    margin-bottom: 10px;
+    margin-top: -5px;
+  }
+  .remember-me label, .forgot-password button {
+    font-size: 0.7rem;
+  }
+  .registro-button-container {
+    margin: 10px 0;
+  }
+  .registro-button {
+    padding: 10px 0;
+    font-size: 0.9rem;
+  }
+  .login-footer {
+    font-size: 0.8rem;
+  }
+  .registro-modal-content {
+    width: 280px;
+    padding: 18px;
+  }
+  .registro-modal-content h3 {
+    font-size: 1.1rem;
+  }
+  .registro-modal-content p {
+    font-size: 0.85rem;
+  }
+  .registro-modal-button {
+    padding: 8px 15px;
+    font-size: 0.8rem;
+  }
+  .google-button {
     padding: 9px 0;
+  }
+  .or-divider {
+    margin: 6px 0;
+    font-size: 0.65rem;
   }
 }
 
 @media (max-width: 380px) {
+  .login-title-image {
+    width: 110px;
+    height: 110px;
+  }
+  .login-left, .login-right-form {
+    padding: 0.8rem 0.6rem;
+  }
+  .login-welcome h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.2rem;
+  }
+  .login-welcome p {
+    font-size: 0.75rem;
+    line-height: 1.2;
+    max-width: 100%;
+  }
+  .shape-2, .shape-3 {
+    display: none;
+  }
+  .shape-1 {
+    width: 40px;
+    height: 40px;
+  }
+  .form-title {
+    margin-bottom: 0.8rem;
+  }
+  .form-title p {
+    font-size: 0.7rem;
+  }
+  .input-box {
+    height: 38px;
+    margin: 8px 0;
+  }
+  .input-box input {
+    font-size: 0.8rem;
+    padding-left: 32px;
+  }
+  .input-box label {
+    font-size: 0.75rem;
+    left: 32px;
+  }
+  .input-box .input-icon {
+    font-size: 0.8rem;
+    left: 10px;
+  }
+  .remember-me, .forgot-password {
+    margin-bottom: 8px;
+    margin-top: -4px;
+  }
+  .remember-me label, .forgot-password button {
+    font-size: 0.65rem;
+  }
+  .registro-button {
+    padding: 8px 0;
+    font-size: 0.85rem;
+  }
+  .login-footer {
+    margin-top: 0.8rem;
+    font-size: 0.75rem;
+  }
+  .registro-modal-content {
+    width: 250px;
+    padding: 15px;
+  }
+  .registro-modal-content h3 {
+    font-size: 1rem;
+  }
+  .registro-modal-content p {
+    font-size: 0.8rem;
+  }
+  .registro-modal-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .registro-modal-button {
+    padding: 7px 0;
+    font-size: 0.75rem;
+  }
   .google-button {
-    width: 100%;
-    min-width: 100%;
-    /* Ajustamos para pantallas muy pequeñas */
     padding: 8px 0;
   }
-}/* Asegurarse de que el modal siempre esté por encima de todo */
+  .or-divider {
+    margin: 5px 0;
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-height: 600px) {
+  .login-container {
+    align-items: flex-start;
+  }
+  .login-right {
+    padding-top: 10px;
+  }
+  .login-form {
+    max-height: 95vh;
+    overflow-y: auto;
+  }
+}
+
+@media (max-height: 480px) {
+  .login-right {
+    padding: 5px;
+  }
+  .login-form {
+    max-height: 98vh;
+  }
+  .login-title-image {
+    width: 120px;
+    height: 120px;
+  }
+  .login-welcome h2 {
+    font-size: 1rem;
+  }
+  .login-welcome p {
+    display: none;
+  }
+}
+
+@media (hover: none) {
+  .registro-button:hover,
+  .back-button:hover,
+  .registro-modal-button:hover,
+  .login-footer button:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .back-button {
+    padding: 12px;
+  }
+  .input-box input,
+  .login-right-form button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 #modal-root {
   position: relative;
   z-index: 9999;
+  isolation: isolate;
 }
 
-/* Contenedor principal completamente transparente */
-.login-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 9999;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: transparent; /* Fondo completamente transparente */
-  backdrop-filter: none; /* Sin efecto blur */
-  -webkit-backdrop-filter: none; /* Sin efecto blur para Safari */
-  pointer-events: auto; /* Captura eventos */
-}
-
-/* Eliminamos la animación del fondo ya que ahora es transparente */
-/* Aseguramos que el login-container capture eventos solo cuando se hace clic en él,
-   pero deja pasar los eventos a través de las áreas vacías */
-.login-container {
-  pointer-events: none; /* No captura eventos por defecto */
-}
-
-.login-right {
-  pointer-events: auto; /* Pero el contenido del modal sí captura eventos */
-}
-
-/* Mejoramos el contraste y la visibilidad del modal */
-.login-form {
-  animation: modalEnter 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  position: relative;
-  z-index: 1001;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4); /* Sombra más pronunciada */
-  border-radius: 20px;
-  overflow: hidden;
-  max-width: 800px;
-  width: 100%;
-  display: flex;
-}
-
-/* Aseguramos que el modal tenga un buen contraste con el fondo */
-.login-left {
-  background: hsl(8, 98%, 23%);
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-}
-
-.login-right-form {
-  background: #121212;
-}
-
-.login-right {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  pointer-events: auto;
-  padding: 15px;
-}
-
-@keyframes modalEnter {
-  from {
-    opacity: 0;
-    transform: translateY(40px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Animación de salida para el modal */
-.login-form.exit {
-  animation: modalExit 0.3s ease forwards;
-}
-
-@keyframes modalExit {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(40px) scale(0.95);
-  }
-}
-
-/* Aseguramos que el scroll del body se desactive cuando el modal está activo 
-   pero preservamos la posición visual */
-body.modal-open {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-}
-
-/* Prevenimos que el foco se vea afectado en dispositivos móviles */
-.login-form input:focus {
-  font-size: 16px; /* Previene el zoom en iOS */
-}
-
-/* Aseguramos que el modal sea visible en pantallas extremadamente pequeñas */
-@media (max-width: 320px) {
-  .login-form {
-    width: 95%;
-    margin: 0;
-    border-radius: 8px;
-  }
-  
-  /* Reducimos aún más los elementos para pantallas muy pequeñas */
-  .login-left, .login-right-form {
-    padding: 0.5rem;
-  }
-}
-
-/* Fix para dispositivos iOS que pueden tener problemas con position:fixed */
 @supports (-webkit-touch-callout: none) {
   .login-container {
     position: absolute;
     height: 100vh;
-    /* Altura fallback para iOS */
     height: -webkit-fill-available;
   }
-}
-
-/* Soporte para navegadores que no soportan backdrop-filter - ya no es necesario */
-
-/* Aseguramos que el portal modal esté siempre por encima */
-#modal-root {
-  isolation: isolate;
 }
