@@ -21,7 +21,8 @@
     "react-phone-input-2": "^2.15.1",
     "react-router-dom": "^7.5.0",
     "react-select": "^5.10.1",
-    "react-select-country-list": "^2.2.3"
+    "react-select-country-list": "^2.2.3",
+    "vitae": "^0.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

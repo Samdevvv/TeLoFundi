@@ -10,6 +10,11 @@ import "../estilos/registr.css";
 import loginImage from "../assets/logo png.png";
 import googleAuthService from "./googleAuthService";
 
+// Configuración de la API - Ajusta según tu estructura de proyecto
+const API_CONFIG = {
+  BASE_URL: "http://localhost:5000"
+};
+
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20">
     <path
@@ -32,11 +37,12 @@ const GoogleIcon = () => (
 );
 
 const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => {
+  // Cambiado el valor inicial de userType a "cliente"
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
-    userType: "acompanante",
+    userType: "cliente",
   });
 
   const [loading, setLoading] = useState(false);
@@ -135,8 +141,11 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Mejorada para incluir logging
   const handleUserTypeChange = (e) => {
-    setFormData(prev => ({ ...prev, userType: e.target.value }));
+    const newUserType = e.target.value;
+    console.log(`Tipo de usuario cambiado a: ${newUserType}`);
+    setFormData(prev => ({ ...prev, userType: newUserType }));
   };
 
   const handleClose = () => {
@@ -210,7 +219,7 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
       // Autenticar con el backend (simulado) especificando el tipo de usuario seleccionado
       const authResponse = await googleAuthService.authenticateWithBackend(
         googleResponse.tokenId, 
-        formData.userType
+        formData.userType // Pasar el tipo de usuario seleccionado
       );
       
       if (authResponse.success) {
@@ -296,6 +305,7 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     }
   };
 
+  // Función handleSubmit mejorada
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -312,28 +322,42 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     }
 
     try {
+      // Creamos el payload base
       const payload = {
-        Username: formData.username.trim(),
-        Email: formData.email.trim(),
-        Password: formData.password.trim(),
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        password: formData.password.trim(),
       };
 
-      const getUrl = () => {
-        switch (formData.userType) {
-          case "cliente":
-            return "https://localhost:7134/api/clientes/registro";
-          case "acompanante":
-            return "https://localhost:7134/api/Acompanantes/registro";
-          case "agencia":
-            return "https://localhost:7134/api/Agencia/solicitar-registro";
-          default:
-            return "";
-        }
-      };
+      // Añadir información específica según el tipo de usuario
+      if (formData.userType === "acompanante") {
+        payload.gender = "otro"; // Campo requerido para acompañantes
+      } else if (formData.userType === "agencia") {
+        payload.name = formData.username.trim(); // Para agencias, name = username
+      }
 
-      const url = getUrl();
+      // Usar las rutas correctas del nuevo backend según el tipo seleccionado
+      let endpoint = '';
+      switch (formData.userType) {
+        case "cliente":
+          endpoint = '/api/auth/register';
+          break;
+        case "acompanante":
+          endpoint = '/api/auth/profile/register';
+          break;
+        case "agencia":
+          endpoint = '/api/auth/agency/register';
+          break;
+        default:
+          endpoint = '/api/auth/register';
+      }
 
-      const response = await fetch(url, {
+      // Agregar logs para debugging
+      console.log(`Tipo de usuario seleccionado: ${formData.userType}`);
+      console.log(`Endpoint seleccionado: ${endpoint}`);
+      console.log(`Payload a enviar:`, payload);
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -344,7 +368,7 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
         console.log("Respuesta de error:", errorData);
         if (response.status === 400) {
           throw new Error(
-            errorData.Detail || errorData.Message || errorData.mensaje ||
+            errorData.Detail || errorData.Message || errorData.mensaje || errorData.message ||
             "Datos de registro inválidos. Verifique los campos obligatorios."
           );
         } else if (response.status === 409) {
@@ -360,27 +384,29 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
       }
 
       const data = await response.json();
+      console.log("Respuesta exitosa:", data);
+      
       if (formData.userType === "cliente") {
         setError({
           title: "Registro Exitoso",
-          message: `Cliente registrado con éxito. ID: ${data.Id}. Por favor, inicia sesión.`,
+          message: `Cliente registrado con éxito. ID: ${data.userId || data.Id}. Por favor, inicia sesión.`,
         });
       } else if (formData.userType === "acompanante") {
         setError({
           title: "Registro Exitoso",
-          message: `Acompañante registrado con éxito. ID: ${data.AcompananteId}. Por favor, inicia sesión.`,
+          message: `Acompañante registrado con éxito. ID: ${data.userId || data.profileId || data.AcompananteId}. Por favor, inicia sesión.`,
         });
       } else if (formData.userType === "agencia") {
         setError({
           title: "Solicitud Enviada",
-          message: `Tu solicitud ha sido enviada con ID: ${data.solicitudId}. Está en proceso de revisión. Te notificaremos por email cuando haya sido procesada.`,
+          message: `Tu solicitud ha sido enviada con ID: ${data.userId || data.agencyId || data.solicitudId}. Está en proceso de revisión. Te notificaremos por email cuando haya sido procesada.`,
         });
       }
     } catch (err) {
       let errorMessage = err.message;
       if (err.message.includes("Failed to fetch")) {
         errorMessage =
-          "No se pudo conectar con el servidor. Verifica que el backend esté corriendo.";
+          "No se pudo conectar con el servidor. Verifica que el backend esté corriendo en http://localhost:5000";
       }
       setError({
         title: "Error de Registro",

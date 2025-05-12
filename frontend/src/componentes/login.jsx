@@ -197,12 +197,13 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
 
     try {
       const payload = {
-        Email: email.trim(),
-        Password: password.trim(),
-        RememberMe: rememberMe
+        email: email.trim(),
+        password: password.trim(),
+        rememberMe: rememberMe
       };
 
-      const response = await fetch("https://localhost:7134/api/users/login", {
+      // Usar la nueva API
+      const response = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -210,30 +211,39 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error("Error de respuesta:", errorData);
+        
         if (response.status === 400) {
           throw new Error(
-            errorData.Message || "Email o contraseña incorrectos."
+            errorData.message || "Datos de inicio de sesión inválidos."
           );
         } else if (response.status === 401) {
-          throw new Error("Credenciales inválidas.");
+          throw new Error(
+            errorData.message || "Credenciales inválidas."
+          );
         } else {
           throw new Error(
-            `Error al iniciar sesión (Código: ${response.status})`
+            `Error al iniciar sesión (Código: ${response.status}) - ${errorData.message || "Error desconocido"}`
           );
         }
       }
 
       const data = await response.json();
-      localStorage.setItem("accessToken", data.AccessToken);
-      localStorage.setItem("refreshToken", data.RefreshToken);
+      localStorage.setItem("accessToken", data.AccessToken || data.accessToken);
+      localStorage.setItem("refreshToken", data.RefreshToken || data.refreshToken);
 
       const userData = {
-        id: data.UserId || 1,
+        id: data.UserId || data.userId,
         email: email,
-        tipoUsuario: data.TipoUsuario || "cliente",
+        tipoUsuario: data.TipoUsuario || data.role,
+        profileInfo: data.ProfileInfo || data.profileInfo
       };
+      
       localStorage.setItem("user", JSON.stringify(userData));
-      onLoginSuccess(userData);
+      
+      if (onLoginSuccess) {
+        onLoginSuccess(userData);
+      }
 
       setError({
         title: "Bienvenido",
@@ -241,14 +251,18 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
       });
     } catch (err) {
       let errorMessage = err.message;
+      console.error("Error completo:", err);
+      
       if (err.message.includes("Failed to fetch")) {
         errorMessage =
-          "No se pudo conectar con el servidor. Verifica tu conexión.";
+          "No se pudo conectar con el servidor. Verifica que el backend esté corriendo en http://localhost:5000";
       }
+      
       setError({
         title: "Error de Inicio de Sesión",
         message: errorMessage,
         retry: true,
+        details: err.toString()
       });
     } finally {
       setLoading(false);
@@ -280,11 +294,25 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
       
       console.log("Respuesta de Google:", googleResponse);
       
-      // Simular autenticación con backend
-      const authResponse = await googleAuthService.authenticateWithBackend(
-        googleResponse.tokenId, 
-        "cliente" // Por defecto para login
-      );
+      // Enviar datos a nuestro backend en lugar de usar el método simulado
+      const payload = {
+        tokenId: googleResponse.tokenId,
+        userData: googleResponse.user,
+        userType: 'cliente' // Por defecto para login
+      };
+
+      const response = await fetch("http://localhost:5000/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Error en la autenticación con Google");
+      }
+
+      const authResponse = await response.json();
       
       // Si la autenticación es exitosa
       if (authResponse.success) {
@@ -299,7 +327,8 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
           name: googleResponse.user.name,
           profileImage: googleResponse.user.picture,
           tipoUsuario: authResponse.tipoUsuario,
-          googleAuth: true
+          googleAuth: true,
+          profileInfo: authResponse.profileInfo
         };
         
         localStorage.setItem("user", JSON.stringify(userData));
@@ -336,7 +365,8 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
         title: "Error de Inicio de Sesión",
         message: errorMessage,
         retry: false,
-        useAlternative: googleButtonMode !== 'redirect'
+        useAlternative: googleButtonMode !== 'redirect',
+        details: err.toString()
       });
     } finally {
       setGoogleLoading(false);
@@ -354,6 +384,7 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
       setError({
         title: "Error de Redirección",
         message: "No se pudo iniciar el proceso de autenticación con Google.",
+        details: err.toString()
       });
     }
   };
@@ -507,6 +538,12 @@ const Login = ({ setMenu, onLoginSuccess, onClose, transitionDirection }) => {
             <div className="registro-modal-content">
               <h3>{error.title}</h3>
               <p>{error.message}</p>
+              {error.details && (
+                <div className="error-details">
+                  <p className="error-details-title">Detalles técnicos:</p>
+                  <pre className="error-details-content">{error.details}</pre>
+                </div>
+              )}
               <div className="registro-modal-buttons">
                 {error.retry && (
                   <button onClick={retrySubmit} className="registro-modal-button">

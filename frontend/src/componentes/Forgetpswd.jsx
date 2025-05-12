@@ -16,6 +16,7 @@ const ForgetPsw = ({ setMenu }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     // Validación básica de email
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -29,27 +30,36 @@ const ForgetPsw = ({ setMenu }) => {
     }
 
     try {
-      // Simular una llamada a API (en producción usarías fetch real)
-      // const response = await fetch("https://localhost:7134/api/users/resetpassword", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email: email.trim() }),
-      // });
+      // Realizar petición al endpoint de recuperación de contraseña
+      const response = await fetch("http://localhost:5000/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
 
-      // Simulamos éxito para demostración
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Ocurrió un error al procesar la solicitud");
+      }
       
       setSuccess(true);
       setError({
         title: "Solicitud Enviada",
-        message: "Se ha enviado un enlace de recuperación a tu correo electrónico. Por favor, revisa tu bandeja de entrada."
+        message: "Si la dirección existe, recibirás un correo con instrucciones para restablecer tu contraseña.",
       });
     } catch (error) {
-      // Ahora utilizamos el parámetro 'error' en lugar de 'err'
       console.error("Error al enviar la solicitud:", error);
+      
+      let errorMessage = "No se pudo enviar el enlace de recuperación.";
+      if (error.message.includes("Failed to fetch")) {
+        errorMessage = "No se pudo conectar con el servidor. Verifica que el backend esté corriendo en http://localhost:5000";
+      }
+      
       setError({
         title: "Error",
-        message: "No se pudo enviar el enlace de recuperación. Por favor, intenta de nuevo más tarde." 
+        message: errorMessage,
+        details: error.toString()
       });
     } finally {
       setLoading(false);
@@ -71,7 +81,7 @@ const ForgetPsw = ({ setMenu }) => {
           <div className="forget-password-left">
             <button
               className="forget-password-back-button"
-              onClick={() => setMenu("mainpage")}
+              onClick={() => setMenu("login")} // Cambio aquí para volver a login en lugar de mainpage
               type="button"
               aria-label="Volver"
             >
@@ -132,12 +142,17 @@ const ForgetPsw = ({ setMenu }) => {
           </div>
         </div>
         
-
         {error && (
           <div className="registro-modal">
             <div className="registro-modal-content">
               <h3>{error.title}</h3>
               <p>{error.message}</p>
+              {error.details && (
+                <div className="error-details">
+                  <p className="error-details-title">Detalles técnicos:</p>
+                  <pre className="error-details-content">{error.details}</pre>
+                </div>
+              )}
               <div className="registro-modal-buttons">
                 <button onClick={closeModal} className="registro-modal-button">
                   {success ? "Ir a Login" : "Cerrar"}
