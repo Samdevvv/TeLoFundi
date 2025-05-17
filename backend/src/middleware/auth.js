@@ -15,15 +15,23 @@ const authMiddleware = async (req, res, next) => {
   try {
     // Obtener token del header
     const authHeader = req.headers.authorization;
+    let token;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Manejo mejorado del token
+    if (!authHeader) {
       return res.status(401).json({
         success: false,
         message: 'No autorizado. Token no proporcionado',
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    // Extraer el token con o sin prefijo "Bearer"
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1].trim();
+    } else {
+      // Si el token viene sin el prefijo "Bearer", usar todo el valor
+      token = authHeader.trim();
+    }
 
     if (!token) {
       return res.status(401).json({
@@ -32,13 +40,36 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
+    // Registrar información sobre el token recibido (para depuración)
+    logger.debug(`Token recibido: ${token.substring(0, 10)}...`);
+
     // Verificar token
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
+      // Registrar información sobre el token decodificado (para depuración)
+      logger.debug(`Token decodificado para el usuario: ${decoded.id || decoded.sub}`);
+      
       // Verificar que el usuario exista y esté activo
+      // Se modifica para aceptar tanto decoded.id como decoded.sub
+      const userId = decoded.id || decoded.sub;
+      
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Token inválido: no contiene identificador de usuario',
+        });
+      }
+      
       const user = await prisma.user.findUnique({
-        where: { id: decoded.sub },
+        where: { id: userId },
+        include: {
+          userRoles: {
+            include: {
+              role: true
+            }
+          }
+        }
       });
 
       if (!user || !user.isActive) {
@@ -49,7 +80,6 @@ const authMiddleware = async (req, res, next) => {
       }
 
       // Verificar si existe una sesión activa
-      // Esto es opcional, pero añade seguridad
       const session = await prisma.userSession.findFirst({
         where: {
           userId: user.id,
@@ -61,6 +91,7 @@ const authMiddleware = async (req, res, next) => {
       });
 
       if (!session) {
+        logger.debug(`No se encontró sesión activa para el usuario: ${user.id}`);
         return res.status(401).json({
           success: false,
           message: 'Sesión expirada o inválida',
@@ -75,6 +106,8 @@ const authMiddleware = async (req, res, next) => {
         isVip: user.isVip,
       };
 
+      logger.debug(`Usuario autenticado correctamente: ${user.id}, rol: ${user.role}`);
+
       // Continuar con el siguiente middleware
       next();
     } catch (error) {
@@ -85,6 +118,10 @@ const authMiddleware = async (req, res, next) => {
           success: false,
           message: 'Token expirado',
         });
+      }
+
+      if (error.name === 'JsonWebTokenError') {
+        logger.error(`JWT Error - Token: ${token ? token.substring(0, 15) + '...' : 'undefined'}`);
       }
 
       return res.status(401).json({
@@ -119,12 +156,14 @@ const roleMiddleware = (roles) => {
 
     // Verificar el rol
     if (!roles.includes(req.user.role)) {
+      logger.debug(`Acceso denegado - Usuario: ${req.user.id}, Rol: ${req.user.role}, Roles requeridos: ${roles.join(', ')}`);
       return res.status(403).json({
         success: false,
         message: 'Acceso denegado. No tiene permisos suficientes',
       });
     }
 
+    logger.debug(`Acceso permitido por rol - Usuario: ${req.user.id}, Rol: ${req.user.role}`);
     // Usuario tiene el rol adecuado, continuar
     next();
   };
@@ -139,13 +178,20 @@ const optionalAuthMiddleware = async (req, res, next) => {
   try {
     // Obtener token del header
     const authHeader = req.headers.authorization;
+    let token;
     
     // Si no hay token, continuar sin usuario autenticado
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader) {
       return next();
     }
 
-    const token = authHeader.split(' ')[1];
+    // Extraer el token con o sin prefijo "Bearer"
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1].trim();
+    } else {
+      // Si el token viene sin el prefijo "Bearer", usar todo el valor
+      token = authHeader.trim();
+    }
 
     if (!token) {
       return next();
@@ -155,9 +201,16 @@ const optionalAuthMiddleware = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
+      // Se modifica para aceptar tanto decoded.id como decoded.sub
+      const userId = decoded.id || decoded.sub;
+      
+      if (!userId) {
+        return next();
+      }
+      
       // Verificar que el usuario exista y esté activo
       const user = await prisma.user.findUnique({
-        where: { id: decoded.sub },
+        where: { id: userId },
       });
 
       if (user && user.isActive) {
@@ -186,5 +239,5 @@ const optionalAuthMiddleware = async (req, res, next) => {
 module.exports = {
   authMiddleware,
   roleMiddleware,
-  optionalAuthMiddleware
+  optionalAuthMiddleware,
 };

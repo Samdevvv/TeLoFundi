@@ -11,28 +11,75 @@ const router = express.Router();
  *   description: API para gestión de perfiles
  */
 
+// Ruta de prueba para verificar que el router funciona
+router.get('/test', (req, res) => {
+  res.json({
+    message: 'Router de perfiles funcionando correctamente',
+    methods: Object.keys(profileController)
+  });
+});
+
 /**
  * @swagger
- * /api/profiles/{id}:
+ * /api/profiles:
  *   get:
- *     summary: Obtiene información de un perfil por su ID
+ *     summary: Busca perfiles con opciones de filtrado y paginación
  *     tags: [Profiles]
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Límite de resultados por página
+ *       - in: query
+ *         name: location
  *         schema:
  *           type: string
- *         description: ID del perfil
+ *         description: Filtro por ubicación
+ *       - in: query
+ *         name: service
+ *         schema:
+ *           type: string
+ *         description: Filtro por servicio
+ *       - in: query
+ *         name: verified
+ *         schema:
+ *           type: boolean
+ *         description: Filtro por verificación
+ *       - in: query
+ *         name: priceMin
+ *         schema:
+ *           type: number
+ *         description: Precio mínimo
+ *       - in: query
+ *         name: priceMax
+ *         schema:
+ *           type: number
+ *         description: Precio máximo
+ *       - in: query
+ *         name: gender
+ *         schema:
+ *           type: string
+ *         description: Filtro por género
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Búsqueda general
  *     responses:
  *       200:
- *         description: Información del perfil obtenida con éxito
- *       404:
- *         description: Perfil no encontrado
+ *         description: Lista de perfiles encontrados
  *       500:
  *         description: Error del servidor
  */
-router.get('/:id', optionalAuthMiddleware, profileController.getProfileById);
+router.get('/', optionalAuthMiddleware, profileController.searchProfiles);
 
 /**
  * @swagger
@@ -56,6 +103,62 @@ router.get('/:id', optionalAuthMiddleware, profileController.getProfileById);
  *         description: Error del servidor
  */
 router.get('/slug/:slug', optionalAuthMiddleware, profileController.getProfileBySlug);
+
+/**
+ * @swagger
+ * /api/profiles/favorites:
+ *   get:
+ *     summary: Obtiene los perfiles favoritos del cliente
+ *     tags: [Profiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Límite de resultados por página
+ *     responses:
+ *       200:
+ *         description: Favoritos obtenidos con éxito
+ *       401:
+ *         description: No autorizado
+ *       403:
+ *         description: Prohibido
+ *       500:
+ *         description: Error del servidor
+ */
+router.get('/favorites', authMiddleware, profileController.getFavorites);
+
+/**
+ * @swagger
+ * /api/profiles/{id}:
+ *   get:
+ *     summary: Obtiene información de un perfil por su ID
+ *     tags: [Profiles]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del perfil
+ *     responses:
+ *       200:
+ *         description: Información del perfil obtenida con éxito
+ *       404:
+ *         description: Perfil no encontrado
+ *       500:
+ *         description: Error del servidor
+ */
+router.get('/:id', optionalAuthMiddleware, profileController.getProfileById);
 
 /**
  * @swagger
@@ -190,39 +293,6 @@ router.post('/view', optionalAuthMiddleware, profileController.viewProfile);
  *         description: Error del servidor
  */
 router.post('/favorite', authMiddleware, profileController.toggleFavorite);
-
-/**
- * @swagger
- * /api/profiles/favorites:
- *   get:
- *     summary: Obtiene los perfiles favoritos del cliente
- *     tags: [Profiles]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *         description: Límite de resultados por página
- *     responses:
- *       200:
- *         description: Favoritos obtenidos con éxito
- *       401:
- *         description: No autorizado
- *       403:
- *         description: Prohibido
- *       500:
- *         description: Error del servidor
- */
-router.get('/favorites', authMiddleware, profileController.getFavorites);
 
 /**
  * @swagger

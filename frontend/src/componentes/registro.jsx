@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   FaArrowLeft,
   FaEnvelope,
@@ -48,9 +48,6 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [shouldAnimate, setShouldAnimate] = useState(!transitionDirection);
-  const googleButtonRef = useRef(null);
-  const [googleButtonMode, setGoogleButtonMode] = useState('custom'); // 'custom', 'rendered', o 'redirect'
-  const googleButtonContainerRef = useRef(null);
 
   useEffect(() => {
     // Inicializar el servicio de Google Auth
@@ -58,25 +55,13 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
       try {
         await googleAuthService.initialize();
         console.log("Google Auth inicializado correctamente");
-        
-        // Si el modo es 'rendered', intentar usar el botón renderizado por Google
-        if (googleButtonMode === 'rendered' && googleButtonContainerRef.current) {
-          try {
-            await googleAuthService.signInWithOneTap();
-          } catch (err) {
-            console.warn("No se pudo inicializar One Tap, usando botón personalizado", err);
-            setGoogleButtonMode('custom');
-          }
-        }
       } catch (err) {
         console.error("Error al inicializar Google Auth:", err);
-        // Si falla la inicialización, cambiar al modo de redirección
-        setGoogleButtonMode('redirect');
       }
     };
 
     initGoogleAuth();
-  }, [googleButtonMode]);
+  }, []);
 
   useEffect(() => {
     if (!document.getElementById("modal-root")) {
@@ -141,11 +126,16 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Mejorada para incluir logging
+  // Mejorada para incluir logging y actualizar la UI
   const handleUserTypeChange = (e) => {
     const newUserType = e.target.value;
     console.log(`Tipo de usuario cambiado a: ${newUserType}`);
     setFormData(prev => ({ ...prev, userType: newUserType }));
+    
+    // Si hay un error visible, limpiarlo al cambiar de tipo de usuario
+    if (error) {
+      setError(null);
+    }
   };
 
   const handleClose = () => {
@@ -193,119 +183,38 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     return null;
   };
 
-  const handleGoogleLogin = async () => {
+  // Función simplificada para registro con Google usando redirección
+  const handleGoogleLogin = () => {
     if (loading) return;
     
     try {
       setLoading(true);
       setError(null);
       
-      console.log("Iniciando registro con Google...");
+      // Mostrar tipo de usuario que se está registrando
+      console.log(`Iniciando registro con Google como: ${formData.userType}`);
       
-      let googleResponse;
+      // Guardar el tipo de usuario para recuperarlo después de la redirección
+      localStorage.setItem("googleAuthUserType", formData.userType);
       
-      // Usar el método apropiado según el modo
-      if (googleButtonMode === 'redirect') {
-        // Usar el método de redirección (no devuelve respuesta)
-        googleAuthService.signInWithRedirect();
-        return; // Terminar aquí ya que redireccionará
-      } else {
-        // Usar el método principal con popup
-        googleResponse = await googleAuthService.signIn();
-      }
+      // Usar directamente el método de redirección
+      googleAuthService.signInWithRedirect();
       
-      console.log("Respuesta de Google:", googleResponse);
-      
-      // Autenticar con el backend (simulado) especificando el tipo de usuario seleccionado
-      const authResponse = await googleAuthService.authenticateWithBackend(
-        googleResponse.tokenId, 
-        formData.userType // Pasar el tipo de usuario seleccionado
-      );
-      
-      if (authResponse.success) {
-        if (authResponse.status === "new_user") {
-          // Se creó un nuevo usuario con Google
-          setError({
-            title: "Registro Exitoso",
-            message: `Te has registrado con éxito como ${formData.userType} usando Google. ¡Bienvenido!`,
-          });
-          
-          // Guardar tokens y datos del usuario para iniciar sesión inmediatamente
-          localStorage.setItem("accessToken", authResponse.accessToken);
-          localStorage.setItem("refreshToken", authResponse.refreshToken);
-          
-          const userData = {
-            id: authResponse.userId,
-            email: googleResponse.user.email,
-            name: googleResponse.user.name,
-            profileImage: googleResponse.user.picture,
-            tipoUsuario: authResponse.tipoUsuario,
-            googleAuth: true
-          };
-          
-          localStorage.setItem("user", JSON.stringify(userData));
-          
-          // Si hay una función de inicio de sesión exitoso, la llamamos
-          if (onLoginSuccess) {
-            onLoginSuccess(userData);
-          }
-        } else {
-          // El usuario ya existía, solo se inició sesión
-          localStorage.setItem("accessToken", authResponse.accessToken);
-          localStorage.setItem("refreshToken", authResponse.refreshToken);
-          
-          const userData = {
-            id: authResponse.userId,
-            email: googleResponse.user.email,
-            name: googleResponse.user.name,
-            profileImage: googleResponse.user.picture,
-            tipoUsuario: authResponse.tipoUsuario,
-            googleAuth: true
-          };
-          
-          localStorage.setItem("user", JSON.stringify(userData));
-          
-          // Si hay una función de inicio de sesión exitoso, la llamamos
-          if (onLoginSuccess) {
-            onLoginSuccess(userData);
-          }
-          
-          setError({
-            title: "Inicio de Sesión",
-            message: "Ya tenías una cuenta con este correo electrónico. Has iniciado sesión correctamente.",
-          });
-        }
-      } else {
-        throw new Error("Error en la autenticación con el servidor.");
-      }
+      // No necesitamos más código aquí ya que la redirección nos sacará de la página
     } catch (err) {
-      console.error("Google registro error:", err);
-      let errorMessage = "Error al registrarse con Google";
-      
-      if (err.message && err.message.includes("popup")) {
-        errorMessage = "La ventana emergente fue bloqueada. Por favor, permite las ventanas emergentes para este sitio.";
-        // Cambiar al modo de redirección después de un error de popup
-        setGoogleButtonMode('redirect');
-      } else if (err.message && err.message.includes("OAuth")) {
-        errorMessage = "Error en la autenticación de Google. Intenta con el método alternativo.";
-        setGoogleButtonMode('redirect');
-      } else if (err.message && err.message.includes("disponible")) {
-        errorMessage = "El servicio de Google no está disponible. Intenta con el método alternativo.";
-        setGoogleButtonMode('redirect');
-      }
+      console.error("Error en redirección de Google:", err);
       
       setError({
         title: "Error de Registro",
-        message: errorMessage,
-        retry: false,
-        useAlternative: googleButtonMode !== 'redirect'
+        message: "No se pudo iniciar el proceso de autenticación con Google.",
+        details: err.toString()
       });
-    } finally {
+      
       setLoading(false);
     }
   };
 
-  // Función handleSubmit mejorada
+  // Función handleSubmit para registro manual
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -412,6 +321,7 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
         title: "Error de Registro",
         message: errorMessage,
         retry: !errorMessage.includes("ya está registrado"),
+        details: err.toString()
       });
     } finally {
       setLoading(false);
@@ -440,19 +350,6 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
       handleGoogleLogin();
     } else {
       handleSubmit({ preventDefault: () => {} });
-    }
-  };
-
-  const useAlternativeMethod = () => {
-    try {
-      setGoogleButtonMode('redirect');
-      googleAuthService.signInWithRedirect();
-    } catch (err) {
-      console.error("Error en redirección de Google:", err);
-      setError({
-        title: "Error de Redirección",
-        message: "No se pudo iniciar el proceso de autenticación con Google.",
-      });
     }
   };
 
@@ -497,22 +394,20 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
               </div>
             </div>
             <div className="registro-fields-container">
-              {googleButtonMode === 'rendered' ? (
-                <div id="google-button-container" ref={googleButtonContainerRef} className="google-button-container"></div>
-              ) : (
-                <div className="google-button-container">
-                  <button
-                    type="button"
-                    className="google-button"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    ref={googleButtonRef}
-                  >
-                    <GoogleIcon />
-                    {googleButtonMode === 'redirect' ? "Continuar con Google (Redirección)" : "Continuar con Google"}
-                  </button>
-                </div>
-              )}
+              <div className="google-button-container">
+                <button
+                  type="button"
+                  className="google-button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  <GoogleIcon />
+                  {loading ? "Procesando..." : 
+                   `Registrarme con Google como ${formData.userType === "cliente" ? "Cliente" : 
+                                                formData.userType === "acompanante" ? "Acompañante" : 
+                                                "Agencia"}`}
+                </button>
+              </div>
               
               <div className="or-divider">o</div>
               
@@ -597,15 +492,16 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
             <div className="registro-modal-content">
               <h3>{error.title}</h3>
               <p>{error.message}</p>
+              {error.details && (
+                <div className="error-details">
+                  <p className="error-details-title">Detalles técnicos:</p>
+                  <pre className="error-details-content">{error.details}</pre>
+                </div>
+              )}
               <div className="registro-modal-buttons">
                 {error.retry && (
                   <button onClick={retrySubmit} className="registro-modal-button">
                     Reintentar
-                  </button>
-                )}
-                {error.useAlternative && (
-                  <button onClick={useAlternativeMethod} className="registro-modal-button">
-                    Método alternativo
                   </button>
                 )}
                 <button onClick={closeModal} className="registro-modal-button">

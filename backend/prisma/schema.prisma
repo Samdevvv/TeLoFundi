@@ -7,7 +7,1303 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enumeraciones
+model User {
+  id                       String                @id @default(uuid())
+  email                    String?               @unique
+  emailVerified            Boolean               @default(false) @map("email_verified")
+  emailVerificationToken   String?               @map("email_verification_token")
+  emailVerificationExpires DateTime?             @map("email_verification_expires")
+  phone                    String?               @unique
+  phoneVerified            Boolean               @default(false) @map("phone_verified")
+  phoneVerificationCode    String?               @map("phone_verification_code")
+  phoneVerificationExpires DateTime?             @map("phone_verification_expires")
+  passwordHash             String?               @map("password_hash")
+  role                     UserRole
+  isActive                 Boolean               @default(true) @map("is_active")
+  isVip                    Boolean               @default(false) @map("is_vip")
+  vipLevel                 VipLevel?             @map("vip_level")
+  lastLogin                DateTime?             @map("last_login")
+  failedLoginAttempts      Int                   @default(0) @map("failed_login_attempts")
+  accountLocked            Boolean               @default(false) @map("account_locked")
+  accountLockedUntil       DateTime?             @map("account_locked_until")
+  createdAt                DateTime              @default(now()) @map("created_at")
+  updatedAt                DateTime              @default(now()) @map("updated_at")
+  deletedAt                DateTime?             @map("deleted_at")
+  ipAddress                String?               @map("ip_address")
+  lastIpAddress            String?               @map("last_ip_address")
+  userAgent                String?               @map("user_agent")
+  preferredLanguage        String                @default("es") @map("preferred_language")
+  marketingOptIn           Boolean               @default(false) @map("marketing_opt_in")
+  termsAcceptedAt          DateTime?             @map("terms_accepted_at")
+  privacyAcceptedAt        DateTime?             @map("privacy_accepted_at")
+  profileImageUrl          String?               @map("profile_image_url")
+  agency                   Agency?
+  client                   Client?
+  emailSettings            EmailSetting?
+  externalAuth             ExternalAuth[]
+  invoices                 Invoice[]
+  receivedMessages         Message[]             @relation("ReceivedMessages")
+  sentMessages             Message[]             @relation("SentMessages")
+  notifications            Notification[]
+  paymentMethods           PaymentMethodSaved[]
+  payments                 Payment[]
+  pointBalanceHistory      PointBalanceHistory[]
+  pointTransactions        PointTransaction[]
+  profile                  Profile?
+  raffleEntries            RaffleEntry[]
+  supportTickets           SupportTicket[]
+  sentTicketMessages       TicketMessage[]       @relation("TicketMessageSender")
+  originalCoupons          UserCoupon[]          @relation("OriginalCoupons")
+  transferredCoupons       UserCoupon[]          @relation("TransferredCoupons")
+  userCoupons              UserCoupon[]
+  devices                  UserDevice[]
+  userPremiumServices      UserPremiumService[]
+  reported                 UserReport[]          @relation("ReportedUser")
+  reportedBy               UserReport[]          @relation("ReporterUser")
+  userRoles                UserRoleMapping[]
+  sessions                 UserSession[]
+  userVipMemberships       UserVipMembership[]
+
+  @@map("users")
+}
+
+model ExternalAuth {
+  id             String     @id @default(uuid())
+  userId         String     @map("user_id")
+  provider       AuthMethod
+  providerUserId String     @map("provider_user_id")
+  providerEmail  String?    @map("provider_email")
+  accessToken    String?    @map("access_token")
+  refreshToken   String?    @map("refresh_token")
+  tokenExpiresAt DateTime?  @map("token_expires_at")
+  profileData    Json?      @map("profile_data")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @default(now()) @map("updated_at")
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@map("external_auth")
+}
+
+model UserSession {
+  id           String      @id @default(uuid())
+  userId       String      @map("user_id")
+  token        String      @unique
+  ipAddress    String?     @map("ip_address")
+  userAgent    String?     @map("user_agent")
+  deviceType   DeviceType? @map("device_type")
+  deviceInfo   Json?       @map("device_info")
+  location     Json?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  expiresAt    DateTime    @map("expires_at")
+  lastActivity DateTime    @default(now()) @map("last_activity")
+  isActive     Boolean     @default(true) @map("is_active")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model Client {
+  id               String           @id
+  username         String?          @unique
+  totalPoints      Int              @default(0) @map("total_points")
+  vipUntil         DateTime?        @map("vip_until")
+  preferences      Json?
+  favoriteProfiles Json?            @map("favorite_profiles")
+  blockedProfiles  Json?            @map("blocked_profiles")
+  lastActivity     DateTime?        @map("last_activity")
+  referralCode     String?          @unique @map("referral_code")
+  referredBy       String?          @map("referred_by")
+  totalContacts    Int              @default(0) @map("total_contacts")
+  verifiedAccount  Boolean          @default(false) @map("verified_account")
+  user             User             @relation(fields: [id], references: [id], onDelete: Cascade)
+  referrer         Client?          @relation("ClientReferrals", fields: [referredBy], references: [id])
+  referrals        Client[]         @relation("ClientReferrals")
+  conversations    Conversation[]
+  profileContacts  ProfileContact[]
+
+  @@map("clients")
+}
+
+model Agency {
+  id                   String                @id
+  name                 String
+  slug                 String                @unique
+  description          String?
+  shortDescription     String?               @map("short_description")
+  website              String?
+  address              String?
+  city                 String?
+  stateProvince        String?               @map("state_province")
+  country              String?
+  postalCode           String?               @map("postal_code")
+  verificationStatus   VerificationStatus    @default(no_verificado) @map("verification_status")
+  verifiedAt           DateTime?             @map("verified_at")
+  verifiedBy           String?               @map("verified_by")
+  logoUrl              String?               @map("logo_url")
+  coverImageUrl        String?               @map("cover_image_url")
+  galleryImages        Json?                 @map("gallery_images")
+  socialMedia          Json?                 @map("social_media")
+  businessHours        Json?                 @map("business_hours")
+  commissionRate       Decimal?              @map("commission_rate")
+  commissionStructure  Json?                 @map("commission_structure")
+  subscriptionTier     String?               @map("subscription_tier")
+  subscriptionExpires  DateTime?             @map("subscription_expires")
+  paymentMethods       Json?                 @map("payment_methods")
+  contactPhone         String?               @map("contact_phone")
+  contactEmail         String?               @map("contact_email")
+  contactWhatsapp      String?               @map("contact_whatsapp")
+  totalProfiles        Int                   @default(0) @map("total_profiles")
+  activeProfiles       Int                   @default(0) @map("active_profiles")
+  verifiedProfiles     Int                   @default(0) @map("verified_profiles")
+  rating               Decimal?
+  totalRatings         Int                   @default(0) @map("total_ratings")
+  featuredUntil        DateTime?             @map("featured_until")
+  taxId                String?               @map("tax_id")
+  legalName            String?               @map("legal_name")
+  legalRepresentative  String?               @map("legal_representative")
+  establishmentYear    Int?                  @map("establishment_year")
+  isExclusive          Boolean               @default(false) @map("is_exclusive")
+  notes                String?
+  user                 User                  @relation(fields: [id], references: [id], onDelete: Cascade)
+  agencyCommissions    AgencyCommission[]
+  agencySubscriptions  AgencySubscription[]
+  commissionPayments   CommissionPayment[]
+  profileVerifications ProfileVerification[]
+  profiles             Profile[]
+
+  @@map("agencies")
+}
+
+model Profile {
+  id                       String                @id
+  displayName              String                @map("display_name")
+  slug                     String                @unique
+  realName                 String?               @map("real_name")
+  gender                   GenderType
+  birthDate                DateTime?             @map("birth_date") @db.Date
+  age                      Int?
+  agencyId                 String?               @map("agency_id")
+  description              String?
+  shortDescription         String?               @map("short_description")
+  verificationStatus       VerificationStatus    @default(no_verificado) @map("verification_status")
+  verifiedAt               DateTime?             @map("verified_at")
+  verifiedBy               String?               @map("verified_by")
+  verificationExpires      DateTime?             @map("verification_expires")
+  height                   Int?
+  weight                   Int?
+  measurements             String?
+  eyeColor                 String?               @map("eye_color")
+  hairColor                String?               @map("hair_color")
+  skinTone                 String?               @map("skin_tone")
+  nationality              String?
+  languages                Json?
+  location                 Json?
+  travelAvailability       Boolean               @default(false) @map("travel_availability")
+  travelDestinations       Json?                 @map("travel_destinations")
+  services                 Json?
+  priceHour                Decimal?              @map("price_hour")
+  priceAdditionalHour      Decimal?              @map("price_additional_hour")
+  priceOvernight           Decimal?              @map("price_overnight")
+  priceWeekend             Decimal?              @map("price_weekend")
+  priceTravel              Decimal?              @map("price_travel")
+  discountPackages         Json?                 @map("discount_packages")
+  currency                 String                @default("USD")
+  paymentMethods           Json?                 @map("payment_methods")
+  availabilityStatus       AvailabilityStatus    @default(disponible) @map("availability_status")
+  availabilitySchedule     Json?                 @map("availability_schedule")
+  contactMethods           Json?                 @map("contact_methods")
+  preferredContactHours    Json?                 @map("preferred_contact_hours")
+  isIndependent            Boolean               @default(false) @map("is_independent")
+  totalViews               Int                   @default(0) @map("total_views")
+  totalContacts            Int                   @default(0) @map("total_contacts")
+  totalFavorites           Int                   @default(0) @map("total_favorites")
+  isFeatured               Boolean               @default(false) @map("is_featured")
+  featuredUntil            DateTime?             @map("featured_until")
+  boostUntil               DateTime?             @map("boost_until")
+  searchBoostFactor        Int                   @default(1) @map("search_boost_factor")
+  lastActivity             DateTime?             @map("last_activity")
+  hasHealthCertificate     Boolean               @default(false) @map("has_health_certificate")
+  healthCertificateExpires DateTime?             @map("health_certificate_expires")
+  orientation              String?
+  personalityTags          Json?                 @map("personality_tags")
+  interests                Json?
+  tattoos                  Boolean               @default(false)
+  piercings                Boolean               @default(false)
+  smoker                   Boolean               @default(false)
+  educationLevel           String?               @map("education_level")
+  aboutMe                  String?               @map("about_me")
+  hidden                   Boolean               @default(false)
+  agencyChanges            AgencyChange[]
+  conversations            Conversation[]
+  profileContacts          ProfileContact[]
+  images                   ProfileImage[]
+  profileMetrics           ProfileMetric[]
+  profileTags              ProfileTag[]
+  profileVerifications     ProfileVerification[]
+  profileViews             ProfileView[]
+  agency                   Agency?               @relation(fields: [agencyId], references: [id])
+  user                     User                  @relation(fields: [id], references: [id], onDelete: Cascade)
+  userPremiumServices      UserPremiumService[]
+
+  @@map("profiles")
+}
+
+model ProfileImage {
+  id            String    @id @default(uuid())
+  profileId     String    @map("profile_id")
+  imageUrl      String    @map("image_url")
+  thumbnailUrl  String?   @map("thumbnail_url")
+  mediumUrl     String?   @map("medium_url")
+  isMain        Boolean   @default(false) @map("is_main")
+  isApproved    Boolean   @default(false) @map("is_approved")
+  approvedBy    String?   @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+  isPublic      Boolean   @default(true) @map("is_public")
+  isPrivate     Boolean   @default(false) @map("is_private")
+  uploadDate    DateTime  @default(now()) @map("upload_date")
+  description   String?
+  orderPosition Int       @default(0) @map("order_position")
+  blurHash      String?   @map("blur_hash")
+  contentType   String    @default("image/jpeg") @map("content_type")
+  fileSize      Int?      @map("file_size")
+  dimensions    Json?
+  tags          Json?
+  profile       Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_images")
+}
+
+model PointTransaction {
+  id                  String                @id @default(uuid())
+  userId              String                @map("user_id")
+  action              PointAction
+  points              Int
+  referenceId         String?               @map("reference_id")
+  referenceType       String?               @map("reference_type")
+  description         String?
+  createdAt           DateTime              @default(now()) @map("created_at")
+  createdBy           String?               @map("created_by")
+  expirationDate      DateTime?             @map("expiration_date")
+  isExpired           Boolean               @default(false) @map("is_expired")
+  transactionBatch    String?               @map("transaction_batch")
+  pointBalanceHistory PointBalanceHistory[]
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  raffleEntry         RaffleEntry[]
+  userVipMembership   UserVipMembership[]
+
+  @@map("point_transactions")
+}
+
+model PointBalanceHistory {
+  id              String            @id @default(uuid())
+  userId          String            @map("user_id")
+  previousBalance Int               @map("previous_balance")
+  newBalance      Int               @map("new_balance")
+  transactionId   String?           @map("transaction_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  transaction     PointTransaction? @relation(fields: [transactionId], references: [id])
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("point_balance_history")
+}
+
+model CouponPackage {
+  id                  String              @id @default(uuid())
+  name                String
+  description         String?
+  shortDescription    String?             @map("short_description")
+  price               Decimal
+  discountPrice       Decimal?            @map("discount_price")
+  currency            String              @default("USD")
+  pointsGranted       Int                 @map("points_granted")
+  sorteoEntries       Int                 @default(0) @map("sorteo_entries")
+  isActive            Boolean             @default(true) @map("is_active")
+  isFeatured          Boolean             @default(false) @map("is_featured")
+  minPurchaseLevel    Int                 @default(0) @map("min_purchase_level")
+  maxPurchasesPerUser Int?                @map("max_purchases_per_user")
+  totalAvailable      Int?                @map("total_available")
+  imageUrl            String?             @map("image_url")
+  startDate           DateTime?           @map("start_date")
+  endDate             DateTime?           @map("end_date")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @default(now()) @map("updated_at")
+  createdBy           String?             @map("created_by")
+  packageItems        CouponPackageItem[]
+
+  @@map("coupon_packages")
+}
+
+model CouponPackageItem {
+  id                 String        @id @default(uuid())
+  packageId          String        @map("package_id")
+  discountPercentage Int           @map("discount_percentage")
+  quantity           Int           @default(1)
+  validDays          Int           @default(30) @map("valid_days")
+  minPurchaseAmount  Decimal?      @map("min_purchase_amount")
+  maxDiscountAmount  Decimal?      @map("max_discount_amount")
+  applicableServices Json?         @map("applicable_services")
+  package            CouponPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  userCoupons        UserCoupon[]
+
+  @@map("coupon_package_items")
+}
+
+model UserCoupon {
+  id                 String             @id @default(uuid())
+  userId             String             @map("user_id")
+  packageItemId      String?            @map("package_item_id")
+  code               String             @unique
+  discountPercentage Int                @map("discount_percentage")
+  isUsed             Boolean            @default(false) @map("is_used")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  expiresAt          DateTime           @map("expires_at")
+  usedAt             DateTime?          @map("used_at")
+  usedFor            String?            @map("used_for")
+  usedInPayment      String?            @map("used_in_payment")
+  isTransferable     Boolean            @default(false) @map("is_transferable")
+  transferredTo      String?            @map("transferred_to")
+  transferredAt      DateTime?          @map("transferred_at")
+  originalOwner      String?            @map("original_owner")
+  paymentUsed        Payment?           @relation("CouponPayment")
+  originalOwnerUser  User?              @relation("OriginalCoupons", fields: [originalOwner], references: [id])
+  packageItem        CouponPackageItem? @relation(fields: [packageItemId], references: [id])
+  transferredToUser  User?              @relation("TransferredCoupons", fields: [transferredTo], references: [id])
+  payment            Payment?           @relation(fields: [usedInPayment], references: [id])
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_coupons")
+}
+
+model Conversation {
+  id                 String    @id @default(uuid())
+  clientId           String    @map("client_id")
+  profileId          String    @map("profile_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @map("updated_at")
+  isActive           Boolean   @default(true) @map("is_active")
+  isArchived         Boolean   @default(false) @map("is_archived")
+  isBlocked          Boolean   @default(false) @map("is_blocked")
+  blockedBy          String?   @map("blocked_by")
+  lastMessageAt      DateTime? @map("last_message_at")
+  totalMessages      Int       @default(0) @map("total_messages")
+  unreadClient       Int       @default(0) @map("unread_client")
+  unreadProfile      Int       @default(0) @map("unread_profile")
+  lastMessagePreview String?   @map("last_message_preview")
+  metadata           Json?
+  client             Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  profile            Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  messages           Message[]
+
+  @@unique([clientId, profileId])
+  @@map("conversations")
+}
+
+model Message {
+  id                 String        @id @default(uuid())
+  conversationId     String        @map("conversation_id")
+  senderId           String        @map("sender_id")
+  recipientId        String        @map("recipient_id")
+  content            String
+  contentType        String        @default("text") @map("content_type")
+  attachments        Json?
+  status             MessageStatus @default(enviado)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  deliveredAt        DateTime?     @map("delivered_at")
+  readAt             DateTime?     @map("read_at")
+  deletedBySender    Boolean       @default(false) @map("deleted_by_sender")
+  deletedByRecipient Boolean       @default(false) @map("deleted_by_recipient")
+  reaction           String?
+  edited             Boolean       @default(false)
+  editedAt           DateTime?     @map("edited_at")
+  originalContent    String?       @map("original_content")
+  metadata           Json?
+  conversation       Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  recipient          User          @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender             User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model ProfileContact {
+  id                  String        @id @default(uuid())
+  clientId            String        @map("client_id")
+  profileId           String        @map("profile_id")
+  contactMethod       ContactMethod
+  contactData         String?       @map("contact_data")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  pointsAwarded       Boolean       @default(false) @map("points_awarded")
+  pointsTransactionId String?       @map("points_transaction_id")
+  initiatedBy         String?       @map("initiated_by")
+  isSuccessful        Boolean?      @map("is_successful")
+  notes               String?
+  location            Json?
+  deviceInfo          Json?         @map("device_info")
+  client              Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  profile             Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_contacts")
+}
+
+model ProfileView {
+  id          String      @id @default(uuid())
+  profileId   String      @map("profile_id")
+  viewerId    String?     @map("viewer_id")
+  viewedAt    DateTime    @default(now()) @map("viewed_at")
+  ipAddress   String?     @map("ip_address")
+  sessionId   String?     @map("session_id")
+  deviceType  DeviceType?
+  deviceInfo  Json?       @map("device_info")
+  referrer    String?
+  duration    Int?
+  location    Json?
+  searchQuery String?     @map("search_query")
+  profile     Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_views")
+}
+
+model PaymentMethodSaved {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  paymentMethod   PaymentMethod @map("payment_method")
+  isDefault       Boolean       @default(false) @map("is_default")
+  provider        String
+  providerToken   String?       @map("provider_token")
+  cardLastFour    String?       @map("card_last_four")
+  cardBrand       String?       @map("card_brand")
+  cardExpiryMonth Int?          @map("card_expiry_month")
+  cardExpiryYear  Int?          @map("card_expiry_year")
+  billingName     String?       @map("billing_name")
+  billingAddress  Json?         @map("billing_address")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @map("updated_at")
+  isVerified      Boolean       @default(false) @map("is_verified")
+  isActive        Boolean       @default(true) @map("is_active")
+  metadata        Json?
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+
+  @@map("payment_methods_saved")
+}
+
+model Payment {
+  id                    String                 @id @default(uuid())
+  userId                String                 @map("user_id")
+  amount                Decimal
+  currency              String                 @default("USD")
+  paymentType           PaymentType            @map("payment_type")
+  referenceId           String?                @map("reference_id")
+  referenceType         String?                @map("reference_type")
+  paymentMethodType     PaymentMethod          @map("payment_method")
+  paymentMethodId       String?                @map("payment_method_id")
+  provider              String
+  providerTransactionId String?                @map("provider_transaction_id")
+  providerFee           Decimal?               @map("provider_fee")
+  platformFee           Decimal?               @map("platform_fee")
+  totalFees             Decimal?               @map("total_fees")
+  netAmount             Decimal?               @map("net_amount")
+  status                PaymentStatus          @default(pendiente)
+  statusDetail          String?                @map("status_detail")
+  statusUpdatedAt       DateTime?              @map("status_updated_at")
+  couponId              String?                @unique @map("coupon_id")
+  discountAmount        Decimal                @default(0) @map("discount_amount")
+  taxAmount             Decimal                @default(0) @map("tax_amount")
+  taxRate               Decimal?               @map("tax_rate")
+  billingAddress        Json?                  @map("billing_address")
+  invoiceNumber         String?                @map("invoice_number")
+  invoiceUrl            String?                @map("invoice_url")
+  receiptUrl            String?                @map("receipt_url")
+  refundId              String?                @map("refund_id")
+  refundReason          String?                @map("refund_reason")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @default(now()) @map("updated_at")
+  completedAt           DateTime?              @map("completed_at")
+  canceledAt            DateTime?              @map("canceled_at")
+  canceledReason        String?                @map("canceled_reason")
+  metadata              Json?
+  ipAddress             String?                @map("ip_address")
+  deviceInfo            Json?                  @map("device_info")
+  agencySubscriptions   AgencySubscription[]
+  invoice               Invoice?
+  statusHistory         PaymentStatusHistory[]
+  coupon                UserCoupon?            @relation("CouponPayment", fields: [couponId], references: [id])
+  savedPaymentMethod    PaymentMethodSaved?    @relation(fields: [paymentMethodId], references: [id])
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileVerifications  ProfileVerification[]
+  refunds               Refund[]
+  userCoupons           UserCoupon[]
+  userPremiumServices   UserPremiumService[]
+  userVipMemberships    UserVipMembership[]
+
+  @@map("payments")
+}
+
+model PaymentStatusHistory {
+  id             String         @id @default(uuid())
+  paymentId      String         @map("payment_id")
+  previousStatus PaymentStatus? @map("previous_status")
+  newStatus      PaymentStatus  @map("new_status")
+  changedAt      DateTime       @default(now()) @map("changed_at")
+  changedBy      String?        @map("changed_by")
+  reason         String?
+  metadata       Json?
+  payment        Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("payment_status_history")
+}
+
+model Invoice {
+  id             String    @id @default(uuid())
+  paymentId      String?   @unique @map("payment_id")
+  userId         String    @map("user_id")
+  invoiceNumber  String    @unique @map("invoice_number")
+  invoiceDate    DateTime  @default(now()) @map("invoice_date")
+  dueDate        DateTime? @map("due_date")
+  totalAmount    Decimal   @map("total_amount")
+  currency       String    @default("USD")
+  status         String    @default("emitida")
+  paidAt         DateTime? @map("paid_at")
+  pdfUrl         String?   @map("pdf_url")
+  items          Json?
+  billingDetails Json?     @map("billing_details")
+  taxDetails     Json?     @map("tax_details")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  payment        Payment?  @relation(fields: [paymentId], references: [id])
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+model Refund {
+  id               String    @id @default(uuid())
+  paymentId        String    @map("payment_id")
+  amount           Decimal
+  reason           String
+  requestedBy      String    @map("requested_by")
+  approvedBy       String?   @map("approved_by")
+  status           String    @default("pendiente")
+  providerRefundId String?   @map("provider_refund_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @map("updated_at")
+  completedAt      DateTime? @map("completed_at")
+  notes            String?
+  metadata         Json?
+  payment          Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("refunds")
+}
+
+model PremiumService {
+  id                  String               @id @default(uuid())
+  name                String
+  description         String?
+  shortDescription    String?              @map("short_description")
+  price               Decimal
+  discountPrice       Decimal?             @map("discount_price")
+  currency            String               @default("USD")
+  durationDays        Int                  @map("duration_days")
+  serviceType         String               @map("service_type")
+  benefits            Json?
+  appliesTo           String               @map("applies_to")
+  isRecurring         Boolean              @default(false) @map("is_recurring")
+  isActive            Boolean              @default(true) @map("is_active")
+  isFeatured          Boolean              @default(false) @map("is_featured")
+  imageUrl            String?              @map("image_url")
+  maxPurchases        Int?                 @map("max_purchases")
+  totalAvailable      Int?                 @map("total_available")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @default(now()) @map("updated_at")
+  createdBy           String?              @map("created_by")
+  userPremiumServices UserPremiumService[]
+
+  @@map("premium_services")
+}
+
+model UserPremiumService {
+  id           String         @id @default(uuid())
+  userId       String         @map("user_id")
+  serviceId    String         @map("service_id")
+  profileId    String?        @map("profile_id")
+  agencyId     String?        @map("agency_id")
+  paymentId    String?        @map("payment_id")
+  startsAt     DateTime       @default(now()) @map("starts_at")
+  expiresAt    DateTime       @map("expires_at")
+  isActive     Boolean        @default(true) @map("is_active")
+  autoRenew    Boolean        @default(false) @map("auto_renew")
+  canceledAt   DateTime?      @map("canceled_at")
+  cancelReason String?        @map("cancel_reason")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  metadata     Json?
+  payment      Payment?       @relation(fields: [paymentId], references: [id])
+  profile      Profile?       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  service      PremiumService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_premium_services")
+}
+
+model VipMembership {
+  id                 String              @id @default(uuid())
+  name               String
+  description        String?
+  shortDescription   String?             @map("short_description")
+  price              Decimal
+  discountPrice      Decimal?            @map("discount_price")
+  currency           String              @default("USD")
+  durationDays       Int                 @map("duration_days")
+  level              VipLevel
+  pointsMultiplier   Decimal             @default(1.0) @map("points_multiplier")
+  signupPoints       Int                 @default(0) @map("signup_points")
+  benefits           Json?
+  isActive           Boolean             @default(true) @map("is_active")
+  isFeatured         Boolean             @default(false) @map("is_featured")
+  imageUrl           String?             @map("image_url")
+  maxPurchases       Int?                @map("max_purchases")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @default(now()) @map("updated_at")
+  createdBy          String?             @map("created_by")
+  userVipMemberships UserVipMembership[]
+
+  @@map("vip_memberships")
+}
+
+model UserVipMembership {
+  id                  String            @id @default(uuid())
+  userId              String            @map("user_id")
+  membershipId        String            @map("membership_id")
+  paymentId           String?           @map("payment_id")
+  startsAt            DateTime          @default(now()) @map("starts_at")
+  expiresAt           DateTime          @map("expires_at")
+  isActive            Boolean           @default(true) @map("is_active")
+  autoRenew           Boolean           @default(false) @map("auto_renew")
+  canceledAt          DateTime?         @map("canceled_at")
+  cancelReason        String?           @map("cancel_reason")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  pointsAwarded       Boolean           @default(false) @map("points_awarded")
+  pointsTransactionId String?           @map("points_transaction_id")
+  membership          VipMembership     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  payment             Payment?          @relation(fields: [paymentId], references: [id])
+  pointsTransaction   PointTransaction? @relation(fields: [pointsTransactionId], references: [id])
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_vip_memberships")
+}
+
+model Raffle {
+  id                String        @id @default(uuid())
+  title             String
+  description       String?
+  shortDescription  String?       @map("short_description")
+  prizeDescription  String        @map("prize_description")
+  prizeValue        Decimal?      @map("prize_value")
+  prizeImageUrl     String?       @map("prize_image_url")
+  startsAt          DateTime      @map("starts_at")
+  endsAt            DateTime      @map("ends_at")
+  drawingDate       DateTime?     @map("drawing_date")
+  minPointsRequired Int           @default(0) @map("min_points_required")
+  pointsPerEntry    Int           @default(10) @map("points_per_entry")
+  maxEntriesPerUser Int?          @map("max_entries_per_user")
+  isActive          Boolean       @default(true) @map("is_active")
+  requiresVip       Boolean       @default(false) @map("requires_vip")
+  minVipLevel       VipLevel?     @map("min_vip_level")
+  winnerId          String?       @map("winner_id")
+  winnerSelectedAt  DateTime?     @map("winner_selected_at")
+  winnerNotified    Boolean       @default(false) @map("winner_notified")
+  winnerConfirmed   Boolean       @default(false) @map("winner_confirmed")
+  prizeDelivered    Boolean       @default(false) @map("prize_delivered")
+  prizeDeliveredAt  DateTime?     @map("prize_delivered_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @default(now()) @map("updated_at")
+  createdBy         String?       @map("created_by")
+  totalEntries      Int           @default(0) @map("total_entries")
+  rulesText         String?       @map("rules_text")
+  entries           RaffleEntry[]
+
+  @@map("raffles")
+}
+
+model RaffleEntry {
+  id                  String            @id @default(uuid())
+  raffleId            String            @map("raffle_id")
+  userId              String            @map("user_id")
+  pointsSpent         Int               @default(0) @map("points_spent")
+  entriesCount        Int               @default(1) @map("entries_count")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  pointsTransactionId String?           @map("points_transaction_id")
+  entryNumber         Int?              @map("entry_number")
+  isWinner            Boolean           @default(false) @map("is_winner")
+  pointsTransaction   PointTransaction? @relation(fields: [pointsTransactionId], references: [id])
+  raffle              Raffle            @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([raffleId, userId, entryNumber])
+  @@map("raffle_entries")
+}
+
+model AgencyChange {
+  id               String   @id @default(uuid())
+  profileId        String   @map("profile_id")
+  previousAgencyId String?  @map("previous_agency_id")
+  newAgencyId      String?  @map("new_agency_id")
+  changeDate       DateTime @default(now()) @map("change_date")
+  requestedBy      String?  @map("requested_by")
+  approvedBy       String?  @map("approved_by")
+  status           String   @default("pendiente")
+  reason           String?
+  notes            String?
+  profile          Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("agency_changes")
+}
+
+model SystemSetting {
+  id                              Int      @id @default(1)
+  pointsForRegistration           Int      @default(50) @map("points_for_registration")
+  pointsForDailyLogin             Int      @default(5) @map("points_for_daily_login")
+  pointsForContact                Int      @default(10) @map("points_for_contact")
+  pointsForReferral               Int      @default(25) @map("points_for_referral")
+  pointsForProfileCompletion      Int      @default(15) @map("points_for_profile_completion")
+  vipPointsMultiplier             Decimal  @default(2.0) @map("vip_points_multiplier")
+  minPointsForCoupon              Int      @default(100) @map("min_points_for_coupon")
+  pointsExpirationDays            Int      @default(365) @map("points_expiration_days")
+  defaultCurrency                 String   @default("USD") @map("default_currency")
+  minProfileImages                Int      @default(1) @map("min_profile_images")
+  maxProfileImages                Int      @default(20) @map("max_profile_images")
+  maxAgencyProfiles               Int?     @default(100) @map("max_agency_profiles")
+  contactMethodsEnabled           Json     @default("[]") @map("contact_methods_enabled")
+  maintenanceMode                 Boolean  @default(false) @map("maintenance_mode")
+  maintenanceMessage              String?  @map("maintenance_message")
+  maximumLoginAttempts            Int      @default(5) @map("maximum_login_attempts")
+  accountLockoutMinutes           Int      @default(30) @map("account_lockout_minutes")
+  verificationRequiredForProfiles Boolean  @default(false) @map("verification_required_for_profiles")
+  autoVerificationExpirationDays  Int      @default(90) @map("auto_verification_expiration_days")
+  platformCommissionPercentage    Decimal  @default(10.00) @map("platform_commission_percentage")
+  vipCommissionDiscount           Decimal  @default(2.00) @map("vip_commission_discount")
+  searchBoostVipFactor            Int      @default(2) @map("search_boost_vip_factor")
+  searchBoostFeaturedFactor       Int      @default(3) @map("search_boost_featured_factor")
+  searchBoostVerifiedFactor       Int      @default(2) @map("search_boost_verified_factor")
+  defaultSearchRadius             Int      @default(50) @map("default_search_radius")
+  defaultPaginationLimit          Int      @default(20) @map("default_pagination_limit")
+  settings                        Json?
+  lastUpdated                     DateTime @default(now()) @map("last_updated")
+  updatedBy                       String?  @map("updated_by")
+
+  @@map("system_settings")
+}
+
+model ProfileVerification {
+  id                   String                 @id @default(uuid())
+  profileId            String                 @map("profile_id")
+  agencyId             String                 @map("agency_id")
+  status               VerificationStatus     @default(pendiente)
+  verificationDate     DateTime?              @map("verification_date")
+  expiresAt            DateTime?              @map("expires_at")
+  verifiedBy           String?                @map("verified_by")
+  verificationMethod   String?                @map("verification_method")
+  verificationLocation String?                @map("verification_location")
+  notes                String?
+  documentUrls         Json?                  @map("document_urls")
+  verificationPhotoUrl String?                @map("verification_photo_url")
+  paymentId            String?                @map("payment_id")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @default(now()) @map("updated_at")
+  agency               Agency                 @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  payment              Payment?               @relation(fields: [paymentId], references: [id])
+  profile              Profile                @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  documents            VerificationDocument[]
+
+  @@map("profile_verifications")
+}
+
+model VerificationDocument {
+  id              String              @id @default(uuid())
+  verificationId  String              @map("verification_id")
+  documentType    DocumentType
+  documentUrl     String              @map("document_url")
+  isVerified      Boolean             @default(false) @map("is_verified")
+  verifiedBy      String?             @map("verified_by")
+  verifiedAt      DateTime?           @map("verified_at")
+  rejectionReason String?             @map("rejection_reason")
+  notes           String?
+  uploadedAt      DateTime            @default(now()) @map("uploaded_at")
+  expiresAt       DateTime?           @map("expires_at")
+  verification    ProfileVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@map("verification_documents")
+}
+
+model ProfileMetric {
+  id                     String    @id @default(uuid())
+  profileId              String    @map("profile_id")
+  viewsCount             Int       @default(0) @map("views_count")
+  contactsCount          Int       @default(0) @map("contacts_count")
+  chatsInitiatedCount    Int       @default(0) @map("chats_initiated_count")
+  searchAppearancesCount Int       @default(0) @map("search_appearances_count")
+  favoriteCount          Int       @default(0) @map("favorite_count")
+  clicksToContactCount   Int       @default(0) @map("clicks_to_contact_count")
+  contactConversionRate  Decimal?  @map("contact_conversion_rate")
+  avgChatResponseTime    Int?      @map("avg_chat_response_time")
+  avgViewTime            Int?      @map("avg_view_time")
+  totalEarnings          Decimal   @default(0) @map("total_earnings")
+  lastCalculated         DateTime  @default(now()) @map("last_calculated")
+  metricsPeriod          String    @default("monthly") @map("metrics_period")
+  periodStart            DateTime? @map("period_start") @db.Date
+  periodEnd              DateTime? @map("period_end") @db.Date
+  geographicDistribution Json?     @map("geographic_distribution")
+  trafficSources         Json?     @map("traffic_sources")
+  searchKeywords         Json?     @map("search_keywords")
+  profile                Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_metrics")
+}
+
+model UserSearch {
+  id              String      @id @default(uuid())
+  userId          String?     @map("user_id")
+  sessionId       String?     @map("session_id")
+  searchQuery     String?     @map("search_query")
+  filters         Json?
+  location        Json?
+  resultsCount    Int?        @map("results_count")
+  clickedProfiles Json?       @map("clicked_profiles")
+  deviceType      DeviceType?
+  ipAddress       String?     @map("ip_address")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  duration        Int?
+
+  @@map("user_searches")
+}
+
+model Category {
+  id            String     @id @default(uuid())
+  name          String
+  slug          String     @unique
+  description   String?
+  parentId      String?    @map("parent_id")
+  iconUrl       String?    @map("icon_url")
+  isActive      Boolean    @default(true) @map("is_active")
+  displayOrder  Int        @default(0) @map("display_order")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @default(now()) @map("updated_at")
+  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  subcategories Category[] @relation("CategoryHierarchy")
+  tags          Tag[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  categoryId  String?      @map("category_id")
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  profileTags ProfileTag[]
+  category    Category?    @relation(fields: [categoryId], references: [id])
+
+  @@map("tags")
+}
+
+model ProfileTag {
+  profileId String   @map("profile_id")
+  tagId     String   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, tagId])
+  @@map("profile_tags")
+}
+
+model Notification {
+  id            String           @id @default(uuid())
+  userId        String           @map("user_id")
+  type          NotificationType
+  title         String
+  content       String?
+  deepLink      String?          @map("deep_link")
+  referenceId   String?          @map("reference_id")
+  referenceType String?          @map("reference_type")
+  imageUrl      String?          @map("image_url")
+  isRead        Boolean          @default(false) @map("is_read")
+  isSent        Boolean          @default(false) @map("is_sent")
+  sendEmail     Boolean          @default(false) @map("send_email")
+  sendPush      Boolean          @default(false) @map("send_push")
+  sendSms       Boolean          @default(false) @map("send_sms")
+  emailSent     Boolean          @default(false) @map("email_sent")
+  pushSent      Boolean          @default(false) @map("push_sent")
+  smsSent       Boolean          @default(false) @map("sms_sent")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  readAt        DateTime?        @map("read_at")
+  expiresAt     DateTime?        @map("expires_at")
+  importance    String           @default("normal")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model UserDevice {
+  id          String     @id @default(uuid())
+  userId      String     @map("user_id")
+  deviceToken String     @map("device_token")
+  deviceType  DeviceType
+  deviceName  String?    @map("device_name")
+  deviceModel String?    @map("device_model")
+  osVersion   String?    @map("os_version")
+  appVersion  String?    @map("app_version")
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  lastUsedAt  DateTime   @default(now()) @map("last_used_at")
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceToken])
+  @@map("user_devices")
+}
+
+model NotificationTemplate {
+  id        String     @id @default(uuid())
+  name      String
+  type      String
+  subject   String?
+  content   String
+  variables Json?
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @default(now()) @map("updated_at")
+  createdBy String?    @map("created_by")
+  emailLogs EmailLog[]
+
+  @@map("notification_templates")
+}
+
+model UserReport {
+  id              String       @id @default(uuid())
+  reporterId      String?      @map("reporter_id")
+  reportedUserId  String       @map("reported_user_id")
+  reason          ReportReason
+  description     String?
+  evidenceUrls    Json?        @map("evidence_urls")
+  status          String       @default("pendiente")
+  resolvedBy      String?      @map("resolved_by")
+  resolutionNotes String?      @map("resolution_notes")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @default(now()) @map("updated_at")
+  resolvedAt      DateTime?    @map("resolved_at")
+  reportedUser    User         @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  reporter        User?        @relation("ReporterUser", fields: [reporterId], references: [id])
+
+  @@map("user_reports")
+}
+
+model SystemLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  ipAddress  String?  @map("ip_address")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("system_logs")
+}
+
+model FaqCategory {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  faqs         Faq[]
+
+  @@map("faq_categories")
+}
+
+model Faq {
+  id           String       @id @default(uuid())
+  categoryId   String?      @map("category_id")
+  question     String
+  answer       String
+  displayOrder Int          @default(0) @map("display_order")
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @default(now()) @map("updated_at")
+  category     FaqCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("faqs")
+}
+
+model BlogPost {
+  id               String    @id @default(uuid())
+  title            String
+  slug             String    @unique
+  content          String
+  excerpt          String?
+  authorId         String?   @map("author_id")
+  featuredImageUrl String?   @map("featured_image_url")
+  isPublished      Boolean   @default(false) @map("is_published")
+  publishedAt      DateTime? @map("published_at")
+  category         String?
+  tags             Json?
+  seoTitle         String?   @map("seo_title")
+  seoDescription   String?   @map("seo_description")
+  viewsCount       Int       @default(0) @map("views_count")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @map("updated_at")
+
+  @@map("blog_posts")
+}
+
+model Banner {
+  id              String    @id @default(uuid())
+  title           String
+  imageUrl        String    @map("image_url")
+  mobileImageUrl  String?   @map("mobile_image_url")
+  linkUrl         String?   @map("link_url")
+  displayLocation String?   @map("display_location")
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+  isActive        Boolean   @default(true) @map("is_active")
+  displayOrder    Int       @default(0) @map("display_order")
+  targetAudience  Json?     @map("target_audience")
+  clicksCount     Int       @default(0) @map("clicks_count")
+  viewsCount      Int       @default(0) @map("views_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @map("updated_at")
+
+  @@map("banners")
+}
+
+model Location {
+  id             String     @id @default(uuid())
+  name           String
+  parentId       String?    @map("parent_id")
+  type           String
+  code           String?
+  isActive       Boolean    @default(true) @map("is_active")
+  displayOrder   Int        @default(0) @map("display_order")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  parent         Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
+  childLocations Location[] @relation("LocationHierarchy")
+
+  @@map("locations")
+}
+
+model SupportTicket {
+  id                String          @id @default(uuid())
+  userId            String          @map("user_id")
+  subject           String
+  description       String
+  priority          TicketPriority  @default(medium)
+  status            TicketStatus    @default(open)
+  assignedTo        String?         @map("assigned_to")
+  category          String?
+  relatedEntityType String?         @map("related_entity_type")
+  relatedEntityId   String?         @map("related_entity_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @map("updated_at")
+  resolvedAt        DateTime?       @map("resolved_at")
+  resolutionNotes   String?         @map("resolution_notes")
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages          TicketMessage[]
+
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id          String        @id @default(uuid())
+  ticketId    String        @map("ticket_id")
+  senderId    String        @map("sender_id")
+  message     String
+  attachments Json?
+  isInternal  Boolean       @default(false) @map("is_internal")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  sender      User          @relation("TicketMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_messages")
+}
+
+model EmailSetting {
+  id                        String   @id @default(uuid())
+  userId                    String   @unique @map("user_id")
+  newsletters               Boolean  @default(false)
+  promotions                Boolean  @default(false)
+  systemNotifications       Boolean  @default(true) @map("system_notifications")
+  chatNotifications         Boolean  @default(true) @map("chat_notifications")
+  contactNotifications      Boolean  @default(true) @map("contact_notifications")
+  paymentNotifications      Boolean  @default(true) @map("payment_notifications")
+  verificationNotifications Boolean  @default(true) @map("verification_notifications")
+  unsubscribeAll            Boolean  @default(false) @map("unsubscribe_all")
+  updatedAt                 DateTime @default(now()) @map("updated_at")
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_settings")
+}
+
+model EmailLog {
+  id                String                @id @default(uuid())
+  userId            String?               @map("user_id")
+  emailAddress      String                @map("email_address")
+  subject           String
+  templateId        String?               @map("template_id")
+  templateName      String?               @map("template_name")
+  status            String                @default("enviado")
+  errorMessage      String?               @map("error_message")
+  emailProvider     String?               @map("email_provider")
+  providerMessageId String?               @map("provider_message_id")
+  opened            Boolean               @default(false)
+  openedAt          DateTime?             @map("opened_at")
+  clicked           Boolean               @default(false)
+  clickedAt         DateTime?             @map("clicked_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  template          NotificationTemplate? @relation(fields: [templateId], references: [id])
+
+  @@map("email_logs")
+}
+
+model AgencySubscriptionPlan {
+  id                       String               @id @default(uuid())
+  name                     String
+  description              String?
+  price                    Decimal
+  currency                 String               @default("USD")
+  billingInterval          String               @default("monthly") @map("billing_interval")
+  maxProfiles              Int?                 @map("max_profiles")
+  featuredProfilesIncluded Int                  @default(0) @map("featured_profiles_included")
+  verificationCredits      Int                  @default(0) @map("verification_credits")
+  commissionDiscount       Decimal              @default(0) @map("commission_discount")
+  additionalBenefits       Json?                @map("additional_benefits")
+  isActive                 Boolean              @default(true) @map("is_active")
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @default(now()) @map("updated_at")
+  agencySubscriptions      AgencySubscription[]
+
+  @@map("agency_subscription_plans")
+}
+
+model AgencySubscription {
+  id                 String                 @id @default(uuid())
+  agencyId           String                 @map("agency_id")
+  planId             String                 @map("plan_id")
+  startsAt           DateTime               @default(now()) @map("starts_at")
+  expiresAt          DateTime               @map("expires_at")
+  isActive           Boolean                @default(true) @map("is_active")
+  autoRenew          Boolean                @default(true) @map("auto_renew")
+  paymentId          String?                @map("payment_id")
+  canceledAt         DateTime?              @map("canceled_at")
+  cancellationReason String?                @map("cancellation_reason")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @default(now()) @map("updated_at")
+  agency             Agency                 @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  payment            Payment?               @relation(fields: [paymentId], references: [id])
+  plan               AgencySubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("agency_subscriptions")
+}
+
+model AgencyCommission {
+  id                   String    @id @default(uuid())
+  agencyId             String    @map("agency_id")
+  profileId            String?   @map("profile_id")
+  commissionPercentage Decimal   @map("commission_percentage")
+  startsAt             DateTime  @default(now()) @map("starts_at")
+  endsAt               DateTime? @map("ends_at")
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  notes                String?
+  agency               Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("agency_commissions")
+}
+
+model CommissionPayment {
+  id            String    @id @default(uuid())
+  agencyId      String    @map("agency_id")
+  profileId     String?   @map("profile_id")
+  amount        Decimal
+  currency      String    @default("USD")
+  paymentDate   DateTime  @default(now()) @map("payment_date")
+  paymentMethod String?
+  transactionId String?   @map("transaction_id")
+  description   String?
+  periodStart   DateTime? @map("period_start")
+  periodEnd     DateTime? @map("period_end")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String?   @map("created_by")
+  agency        Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("commission_payments")
+}
+
+model Role {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  description String?
+  isSystem    Boolean           @default(false) @map("is_system")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  permissions RolePermission[]
+  userRoles   UserRoleMapping[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  resource        String
+  action          String
+  isSystem        Boolean          @default(false) @map("is_system")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRoleMapping {
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  userId        String?  @map("user_id")
+  action        String
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  previousState Json?    @map("previous_state")
+  newState      Json?    @map("new_state")
+  changes       Json?
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
 enum UserRole {
   cliente
   perfil
@@ -169,1412 +1465,4 @@ enum TicketStatus {
   waiting
   resolved
   closed
-}
-
-// Modelos
-// Here are the fixes for the User model section - add these relation fields
-model User {
-  id                      String    @id @default(uuid())
-  email                   String?   @unique
-  emailVerified           Boolean   @default(false) @map("email_verified")
-  emailVerificationToken  String?   @map("email_verification_token")
-  emailVerificationExpires DateTime? @map("email_verification_expires")
-  phone                   String?   @unique
-  phoneVerified           Boolean   @default(false) @map("phone_verified")
-  phoneVerificationCode   String?   @map("phone_verification_code")
-  phoneVerificationExpires DateTime? @map("phone_verification_expires")
-  passwordHash            String?   @map("password_hash")
-  role                    UserRole
-  isActive                Boolean   @default(true) @map("is_active")
-  isVip                   Boolean   @default(false) @map("is_vip")
-  vipLevel                VipLevel? @map("vip_level")
-  lastLogin               DateTime? @map("last_login")
-  failedLoginAttempts     Int       @default(0) @map("failed_login_attempts")
-  accountLocked           Boolean   @default(false) @map("account_locked")
-  accountLockedUntil      DateTime? @map("account_locked_until")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @default(now()) @map("updated_at")
-  deletedAt               DateTime? @map("deleted_at")
-  ipAddress               String?   @map("ip_address")
-  lastIpAddress           String?   @map("last_ip_address")
-  userAgent               String?   @map("user_agent")
-  preferredLanguage       String    @default("es") @map("preferred_language")
-  marketingOptIn          Boolean   @default(false) @map("marketing_opt_in")
-  termsAcceptedAt         DateTime? @map("terms_accepted_at")
-  privacyAcceptedAt       DateTime? @map("privacy_accepted_at")
-  profileImageUrl         String?   @map("profile_image_url")
-
-  // Relaciones
-  externalAuth            ExternalAuth[]
-  sessions                UserSession[]
-  client                  Client?
-  agency                  Agency?
-  profile                 Profile?
-  pointTransactions       PointTransaction[]
-  sentMessages            Message[]         @relation("SentMessages")
-  receivedMessages        Message[]         @relation("ReceivedMessages")
-  payments                Payment[]
-  userCoupons             UserCoupon[]
-  userVipMemberships      UserVipMembership[]
-  userPremiumServices     UserPremiumService[]
-  raffleEntries           RaffleEntry[]
-  notifications           Notification[]
-  devices                 UserDevice[]
-  reportedBy              UserReport[]      @relation("ReporterUser")
-  reported                UserReport[]      @relation("ReportedUser")
-  emailSettings           EmailSetting?
-  userRoles               UserRoleMapping[]
-  supportTickets          SupportTicket[]
-  sentTicketMessages      TicketMessage[]   @relation("TicketMessageSender")
-  
-  // Add these missing relation fields:
-  pointBalanceHistory     PointBalanceHistory[]
-  transferredCoupons      UserCoupon[]      @relation("TransferredCoupons")
-  originalCoupons         UserCoupon[]      @relation("OriginalCoupons")
-  paymentMethods          PaymentMethodSaved[]
-  invoices                Invoice[]
-
-  @@map("users")
-}
-
-model ExternalAuth {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  provider          AuthMethod
-  providerUserId    String   @map("provider_user_id")
-  providerEmail     String?  @map("provider_email")
-  accessToken       String?  @map("access_token")
-  refreshToken      String?  @map("refresh_token")
-  tokenExpiresAt    DateTime? @map("token_expires_at")
-  profileData       Json?    @map("profile_data")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @default(now()) @map("updated_at")
-  
-  // Relaciones
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerUserId])
-  @@map("external_auth")
-}
-
-model UserSession {
-  id            String    @id @default(uuid())
-  userId        String    @map("user_id")
-  token         String    @unique
-  ipAddress     String?   @map("ip_address")
-  userAgent     String?   @map("user_agent")
-  deviceType    DeviceType? @map("device_type")
-  deviceInfo    Json?     @map("device_info")
-  location      Json?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  expiresAt     DateTime  @map("expires_at")
-  lastActivity  DateTime  @default(now()) @map("last_activity")
-  isActive      Boolean   @default(true) @map("is_active")
-  
-  // Relaciones
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_sessions")
-}
-
-model Client {
-  id                String   @id
-  username          String?  @unique
-  totalPoints       Int      @default(0) @map("total_points")
-  vipUntil          DateTime? @map("vip_until")
-  preferences       Json?
-  favoriteProfiles  Json?    @map("favorite_profiles")
-  blockedProfiles   Json?    @map("blocked_profiles")
-  lastActivity      DateTime? @map("last_activity")
-  referralCode      String?  @unique @map("referral_code")
-  referredBy        String?  @map("referred_by")
-  totalContacts     Int      @default(0) @map("total_contacts")
-  verifiedAccount   Boolean  @default(false) @map("verified_account")
-  
-  // Relaciones
-  user              User     @relation(fields: [id], references: [id], onDelete: Cascade)
-  referrer          Client?  @relation("ClientReferrals", fields: [referredBy], references: [id], onDelete: SetNull)
-  referrals         Client[] @relation("ClientReferrals")
-  conversations     Conversation[]
-  profileContacts   ProfileContact[]
-
-  @@map("clients")
-}
-
-model Agency {
-  id                  String   @id
-  name                String
-  slug                String   @unique
-  description         String?
-  shortDescription    String?  @map("short_description")
-  website             String?
-  address             String?
-  city                String?
-  stateProvince       String?  @map("state_province")
-  country             String?
-  postalCode          String?  @map("postal_code")
-  verificationStatus  VerificationStatus @default(no_verificado) @map("verification_status")
-  verifiedAt          DateTime? @map("verified_at")
-  verifiedBy          String?   @map("verified_by")
-  logoUrl             String?   @map("logo_url")
-  coverImageUrl       String?   @map("cover_image_url")
-  galleryImages       Json?     @map("gallery_images")
-  socialMedia         Json?     @map("social_media")
-  businessHours       Json?     @map("business_hours")
-  commissionRate      Decimal?  @map("commission_rate")
-  commissionStructure Json?     @map("commission_structure")
-  subscriptionTier    String?   @map("subscription_tier")
-  subscriptionExpires DateTime? @map("subscription_expires")
-  paymentMethods      Json?     @map("payment_methods")
-  contactPhone        String?   @map("contact_phone")
-  contactEmail        String?   @map("contact_email")
-  contactWhatsapp     String?   @map("contact_whatsapp")
-  totalProfiles       Int       @default(0) @map("total_profiles")
-  activeProfiles      Int       @default(0) @map("active_profiles")
-  verifiedProfiles    Int       @default(0) @map("verified_profiles")
-  rating              Decimal?
-  totalRatings        Int       @default(0) @map("total_ratings")
-  featuredUntil       DateTime? @map("featured_until")
-  taxId               String?   @map("tax_id")
-  legalName           String?   @map("legal_name")
-  legalRepresentative String?   @map("legal_representative")
-  establishmentYear   Int?      @map("establishment_year")
-  isExclusive         Boolean   @default(false) @map("is_exclusive")
-  notes               String?
-  
-  // Relaciones
-  user                User      @relation(fields: [id], references: [id], onDelete: Cascade)
-  profiles            Profile[]
-  agencySubscriptions AgencySubscription[]
-  agencyCommissions   AgencyCommission[]
-  commissionPayments  CommissionPayment[]
-  profileVerifications ProfileVerification[]
-
-  @@map("agencies")
-}
-
-model Profile {
-  id                    String    @id
-  displayName           String    @map("display_name")
-  slug                  String    @unique
-  realName              String?   @map("real_name")
-  gender                GenderType
-  birthDate             DateTime? @map("birth_date") @db.Date
-  age                   Int?
-  agencyId              String?   @map("agency_id")
-  description           String?
-  shortDescription      String?   @map("short_description")
-  verificationStatus    VerificationStatus @default(no_verificado) @map("verification_status")
-  verifiedAt            DateTime? @map("verified_at")
-  verifiedBy            String?   @map("verified_by")
-  verificationExpires   DateTime? @map("verification_expires")
-  height                Int?
-  weight                Int?
-  measurements          String?
-  eyeColor              String?   @map("eye_color")
-  hairColor             String?   @map("hair_color")
-  skinTone              String?   @map("skin_tone")
-  nationality           String?
-  languages             Json?
-  location              Json?
-  travelAvailability    Boolean   @default(false) @map("travel_availability")
-  travelDestinations    Json?     @map("travel_destinations")
-  services              Json?
-  priceHour             Decimal?  @map("price_hour")
-  priceAdditionalHour   Decimal?  @map("price_additional_hour")
-  priceOvernight        Decimal?  @map("price_overnight")
-  priceWeekend          Decimal?  @map("price_weekend")
-  priceTravel           Decimal?  @map("price_travel")
-  discountPackages      Json?     @map("discount_packages")
-  currency              String    @default("USD")
-  paymentMethods        Json?     @map("payment_methods")
-  availabilityStatus    AvailabilityStatus @default(disponible) @map("availability_status")
-  availabilitySchedule  Json?     @map("availability_schedule")
-  contactMethods        Json?     @map("contact_methods")
-  preferredContactHours Json?     @map("preferred_contact_hours")
-  isIndependent         Boolean   @default(false) @map("is_independent")
-  totalViews            Int       @default(0) @map("total_views")
-  totalContacts         Int       @default(0) @map("total_contacts")
-  totalFavorites        Int       @default(0) @map("total_favorites")
-  isFeatured            Boolean   @default(false) @map("is_featured")
-  featuredUntil         DateTime? @map("featured_until")
-  boostUntil            DateTime? @map("boost_until")
-  searchBoostFactor     Int       @default(1) @map("search_boost_factor")
-  lastActivity          DateTime? @map("last_activity")
-  hasHealthCertificate  Boolean   @default(false) @map("has_health_certificate")
-  healthCertificateExpires DateTime? @map("health_certificate_expires")
-  orientation           String?
-  personalityTags       Json?     @map("personality_tags")
-  interests             Json?
-  tattoos               Boolean   @default(false)
-  piercings             Boolean   @default(false)
-  smoker                Boolean   @default(false)
-  educationLevel        String?   @map("education_level")
-  aboutMe               String?   @map("about_me")
-  hidden                Boolean   @default(false)
-  
-  // Relaciones
-  user                  User      @relation(fields: [id], references: [id], onDelete: Cascade)
-  agency                Agency?   @relation(fields: [agencyId], references: [id], onDelete: SetNull)
-  images                ProfileImage[]
-  conversations         Conversation[]
-  profileContacts       ProfileContact[]
-  profileViews          ProfileView[]
-  userPremiumServices   UserPremiumService[]
-  profileVerifications  ProfileVerification[]
-  profileMetrics        ProfileMetric[]
-  profileTags           ProfileTag[]
-  agencyChanges         AgencyChange[]
-
-  @@map("profiles")
-}
-
-model ProfileImage {
-  id              String    @id @default(uuid())
-  profileId       String    @map("profile_id")
-  imageUrl        String    @map("image_url")
-  thumbnailUrl    String?   @map("thumbnail_url")
-  mediumUrl       String?   @map("medium_url")
-  isMain          Boolean   @default(false) @map("is_main")
-  isApproved      Boolean   @default(false) @map("is_approved")
-  approvedBy      String?   @map("approved_by")
-  approvedAt      DateTime? @map("approved_at")
-  isPublic        Boolean   @default(true) @map("is_public")
-  isPrivate       Boolean   @default(false) @map("is_private")
-  uploadDate      DateTime  @default(now()) @map("upload_date")
-  description     String?
-  orderPosition   Int       @default(0) @map("order_position")
-  blurHash        String?   @map("blur_hash")
-  contentType     String    @default("image/jpeg") @map("content_type")
-  fileSize        Int?      @map("file_size")
-  dimensions      Json?
-  tags            Json?
-  
-  // Relaciones
-  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@map("profile_images")
-}
-
-model PointTransaction {
-  id                String        @id @default(uuid())
-  userId            String        @map("user_id")
-  action            PointAction
-  points            Int
-  referenceId       String?       @map("reference_id")
-  referenceType     String?       @map("reference_type")
-  description       String?
-  createdAt         DateTime      @default(now()) @map("created_at")
-  createdBy         String?       @map("created_by")
-  expirationDate    DateTime?     @map("expiration_date")
-  isExpired         Boolean       @default(false) @map("is_expired")
-  transactionBatch  String?       @map("transaction_batch")
-  
-  // Relaciones
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pointBalanceHistory PointBalanceHistory[]
-  userVipMembership  UserVipMembership[]
-  raffleEntry       RaffleEntry[]
-
-  @@map("point_transactions")
-}
-
-model PointBalanceHistory {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  previousBalance   Int       @map("previous_balance")
-  newBalance        Int       @map("new_balance")
-  transactionId     String?   @map("transaction_id")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transaction       PointTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
-
-  @@map("point_balance_history")
-}
-
-model CouponPackage {
-  id                String    @id @default(uuid())
-  name              String
-  description       String?
-  shortDescription  String?   @map("short_description")
-  price             Decimal
-  discountPrice     Decimal?  @map("discount_price")
-  currency          String    @default("USD")
-  pointsGranted     Int       @map("points_granted")
-  sorteoEntries     Int       @default(0) @map("sorteo_entries")
-  isActive          Boolean   @default(true) @map("is_active")
-  isFeatured        Boolean   @default(false) @map("is_featured")
-  minPurchaseLevel  Int       @default(0) @map("min_purchase_level")
-  maxPurchasesPerUser Int?     @map("max_purchases_per_user")
-  totalAvailable    Int?      @map("total_available")
-  imageUrl          String?   @map("image_url")
-  startDate         DateTime? @map("start_date")
-  endDate           DateTime? @map("end_date")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  createdBy         String?   @map("created_by")
-  
-  // Relaciones
-  packageItems      CouponPackageItem[]
-
-  @@map("coupon_packages")
-}
-
-model CouponPackageItem {
-  id                  String    @id @default(uuid())
-  packageId           String    @map("package_id")
-  discountPercentage  Int       @map("discount_percentage")
-  quantity            Int       @default(1)
-  validDays           Int       @default(30) @map("valid_days")
-  minPurchaseAmount   Decimal?  @map("min_purchase_amount")
-  maxDiscountAmount   Decimal?  @map("max_discount_amount")
-  applicableServices  Json?     @map("applicable_services")
-  
-  // Relaciones
-  package             CouponPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  userCoupons         UserCoupon[]
-
-  @@map("coupon_package_items")
-}
-
-model UserCoupon {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  packageItemId     String?   @map("package_item_id")
-  code              String    @unique
-  discountPercentage Int       @map("discount_percentage")
-  isUsed            Boolean   @default(false) @map("is_used")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  expiresAt         DateTime  @map("expires_at")
-  usedAt            DateTime? @map("used_at")
-  usedFor           String?   @map("used_for")
-  usedInPayment     String?   @map("used_in_payment")
-  isTransferable    Boolean   @default(false) @map("is_transferable")
-  transferredTo     String?   @map("transferred_to")
-  transferredAt     DateTime? @map("transferred_at")
-  originalOwner     String?   @map("original_owner")
-  
-  // Relaciones
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  packageItem       CouponPackageItem? @relation(fields: [packageItemId], references: [id], onDelete: SetNull)
-  payment           Payment?  @relation(fields: [usedInPayment], references: [id], onDelete: SetNull)
-  transferredToUser User?     @relation("TransferredCoupons", fields: [transferredTo], references: [id], onDelete: SetNull)
-  originalOwnerUser User?     @relation("OriginalCoupons", fields: [originalOwner], references: [id], onDelete: SetNull)
-  paymentUsed       Payment?  @relation("CouponPayment")
-
-  @@map("user_coupons")
-}
-
-model Conversation {
-  id                String    @id @default(uuid())
-  clientId          String    @map("client_id")
-  profileId         String    @map("profile_id")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  isActive          Boolean   @default(true) @map("is_active")
-  isArchived        Boolean   @default(false) @map("is_archived")
-  isBlocked         Boolean   @default(false) @map("is_blocked")
-  blockedBy         String?   @map("blocked_by")
-  lastMessageAt     DateTime? @map("last_message_at")
-  totalMessages     Int       @default(0) @map("total_messages")
-  unreadClient      Int       @default(0) @map("unread_client")
-  unreadProfile     Int       @default(0) @map("unread_profile")
-  lastMessagePreview String?   @map("last_message_preview")
-  metadata          Json?
-  
-  // Relaciones
-  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  profile           Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  messages          Message[]
-
-  @@unique([clientId, profileId])
-  @@map("conversations")
-}
-
-model Message {
-  id                String        @id @default(uuid())
-  conversationId    String        @map("conversation_id")
-  senderId          String        @map("sender_id")
-  recipientId       String        @map("recipient_id")
-  content           String
-  contentType       String        @default("text") @map("content_type")
-  attachments       Json?
-  status            MessageStatus @default(enviado)
-  createdAt         DateTime      @default(now()) @map("created_at")
-  deliveredAt       DateTime?     @map("delivered_at")
-  readAt            DateTime?     @map("read_at")
-  deletedBySender   Boolean       @default(false) @map("deleted_by_sender")
-  deletedByRecipient Boolean      @default(false) @map("deleted_by_recipient")
-  reaction          String?
-  edited            Boolean       @default(false)
-  editedAt          DateTime?     @map("edited_at")
-  originalContent   String?       @map("original_content")
-  metadata          Json?
-  
-  // Relaciones
-  conversation      Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender            User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient         User          @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
-
-  @@map("messages")
-}
-
-model ProfileContact {
-  id                String        @id @default(uuid())
-  clientId          String        @map("client_id")
-  profileId         String        @map("profile_id")
-  contactMethod     ContactMethod
-  contactData       String?       @map("contact_data")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  pointsAwarded     Boolean       @default(false) @map("points_awarded")
-  pointsTransactionId String?      @map("points_transaction_id")
-  initiatedBy       String?       @map("initiated_by")
-  isSuccessful      Boolean?      @map("is_successful")
-  notes             String?
-  location          Json?
-  deviceInfo        Json?         @map("device_info")
-  
-  // Relaciones
-  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  profile           Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@map("profile_contacts")
-}
-
-model ProfileView {
-  id                String    @id @default(uuid())
-  profileId         String    @map("profile_id")
-  viewerId          String?   @map("viewer_id")
-  viewedAt          DateTime  @default(now()) @map("viewed_at")
-  ipAddress         String?   @map("ip_address")
-  sessionId         String?   @map("session_id")
-  deviceType        DeviceType?
-  deviceInfo        Json?     @map("device_info")
-  referrer          String?
-  duration          Int?
-  location          Json?
-  searchQuery       String?   @map("search_query")
-  
-  // Relaciones
-  profile           Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@map("profile_views")
-}
-
-model PaymentMethodSaved {
-  id                String        @id @default(uuid())
-  userId            String        @map("user_id")
-  paymentMethod     PaymentMethod @map("payment_method")
-  isDefault         Boolean       @default(false) @map("is_default")
-  provider          String
-  providerToken     String?       @map("provider_token")
-  cardLastFour      String?       @map("card_last_four")
-  cardBrand         String?       @map("card_brand")
-  cardExpiryMonth   Int?          @map("card_expiry_month")
-  cardExpiryYear    Int?          @map("card_expiry_year")
-  billingName       String?       @map("billing_name")
-  billingAddress    Json?         @map("billing_address")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @default(now()) @map("updated_at")
-  isVerified        Boolean       @default(false) @map("is_verified")
-  isActive          Boolean       @default(true) @map("is_active")
-  metadata          Json?
-  
-  // Relaciones
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments          Payment[]
-
-  @@map("payment_methods_saved")
-}
-
-// Fix for the Payment model - make the coupon relation one-to-many
-model Payment {
-  id                    String        @id @default(uuid())
-  userId                String        @map("user_id")
-  amount                Decimal
-  currency              String        @default("USD")
-  paymentType           PaymentType   @map("payment_type")
-  referenceId           String?       @map("reference_id")
-  referenceType         String?       @map("reference_type")
-  paymentMethodType     PaymentMethod @map("payment_method")
-  paymentMethodId       String?       @map("payment_method_id")
-  provider              String
-  providerTransactionId String?       @map("provider_transaction_id")
-  providerFee           Decimal?      @map("provider_fee")
-  platformFee           Decimal?      @map("platform_fee")
-  totalFees             Decimal?      @map("total_fees")
-  netAmount             Decimal?      @map("net_amount")
-  status                PaymentStatus @default(pendiente)
-  statusDetail          String?       @map("status_detail")
-  statusUpdatedAt       DateTime?     @map("status_updated_at")
-  couponId              String?       @map("coupon_id") @unique // Add @unique here to fix one-to-one relation
-  discountAmount        Decimal       @default(0) @map("discount_amount")
-  taxAmount             Decimal       @default(0) @map("tax_amount")
-  taxRate               Decimal?      @map("tax_rate")
-  billingAddress        Json?         @map("billing_address")
-  invoiceNumber         String?       @map("invoice_number")
-  invoiceUrl            String?       @map("invoice_url")
-  receiptUrl            String?       @map("receipt_url")
-  refundId              String?       @map("refund_id")
-  refundReason          String?       @map("refund_reason")
-  createdAt             DateTime      @default(now()) @map("created_at")
-  updatedAt             DateTime      @default(now()) @map("updated_at")
-  completedAt           DateTime?     @map("completed_at")
-  canceledAt            DateTime?     @map("canceled_at")
-  canceledReason        String?       @map("canceled_reason")
-  metadata              Json?
-  ipAddress             String?       @map("ip_address")
-  deviceInfo            Json?         @map("device_info")
-  
-  // Relaciones
-  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  savedPaymentMethod    PaymentMethodSaved? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
-  coupon                UserCoupon?   @relation("CouponPayment", fields: [couponId], references: [id], onDelete: SetNull)
-  userCoupons           UserCoupon[]
-  statusHistory         PaymentStatusHistory[]
-  invoice               Invoice?
-  refunds               Refund[]
-  userPremiumServices   UserPremiumService[]
-  userVipMemberships    UserVipMembership[]
-  profileVerifications  ProfileVerification[]
-  agencySubscriptions   AgencySubscription[]
-
-  @@map("payments")
-}
-
-model PaymentStatusHistory {
-  id                String        @id @default(uuid())
-  paymentId         String        @map("payment_id")
-  previousStatus    PaymentStatus? @map("previous_status")
-  newStatus         PaymentStatus @map("new_status")
-  changedAt         DateTime      @default(now()) @map("changed_at")
-  changedBy         String?       @map("changed_by")
-  reason            String?
-  metadata          Json?
-  
-  // Relaciones
-  payment           Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-
-  @@map("payment_status_history")
-}
-
-model Invoice {
-  id                String    @id @default(uuid())
-  paymentId         String?   @map("payment_id") @unique
-  userId            String    @map("user_id")
-  invoiceNumber     String    @unique @map("invoice_number")
-  invoiceDate       DateTime  @default(now()) @map("invoice_date")
-  dueDate           DateTime? @map("due_date")
-  totalAmount       Decimal   @map("total_amount")
-  currency          String    @default("USD")
-  status            String    @default("emitida")
-  paidAt            DateTime? @map("paid_at")
-  pdfUrl            String?   @map("pdf_url")
-  items             Json?
-  billingDetails    Json?     @map("billing_details")
-  taxDetails        Json?     @map("tax_details")
-  notes             String?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  payment           Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("invoices")
-}
-
-model Refund {
-  id                String    @id @default(uuid())
-  paymentId         String    @map("payment_id")
-  amount            Decimal
-  reason            String
-  requestedBy       String    @map("requested_by")
-  approvedBy        String?   @map("approved_by")
-  status            String    @default("pendiente")
-  providerRefundId  String?   @map("provider_refund_id")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  completedAt       DateTime? @map("completed_at")
-  notes             String?
-  metadata          Json?
-  
-  // Relaciones
-  payment           Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-
-  @@map("refunds")
-}
-
-model PremiumService {
-  id                String    @id @default(uuid())
-  name              String
-  description       String?
-  shortDescription  String?   @map("short_description")
-  price             Decimal
-  discountPrice     Decimal?  @map("discount_price")
-  currency          String    @default("USD")
-  durationDays      Int       @map("duration_days")
-  serviceType       String    @map("service_type")
-  benefits          Json?
-  appliesTo         String    @map("applies_to")
-  isRecurring       Boolean   @default(false) @map("is_recurring")
-  isActive          Boolean   @default(true) @map("is_active")
-  isFeatured        Boolean   @default(false) @map("is_featured")
-  imageUrl          String?   @map("image_url")
-  maxPurchases      Int?      @map("max_purchases")
-  totalAvailable    Int?      @map("total_available")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  createdBy         String?   @map("created_by")
-  
-  // Relaciones
-  userPremiumServices UserPremiumService[]
-
-  @@map("premium_services")
-}
-
-model UserPremiumService {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  serviceId         String    @map("service_id")
-  profileId         String?   @map("profile_id")
-  agencyId          String?   @map("agency_id")
-  paymentId         String?   @map("payment_id")
-  startsAt          DateTime  @default(now()) @map("starts_at")
-  expiresAt         DateTime  @map("expires_at")
-  isActive          Boolean   @default(true) @map("is_active")
-  autoRenew         Boolean   @default(false) @map("auto_renew")
-  canceledAt        DateTime? @map("canceled_at")
-  cancelReason      String?   @map("cancel_reason")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  metadata          Json?
-  
-  // Relaciones
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service           PremiumService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  profile           Profile?  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  payment           Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  @@map("user_premium_services")
-}
-
-model VipMembership {
-  id                String    @id @default(uuid())
-  name              String
-  description       String?
-  shortDescription  String?   @map("short_description")
-  price             Decimal
-  discountPrice     Decimal?  @map("discount_price")
-  currency          String    @default("USD")
-  durationDays      Int       @map("duration_days")
-  level             VipLevel
-  pointsMultiplier  Decimal   @default(1.0) @map("points_multiplier")
-  signupPoints      Int       @default(0) @map("signup_points")
-  benefits          Json?
-  isActive          Boolean   @default(true) @map("is_active")
-  isFeatured        Boolean   @default(false) @map("is_featured")
-  imageUrl          String?   @map("image_url")
-  maxPurchases      Int?      @map("max_purchases")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  createdBy         String?   @map("created_by")
-  
-  // Relaciones
-  userVipMemberships UserVipMembership[]
-
-  @@map("vip_memberships")
-}
-
-model UserVipMembership {
-  id                    String    @id @default(uuid())
-  userId                String    @map("user_id")
-  membershipId          String    @map("membership_id")
-  paymentId             String?   @map("payment_id")
-  startsAt              DateTime  @default(now()) @map("starts_at")
-  expiresAt             DateTime  @map("expires_at")
-  isActive              Boolean   @default(true) @map("is_active")
-  autoRenew             Boolean   @default(false) @map("auto_renew")
-  canceledAt            DateTime? @map("canceled_at")
-  cancelReason          String?   @map("cancel_reason")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  pointsAwarded         Boolean   @default(false) @map("points_awarded")
-  pointsTransactionId   String?   @map("points_transaction_id")
-  
-  // Relaciones
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  membership            VipMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  payment               Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  pointsTransaction     PointTransaction? @relation(fields: [pointsTransactionId], references: [id], onDelete: SetNull)
-
-  @@map("user_vip_memberships")
-}
-
-model Raffle {
-  id                    String    @id @default(uuid())
-  title                 String
-  description           String?
-  shortDescription      String?   @map("short_description")
-  prizeDescription      String    @map("prize_description")
-  prizeValue            Decimal?  @map("prize_value")
-  prizeImageUrl         String?   @map("prize_image_url")
-  startsAt              DateTime  @map("starts_at")
-  endsAt                DateTime  @map("ends_at")
-  drawingDate           DateTime? @map("drawing_date")
-  minPointsRequired     Int       @default(0) @map("min_points_required")
-  pointsPerEntry        Int       @default(10) @map("points_per_entry")
-  maxEntriesPerUser     Int?      @map("max_entries_per_user")
-  isActive              Boolean   @default(true) @map("is_active")
-  requiresVip           Boolean   @default(false) @map("requires_vip")
-  minVipLevel           VipLevel? @map("min_vip_level")
-  winnerId              String?   @map("winner_id")
-  winnerSelectedAt      DateTime? @map("winner_selected_at")
-  winnerNotified        Boolean   @default(false) @map("winner_notified")
-  winnerConfirmed       Boolean   @default(false) @map("winner_confirmed")
-  prizeDelivered        Boolean   @default(false) @map("prize_delivered")
-  prizeDeliveredAt      DateTime? @map("prize_delivered_at")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @default(now()) @map("updated_at")
-  createdBy             String?   @map("created_by")
-  totalEntries          Int       @default(0) @map("total_entries")
-  rulesText             String?   @map("rules_text")
-  
-  // Relaciones
-  entries               RaffleEntry[]
-
-  @@map("raffles")
-}
-
-model RaffleEntry {
-  id                    String    @id @default(uuid())
-  raffleId              String    @map("raffle_id")
-  userId                String    @map("user_id")
-  pointsSpent           Int       @default(0) @map("points_spent")
-  entriesCount          Int       @default(1) @map("entries_count")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  pointsTransactionId   String?   @map("points_transaction_id")
-  entryNumber           Int?      @map("entry_number")
-  isWinner              Boolean   @default(false) @map("is_winner")
-  
-  // Relaciones
-  raffle                Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pointsTransaction     PointTransaction? @relation(fields: [pointsTransactionId], references: [id], onDelete: SetNull)
-
-  @@unique([raffleId, userId, entryNumber])
-  @@map("raffle_entries")
-}
-
-model AgencyChange {
-  id                    String    @id @default(uuid())
-  profileId             String    @map("profile_id")
-  previousAgencyId      String?   @map("previous_agency_id")
-  newAgencyId           String?   @map("new_agency_id")
-  changeDate            DateTime  @default(now()) @map("change_date")
-  requestedBy           String?   @map("requested_by")
-  approvedBy            String?   @map("approved_by")
-  status                String    @default("pendiente")
-  reason                String?
-  notes                 String?
-  
-  // Relaciones
-  profile               Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@map("agency_changes")
-}
-
-model SystemSetting {
-  id                            Int       @id @default(1)
-  pointsForRegistration         Int       @default(50) @map("points_for_registration")
-  pointsForDailyLogin           Int       @default(5) @map("points_for_daily_login")
-  pointsForContact              Int       @default(10) @map("points_for_contact")
-  pointsForReferral             Int       @default(25) @map("points_for_referral")
-  pointsForProfileCompletion    Int       @default(15) @map("points_for_profile_completion")
-  vipPointsMultiplier           Decimal   @default(2.0) @map("vip_points_multiplier")
-  minPointsForCoupon            Int       @default(100) @map("min_points_for_coupon")
-  pointsExpirationDays          Int       @default(365) @map("points_expiration_days")
-  defaultCurrency               String    @default("USD") @map("default_currency")
-  minProfileImages              Int       @default(1) @map("min_profile_images")
-  maxProfileImages              Int       @default(20) @map("max_profile_images")
-  maxAgencyProfiles             Int?      @default(100) @map("max_agency_profiles")
-  contactMethodsEnabled         Json      @default("[]") @map("contact_methods_enabled")
-  maintenanceMode               Boolean   @default(false) @map("maintenance_mode")
-  maintenanceMessage            String?   @map("maintenance_message")
-  maximumLoginAttempts          Int       @default(5) @map("maximum_login_attempts")
-  accountLockoutMinutes         Int       @default(30) @map("account_lockout_minutes")
-  verificationRequiredForProfiles Boolean  @default(false) @map("verification_required_for_profiles")
-  autoVerificationExpirationDays Int      @default(90) @map("auto_verification_expiration_days")
-  platformCommissionPercentage  Decimal   @default(10.00) @map("platform_commission_percentage")
-  vipCommissionDiscount         Decimal   @default(2.00) @map("vip_commission_discount")
-  searchBoostVipFactor          Int       @default(2) @map("search_boost_vip_factor")
-  searchBoostFeaturedFactor     Int       @default(3) @map("search_boost_featured_factor")
-  searchBoostVerifiedFactor     Int       @default(2) @map("search_boost_verified_factor")
-  defaultSearchRadius           Int       @default(50) @map("default_search_radius")
-  defaultPaginationLimit        Int       @default(20) @map("default_pagination_limit")
-  settings                      Json?
-  lastUpdated                   DateTime  @default(now()) @map("last_updated")
-  updatedBy                     String?   @map("updated_by")
-
-  @@map("system_settings")
-}
-
-model ProfileVerification {
-  id                  String            @id @default(uuid())
-  profileId           String            @map("profile_id")
-  agencyId            String            @map("agency_id")
-  status              VerificationStatus @default(pendiente)
-  verificationDate    DateTime?         @map("verification_date")
-  expiresAt           DateTime?         @map("expires_at")
-  verifiedBy          String?           @map("verified_by")
-  verificationMethod  String?           @map("verification_method")
-  verificationLocation String?          @map("verification_location")
-  notes               String?
-  documentUrls        Json?             @map("document_urls")
-  verificationPhotoUrl String?          @map("verification_photo_url")
-  paymentId           String?           @map("payment_id")
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @default(now()) @map("updated_at")
-  
-  // Relaciones
-  profile             Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  agency              Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  payment             Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  documents           VerificationDocument[]
-
-  @@map("profile_verifications")
-}
-
-model VerificationDocument {
-  id                String            @id @default(uuid())
-  verificationId    String            @map("verification_id")
-  documentType      DocumentType
-  documentUrl       String            @map("document_url")
-  isVerified        Boolean           @default(false) @map("is_verified")
-  verifiedBy        String?           @map("verified_by")
-  verifiedAt        DateTime?         @map("verified_at")
-  rejectionReason   String?           @map("rejection_reason")
-  notes             String?
-  uploadedAt        DateTime          @default(now()) @map("uploaded_at")
-  expiresAt         DateTime?         @map("expires_at")
-  
-  // Relaciones
-  verification      ProfileVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-
-  @@map("verification_documents")
-}
-
-model ProfileMetric {
-  id                      String    @id @default(uuid())
-  profileId               String    @map("profile_id")
-  viewsCount              Int       @default(0) @map("views_count")
-  contactsCount           Int       @default(0) @map("contacts_count")
-  chatsInitiatedCount     Int       @default(0) @map("chats_initiated_count")
-  searchAppearancesCount  Int       @default(0) @map("search_appearances_count")
-  favoriteCount           Int       @default(0) @map("favorite_count")
-  clicksToContactCount    Int       @default(0) @map("clicks_to_contact_count")
-  contactConversionRate   Decimal?  @map("contact_conversion_rate")
-  avgChatResponseTime     Int?      @map("avg_chat_response_time")
-  avgViewTime             Int?      @map("avg_view_time")
-  totalEarnings           Decimal   @default(0) @map("total_earnings")
-  lastCalculated          DateTime  @default(now()) @map("last_calculated")
-  metricsPeriod           String    @default("monthly") @map("metrics_period")
-  periodStart             DateTime? @map("period_start") @db.Date
-  periodEnd               DateTime? @map("period_end") @db.Date
-  geographicDistribution  Json?     @map("geographic_distribution")
-  trafficSources          Json?     @map("traffic_sources")
-  searchKeywords          Json?     @map("search_keywords")
-  
-  // Relaciones
-  profile                 Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@map("profile_metrics")
-}
-
-model UserSearch {
-  id                String      @id @default(uuid())
-  userId            String?     @map("user_id")
-  sessionId         String?     @map("session_id")
-  searchQuery       String?     @map("search_query")
-  filters           Json?
-  location          Json?
-  resultsCount      Int?        @map("results_count")
-  clickedProfiles   Json?       @map("clicked_profiles")
-  deviceType        DeviceType?
-  ipAddress         String?     @map("ip_address")
-  createdAt         DateTime    @default(now()) @map("created_at")
-  duration          Int?
-
-  @@map("user_searches")
-}
-
-model Category {
-  id                String    @id @default(uuid())
-  name              String
-  slug              String    @unique
-  description       String?
-  parentId          String?   @map("parent_id")
-  iconUrl           String?   @map("icon_url")
-  isActive          Boolean   @default(true) @map("is_active")
-  displayOrder      Int       @default(0) @map("display_order")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  
-  // Relaciones
-  parent            Category? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  subcategories     Category[] @relation("CategoryHierarchy")
-  tags              Tag[]
-
-  @@map("categories")
-}
-
-model Tag {
-  id                String    @id @default(uuid())
-  name              String
-  slug              String    @unique
-  categoryId        String?   @map("category_id")
-  isActive          Boolean   @default(true) @map("is_active")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  profileTags       ProfileTag[]
-
-  @@map("tags")
-}
-
-model ProfileTag {
-  profileId         String    @map("profile_id")
-  tagId             String    @map("tag_id")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  profile           Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  tag               Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([profileId, tagId])
-  @@map("profile_tags")
-}
-
-model Notification {
-  id                String           @id @default(uuid())
-  userId            String           @map("user_id")
-  type              NotificationType
-  title             String
-  content           String?
-  deepLink          String?          @map("deep_link")
-  referenceId       String?          @map("reference_id")
-  referenceType     String?          @map("reference_type")
-  imageUrl          String?          @map("image_url")
-  isRead            Boolean          @default(false) @map("is_read")
-  isSent            Boolean          @default(false) @map("is_sent")
-  sendEmail         Boolean          @default(false) @map("send_email")
-  sendPush          Boolean          @default(false) @map("send_push")
-  sendSms           Boolean          @default(false) @map("send_sms")
-  emailSent         Boolean          @default(false) @map("email_sent")
-  pushSent          Boolean          @default(false) @map("push_sent")
-  smsSent           Boolean          @default(false) @map("sms_sent")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  readAt            DateTime?        @map("read_at")
-  expiresAt         DateTime?        @map("expires_at")
-  importance        String           @default("normal")
-  
-  // Relaciones
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
-}
-
-model UserDevice {
-  id                String      @id @default(uuid())
-  userId            String      @map("user_id")
-  deviceToken       String      @map("device_token")
-  deviceType        DeviceType
-  deviceName        String?     @map("device_name")
-  deviceModel       String?     @map("device_model")
-  osVersion         String?     @map("os_version")
-  appVersion        String?     @map("app_version")
-  isActive          Boolean     @default(true) @map("is_active")
-  createdAt         DateTime    @default(now()) @map("created_at")
-  lastUsedAt        DateTime    @default(now()) @map("last_used_at")
-  
-  // Relaciones
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, deviceToken])
-  @@map("user_devices")
-}
-
-model NotificationTemplate {
-  id                String    @id @default(uuid())
-  name              String
-  type              String
-  subject           String?
-  content           String
-  variables         Json?
-  isActive          Boolean   @default(true) @map("is_active")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  createdBy         String?   @map("created_by")
-  
-  // Relaciones
-  emailLogs         EmailLog[]
-
-  @@map("notification_templates")
-}
-
-model UserReport {
-  id                String       @id @default(uuid())
-  reporterId        String?      @map("reporter_id")
-  reportedUserId    String       @map("reported_user_id")
-  reason            ReportReason
-  description       String?
-  evidenceUrls      Json?        @map("evidence_urls")
-  status            String       @default("pendiente")
-  resolvedBy        String?      @map("resolved_by")
-  resolutionNotes   String?      @map("resolution_notes")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @default(now()) @map("updated_at")
-  resolvedAt        DateTime?    @map("resolved_at")
-  
-  // Relaciones
-  reporter          User?        @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: SetNull)
-  reportedUser      User         @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: Cascade)
-
-  @@map("user_reports")
-}
-
-model SystemLog {
-  id                String    @id @default(uuid())
-  userId            String?   @map("user_id")
-  action            String
-  entityType        String?   @map("entity_type")
-  entityId          String?   @map("entity_id")
-  ipAddress         String?   @map("ip_address")
-  details           Json?
-  createdAt         DateTime  @default(now()) @map("created_at")
-
-  @@map("system_logs")
-}
-
-model FaqCategory {
-  id                String    @id @default(uuid())
-  name              String
-  description       String?
-  displayOrder      Int       @default(0) @map("display_order")
-  isActive          Boolean   @default(true) @map("is_active")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  faqs              Faq[]
-
-  @@map("faq_categories")
-}
-
-model Faq {
-  id                String    @id @default(uuid())
-  categoryId        String?   @map("category_id")
-  question          String
-  answer            String
-  displayOrder      Int       @default(0) @map("display_order")
-  isActive          Boolean   @default(true) @map("is_active")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-  
-  // Relaciones
-  category          FaqCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  @@map("faqs")
-}
-
-model BlogPost {
-  id                String    @id @default(uuid())
-  title             String
-  slug              String    @unique
-  content           String
-  excerpt           String?
-  authorId          String?   @map("author_id")
-  featuredImageUrl  String?   @map("featured_image_url")
-  isPublished       Boolean   @default(false) @map("is_published")
-  publishedAt       DateTime? @map("published_at")
-  category          String?
-  tags              Json?
-  seoTitle          String?   @map("seo_title")
-  seoDescription    String?   @map("seo_description")
-  viewsCount        Int       @default(0) @map("views_count")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-
-  @@map("blog_posts")
-}
-
-model Banner {
-  id                String    @id @default(uuid())
-  title             String
-  imageUrl          String    @map("image_url")
-  mobileImageUrl    String?   @map("mobile_image_url")
-  linkUrl           String?   @map("link_url")
-  displayLocation   String?   @map("display_location")
-  startDate         DateTime? @map("start_date")
-  endDate           DateTime? @map("end_date")
-  isActive          Boolean   @default(true) @map("is_active")
-  displayOrder      Int       @default(0) @map("display_order")
-  targetAudience    Json?     @map("target_audience")
-  clicksCount       Int       @default(0) @map("clicks_count")
-  viewsCount        Int       @default(0) @map("views_count")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @map("updated_at")
-
-  @@map("banners")
-}
-
-model Location {
-  id                String    @id @default(uuid())
-  name              String
-  parentId          String?   @map("parent_id")
-  type              String
-  code              String?
-  isActive          Boolean   @default(true) @map("is_active")
-  displayOrder      Int       @default(0) @map("display_order")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  parent            Location? @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  childLocations    Location[] @relation("LocationHierarchy")
-
-  @@map("locations")
-}
-
-model SupportTicket {
-  id                String         @id @default(uuid())
-  userId            String         @map("user_id")
-  subject           String
-  description       String
-  priority          TicketPriority @default(medium)
-  status            TicketStatus   @default(open)
-  assignedTo        String?        @map("assigned_to")
-  category          String?
-  relatedEntityType String?        @map("related_entity_type")
-  relatedEntityId   String?        @map("related_entity_id")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @default(now()) @map("updated_at")
-  resolvedAt        DateTime?      @map("resolved_at")
-  resolutionNotes   String?        @map("resolution_notes")
-  
-  // Relaciones
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages          TicketMessage[]
-
-  @@map("support_tickets")
-}
-
-model TicketMessage {
-  id                String    @id @default(uuid())
-  ticketId          String    @map("ticket_id")
-  senderId          String    @map("sender_id")
-  message           String
-  attachments       Json?
-  isInternal        Boolean   @default(false) @map("is_internal")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  ticket            SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender            User      @relation("TicketMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-
-  @@map("ticket_messages")
-}
-
-model EmailSetting {
-  id                      String    @id @default(uuid())
-  userId                  String    @unique @map("user_id")
-  newsletters             Boolean   @default(false)
-  promotions              Boolean   @default(false)
-  systemNotifications     Boolean   @default(true) @map("system_notifications") 
-  chatNotifications       Boolean   @default(true) @map("chat_notifications")
-  contactNotifications    Boolean   @default(true) @map("contact_notifications")
-  paymentNotifications    Boolean   @default(true) @map("payment_notifications")
-  verificationNotifications Boolean  @default(true) @map("verification_notifications")
-  unsubscribeAll          Boolean   @default(false) @map("unsubscribe_all")
-  updatedAt               DateTime  @default(now()) @map("updated_at")
-  
-  // Relaciones
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("email_settings")
-}
-
-model EmailLog {
-  id                      String    @id @default(uuid())
-  userId                  String?   @map("user_id")
-  emailAddress            String    @map("email_address")
-  subject                 String
-  templateId              String?   @map("template_id")
-  templateName            String?   @map("template_name")
-  status                  String    @default("enviado")
-  errorMessage            String?   @map("error_message")
-  emailProvider           String?   @map("email_provider")
-  providerMessageId       String?   @map("provider_message_id")
-  opened                  Boolean   @default(false)
-  openedAt                DateTime? @map("opened_at")
-  clicked                 Boolean   @default(false)
-  clickedAt               DateTime? @map("clicked_at")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  template                NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-
-  @@map("email_logs")
-}
-
-model AgencySubscriptionPlan {
-  id                      String    @id @default(uuid())
-  name                    String
-  description             String?
-  price                   Decimal
-  currency                String    @default("USD")
-  billingInterval         String    @default("monthly") @map("billing_interval")
-  maxProfiles             Int?      @map("max_profiles")
-  featuredProfilesIncluded Int      @default(0) @map("featured_profiles_included")
-  verificationCredits     Int       @default(0) @map("verification_credits")
-  commissionDiscount      Decimal   @default(0) @map("commission_discount")
-  additionalBenefits      Json?     @map("additional_benefits")
-  isActive                Boolean   @default(true) @map("is_active")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @default(now()) @map("updated_at")
-  
-  // Relaciones
-  agencySubscriptions     AgencySubscription[]
-
-  @@map("agency_subscription_plans")
-}
-
-model AgencySubscription {
-  id                      String    @id @default(uuid())
-  agencyId                String    @map("agency_id")
-  planId                  String    @map("plan_id")
-  startsAt                DateTime  @default(now()) @map("starts_at")
-  expiresAt               DateTime  @map("expires_at")
-  isActive                Boolean   @default(true) @map("is_active")
-  autoRenew               Boolean   @default(true) @map("auto_renew")
-  paymentId               String?   @map("payment_id")
-  canceledAt              DateTime? @map("canceled_at")
-  cancellationReason      String?   @map("cancellation_reason")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @default(now()) @map("updated_at")
-  
-  // Relaciones
-  agency                  Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  plan                    AgencySubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  payment                 Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  @@map("agency_subscriptions")
-}
-
-model AgencyCommission {
-  id                      String    @id @default(uuid())
-  agencyId                String    @map("agency_id")
-  profileId               String?   @map("profile_id")
-  commissionPercentage    Decimal   @map("commission_percentage")
-  startsAt                DateTime  @default(now()) @map("starts_at")
-  endsAt                  DateTime? @map("ends_at")
-  isActive                Boolean   @default(true) @map("is_active")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  notes                   String?
-  
-  // Relaciones
-  agency                  Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-
-  @@map("agency_commissions")
-}
-
-model CommissionPayment {
-  id                      String    @id @default(uuid())
-  agencyId                String    @map("agency_id")
-  profileId               String?   @map("profile_id")
-  amount                  Decimal
-  currency                String    @default("USD")
-  paymentDate             DateTime  @default(now()) @map("payment_date")
-  paymentMethod           String?
-  transactionId           String?   @map("transaction_id")
-  description             String?
-  periodStart             DateTime? @map("period_start")
-  periodEnd               DateTime? @map("period_end")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  createdBy               String?   @map("created_by")
-  
-  // Relaciones
-  agency                  Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-
-  @@map("commission_payments")
-}
-
-model Role {
-  id                      String    @id @default(uuid())
-  name                    String    @unique
-  description             String?
-  isSystem                Boolean   @default(false) @map("is_system")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  permissions             RolePermission[]
-  userRoles               UserRoleMapping[]
-
-  @@map("roles")
-}
-
-model Permission {
-  id                      String    @id @default(uuid())
-  name                    String    @unique
-  description             String?
-  resource                String
-  action                  String
-  isSystem                Boolean   @default(false) @map("is_system")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  rolePermissions         RolePermission[]
-
-  @@map("permissions")
-}
-
-model RolePermission {
-  roleId                  String    @map("role_id")
-  permissionId            String    @map("permission_id")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  
-  // Relaciones
-  role                    Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission              Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
-  @@map("role_permissions")
-}
-
-model UserRoleMapping {
-  userId                  String    @map("user_id")
-  roleId                  String    @map("role_id")
-  createdAt               DateTime  @default(now()) @map("created_at")
-  createdBy               String?   @map("created_by")
-  
-  // Relaciones
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role                    Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@id([userId, roleId])
-  @@map("user_roles")
-}
-
-model AuditLog {
-  id                      String    @id @default(uuid())
-  userId                  String?   @map("user_id")
-  action                  String
-  entityType              String    @map("entity_type")
-  entityId                String    @map("entity_id")
-  previousState           Json?     @map("previous_state")
-  newState                Json?     @map("new_state")
-  changes                 Json?
-  ipAddress               String?   @map("ip_address")
-  userAgent               String?   @map("user_agent")
-  createdAt               DateTime  @default(now()) @map("created_at")
-
-  @@map("audit_logs")
 }

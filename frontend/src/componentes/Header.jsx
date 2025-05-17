@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { FaUser, FaSignOutAlt, FaHeart } from 'react-icons/fa';
 import '../estilos/Header.css';
 import loginImage from '../assets/logo png.png';
 
@@ -22,12 +21,19 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const tipoUsuario = user.tipoUsuario || "cliente";
     
+    console.log("Tipo de usuario detectado:", tipoUsuario); // Para debug
+    
     if (tipoUsuario === "cliente") {
       handleNavigation("perfilCliente");
     } else if (tipoUsuario === "agencia") {
       handleNavigation("perfilAgencia");
-    } else if (tipoUsuario === "acompanante") {
+    } else if (tipoUsuario === "perfil" || tipoUsuario === "acompanante") {
+      // Modificado para aceptar "perfil" o "acompanante" como tipo de usuario
       handleNavigation("perfilAcompanante");
+    } else {
+      // Caso por defecto, navegar a homepage
+      console.log("Tipo de usuario no reconocido:", tipoUsuario);
+      handleNavigation("homepage");
     }
   };
   
@@ -80,6 +86,17 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
                 href="#" 
                 onClick={(e) => {
                   e.preventDefault();
+                  handleNavigation('exploreProfiles');
+                }}
+              >
+                Perfiles
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                onClick={(e) => {
+                  e.preventDefault();
                   handleNavigation('listadoAgencias');
                 }}
               >
@@ -114,6 +131,13 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
         <div className="auth-buttons">
           {userLoggedIn ? (
             <div className="user-profile-actions">
+              <button 
+                className="favorites-button"
+                onClick={() => handleNavigation('favorites')}
+                title="Mis Favoritos"
+              >
+                <FaHeart />
+              </button>
               <button 
                 className="profile-button"
                 onClick={handleProfileNavigation}

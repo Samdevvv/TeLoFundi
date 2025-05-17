@@ -4,6 +4,47 @@ const logger = require('../../utils/logger');
 
 class ProfileController {
   /**
+   * Busca perfiles con opciones de filtrado y paginación
+   * @param {Object} req - Objeto de petición
+   * @param {Object} res - Objeto de respuesta
+   */
+  async searchProfiles(req, res) {
+    try {
+      // Extraer opciones de paginación
+      const options = {
+        page: parseInt(req.query.page || 1),
+        limit: parseInt(req.query.limit || 20)
+      };
+      
+      // Extraer filtros de búsqueda
+      const filters = {
+        location: req.query.location,
+        service: req.query.service,
+        verified: req.query.verified === 'true',
+        priceMin: req.query.priceMin,
+        priceMax: req.query.priceMax,
+        gender: req.query.gender,
+        searchQuery: req.query.q
+      };
+      
+      const result = await profileService.searchProfiles(filters, options);
+      
+      res.status(200).json({
+        success: true,
+        data: result.profiles,
+        meta: result.meta
+      });
+    } catch (error) {
+      logger.error(`Error al buscar perfiles: ${error.message}`, { error });
+      res.status(500).json({
+        success: false,
+        message: 'Error al buscar perfiles',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Obtiene información de un perfil por su ID
    * @param {Object} req - Objeto de petición
    * @param {Object} res - Objeto de respuesta

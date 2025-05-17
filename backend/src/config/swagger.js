@@ -1,3 +1,4 @@
+// src/config/swagger.js
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -6,17 +7,17 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'API de Plataforma de Agencias y Acompañantes',
+      title: 'API TeLoFundi',
       version: '1.0.0',
-      description: 'Documentación de la API para la plataforma de agencias y acompañantes',
+      description: 'Documentación de la API para la plataforma TeLoFundi',
       contact: {
         name: 'TeLoFundi',
-        url: 'https://tudominio.com',
-        email: 'info@tudominio.com'
+        url: 'https://telofundi.com',
+        email: 'info@telofundi.com'
       },
       license: {
         name: 'Privado',
-        url: 'https://tudominio.com/terminos'
+        url: 'https://telofundi.com/terminos'
       }
     },
     servers: [
@@ -88,10 +89,21 @@ const options = {
       { name: 'Search', description: 'Búsqueda y filtros' }
     ]
   },
-  // Rutas a los archivos que contienen anotaciones JSDoc
+  // Rutas a los archivos que contienen anotaciones JSDoc (actualizadas según tu estructura)
   apis: [
-    'src/api/*/*.js',
-    'src/models/*.js'
+    './src/api/admin/**/*.js',
+    './src/api/agency/**/*.js',
+    './src/api/auth/**/*.js',
+    './src/api/chat/**/*.js',
+    './src/api/client/**/*.js',
+    './src/api/metrics/**/*.js',
+    './src/api/notification/**/*.js',
+    './src/api/payment/**/*.js',
+    './src/api/points/**/*.js',
+    './src/api/profile/**/*.js',
+    './src/api/search/**/*.js',
+    './src/api/user/**/*.js',
+    './src/services/**/*.js'
   ]
 };
 
@@ -102,7 +114,7 @@ module.exports = {
   setup: swaggerUi.setup(specs, {
     explorer: true,
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'API - Plataforma de Agencias y Acompañantes'
+    customSiteTitle: 'API - TeLoFundi'
   }),
   specs
 };

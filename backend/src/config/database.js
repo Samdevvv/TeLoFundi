@@ -2,10 +2,10 @@
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
 
-// Crear una instancia de conexión a PostgreSQL
+// Crear una instancia de conexión a PostgreSQL con valores por defecto explícitos
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT || '5432'),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'C123456',
   database: process.env.DB_NAME || 'TeLoFundiDev',

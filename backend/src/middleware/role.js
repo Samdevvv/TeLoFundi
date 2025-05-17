@@ -1,5 +1,7 @@
 // src/middleware/role.js
 const logger = require('../utils/logger');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 /**
  * Middleware para verificar roles específicos
@@ -11,20 +13,26 @@ const roleMiddleware = (allowedRoles) => {
     try {
       // Verificar que el usuario está autenticado
       if (!req.user) {
+        logger.debug('Intento de acceso a ruta protegida sin usuario autenticado');
         return res.status(401).json({
           success: false,
           message: 'No autorizado. Debe iniciar sesión.'
         });
       }
 
+      // Registrar intento de acceso (para depuración)
+      logger.debug(`Verificando acceso para usuario ${req.user.id} con rol ${req.user.role}. Roles permitidos: ${allowedRoles.join(', ')}`);
+
       // Verificar que el rol del usuario esté en la lista de roles permitidos
       if (!allowedRoles.includes(req.user.role)) {
+        logger.debug(`Acceso denegado a usuario ${req.user.id} con rol ${req.user.role}`);
         return res.status(403).json({
           success: false,
           message: 'Acceso denegado. No tiene los permisos necesarios.'
         });
       }
 
+      logger.debug(`Acceso permitido a usuario ${req.user.id} con rol ${req.user.role}`);
       // Si el rol es válido, continuar
       next();
     } catch (error) {
@@ -86,11 +94,14 @@ const resourceOwnerMiddleware = (resourceIdParam, getResourceOwner) => {
 
       // Si es admin, permitir acceso sin verificar propiedad
       if (req.user.role === 'admin') {
+        logger.debug(`Acceso admin a recurso ${resourceId} concedido automáticamente`);
         return next();
       }
 
       // Obtener propietario del recurso
       const resourceOwnerId = await getResourceOwner(resourceId);
+      
+      logger.debug(`Verificando propiedad: usuario ${req.user.id} intenta acceder al recurso ${resourceId} de propietario ${resourceOwnerId}`);
 
       // Verificar si el usuario autenticado es el propietario
       if (resourceOwnerId !== req.user.id) {
@@ -100,6 +111,7 @@ const resourceOwnerMiddleware = (resourceIdParam, getResourceOwner) => {
         });
       }
 
+      logger.debug(`Acceso a recurso propio permitido: ${resourceId}`);
       next();
     } catch (error) {
       logger.error(`Error en middleware de propietario: ${error.message}`, { error });
@@ -128,6 +140,8 @@ const vipOnly = (strictMode = true) => {
       }
 
       // Verificar si el usuario es VIP
+      logger.debug(`Verificando acceso VIP para usuario ${req.user.id}, isVip: ${req.user.isVip}, strictMode: ${strictMode}`);
+      
       if (!req.user.isVip) {
         if (strictMode) {
           return res.status(403).json({
@@ -137,9 +151,11 @@ const vipOnly = (strictMode = true) => {
         } else {
           // En modo permisivo, se pasa la flag y se continúa
           req.isVipAccess = false;
+          logger.debug(`Acceso no-VIP permitido en modo permisivo para usuario ${req.user.id}`);
         }
       } else {
         req.isVipAccess = true;
+        logger.debug(`Acceso VIP permitido para usuario ${req.user.id}`);
       }
 
       next();
@@ -171,6 +187,7 @@ const verifiedProfileOnly = (strictMode = true) => {
 
       // Verificar que sea un perfil
       if (req.user.role !== 'perfil') {
+        logger.debug(`Acceso denegado: usuario ${req.user.id} con rol ${req.user.role} no es un perfil`);
         return res.status(403).json({
           success: false,
           message: 'Acceso denegado. Solo para perfiles.'
@@ -178,15 +195,13 @@ const verifiedProfileOnly = (strictMode = true) => {
       }
 
       // Obtener estado de verificación del perfil
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
       const profile = await prisma.profile.findUnique({
         where: { id: req.user.id },
         select: { verificationStatus: true }
       });
 
       if (!profile) {
+        logger.debug(`Perfil no encontrado para usuario ${req.user.id}`);
         return res.status(404).json({
           success: false,
           message: 'Perfil no encontrado.'
@@ -194,6 +209,7 @@ const verifiedProfileOnly = (strictMode = true) => {
       }
 
       const isVerified = profile.verificationStatus === 'verificado';
+      logger.debug(`Estado de verificación para perfil ${req.user.id}: ${profile.verificationStatus}, isVerified: ${isVerified}`);
 
       if (!isVerified && strictMode) {
         return res.status(403).json({
@@ -204,6 +220,7 @@ const verifiedProfileOnly = (strictMode = true) => {
 
       // Pasar flag de verificación
       req.isVerifiedProfile = isVerified;
+      logger.debug(`Acceso permitido para perfil ${req.user.id}, verificado: ${isVerified}`);
 
       next();
     } catch (error) {
@@ -232,27 +249,29 @@ const profileOwnerOrAgencyMiddleware = (profileIdParam) => {
         });
       }
 
+      logger.debug(`Verificando acceso al perfil ${profileId} por el usuario ${req.user.id} con rol ${req.user.role}`);
+
       // Si es admin, permitir acceso sin verificar
       if (req.user.role === 'admin') {
+        logger.debug(`Acceso admin permitido al perfil ${profileId}`);
         return next();
       }
 
       // Si es el propio perfil, permitir acceso
       if (req.user.id === profileId) {
+        logger.debug(`Acceso permitido al propio perfil ${profileId}`);
         return next();
       }
 
       // Si es agencia, verificar relación con el perfil
       if (req.user.role === 'agencia') {
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
-        
         const profile = await prisma.profile.findUnique({
           where: { id: profileId },
           select: { agencyId: true }
         });
 
         if (!profile) {
+          logger.debug(`Perfil ${profileId} no encontrado`);
           return res.status(404).json({
             success: false,
             message: 'Perfil no encontrado.'
@@ -260,6 +279,8 @@ const profileOwnerOrAgencyMiddleware = (profileIdParam) => {
         }
 
         // Verificar si la agencia está relacionada con el perfil
+        logger.debug(`Agencia del perfil: ${profile.agencyId}, Agencia solicitante: ${req.user.id}`);
+        
         if (profile.agencyId !== req.user.id) {
           return res.status(403).json({
             success: false,
@@ -267,10 +288,12 @@ const profileOwnerOrAgencyMiddleware = (profileIdParam) => {
           });
         }
 
+        logger.debug(`Acceso permitido a agencia ${req.user.id} para perfil ${profileId}`);
         return next();
       }
 
       // Si llega aquí, no tiene acceso
+      logger.debug(`Acceso denegado para usuario ${req.user.id} con rol ${req.user.role} al perfil ${profileId}`);
       return res.status(403).json({
         success: false,
         message: 'No autorizado. No tiene acceso a este perfil.'

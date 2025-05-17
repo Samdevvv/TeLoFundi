@@ -3,7 +3,15 @@ const nodemailer = require('nodemailer');
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
 
-const prisma = new PrismaClient();
+let prismaInstance = null;
+
+// Función para obtener o crear la instancia de Prisma bajo demanda
+const getPrisma = () => {
+  if (!prismaInstance) {
+    prismaInstance = new PrismaClient();
+  }
+  return prismaInstance;
+};
 
 /**
  * Servicio para gestionar el envío de correos electrónicos
@@ -21,8 +29,15 @@ class EmailService {
       }
     });
 
-    // Verificar conexión
-    this.verifyConnection();
+    // No verificar conexión en el constructor para evitar bloquear la inicialización
+    // En su lugar, programamos la verificación para que ocurra después
+    if (process.env.NODE_ENV === 'production') {
+      // En producción, programar verificación para 5 segundos después
+      setTimeout(() => this.verifyConnection(), 5000);
+    } else {
+      // En desarrollo, solo registrar el mensaje sin intentar verificar
+      logger.info('Modo de desarrollo: verificación de conexión SMTP omitida');
+    }
   }
 
   /**
@@ -87,27 +102,36 @@ class EmailService {
       // Enviar correo
       const result = await this.transporter.sendMail(options);
 
-      // Registrar el envío
-      await this._logEmailSent({
-        to,
-        subject,
-        templateId,
-        status: 'enviado',
-        providerMessageId: result.messageId
-      });
+      // Registrar el envío (con manejo seguro para evitar errores fatales)
+      try {
+        await this._logEmailSent({
+          to,
+          subject,
+          templateId,
+          status: 'enviado',
+          providerMessageId: result.messageId
+        });
+      } catch (logError) {
+        logger.error(`Error al registrar envío de correo: ${logError.message}`, { logError });
+        // No interrumpir el flujo por errores de registro
+      }
 
       return result;
     } catch (error) {
       logger.error(`Error al enviar correo: ${error.message}`, { error });
       
-      // Registrar el error
-      await this._logEmailSent({
-        to: mailOptions.to,
-        subject: mailOptions.subject,
-        templateId: mailOptions.templateId,
-        status: 'fallido',
-        errorMessage: error.message
-      });
+      // Registrar el error (con manejo seguro)
+      try {
+        await this._logEmailSent({
+          to: mailOptions.to,
+          subject: mailOptions.subject,
+          templateId: mailOptions.templateId,
+          status: 'fallido',
+          errorMessage: error.message
+        });
+      } catch (logError) {
+        logger.error(`Error al registrar fallo de correo: ${logError.message}`, { logError });
+      }
       
       throw new Error(`Error al enviar correo: ${error.message}`);
     }
@@ -120,7 +144,14 @@ class EmailService {
    * @private
    */
   async _logEmailSent(logData) {
+    // Si no estamos en producción, solo simular el registro
+    if (process.env.NODE_ENV !== 'production') {
+      logger.debug(`[SIMULADO] Registro de envío de correo: ${JSON.stringify(logData)}`);
+      return;
+    }
+
     try {
+      const prisma = getPrisma();
       const {
         to,
         subject,
@@ -130,63 +161,88 @@ class EmailService {
         errorMessage
       } = logData;
 
-      // Buscar usuario por correo
-      const user = await prisma.user.findFirst({
-        where: { email: to }
-      });
+      // Buscar usuario por correo (con manejo seguro)
+      let user = null;
+      try {
+        user = await prisma.user.findFirst({
+          where: { email: to }
+        });
+      } catch (userError) {
+        logger.error(`Error al buscar usuario por email: ${userError.message}`);
+        // Continuar sin el usuario
+      }
 
-      // Crear registro
-      await prisma.emailLog.create({
-        data: {
-          userId: user?.id,
-          emailAddress: to,
-          subject,
-          templateId,
-          status,
-          providerMessageId,
-          errorMessage,
-          emailProvider: 'nodemailer'
+      // Crear registro con manejo seguro
+      try {
+        await prisma.emailLog.create({
+          data: {
+            userId: user?.id,
+            emailAddress: to,
+            subject,
+            templateId,
+            status,
+            providerMessageId,
+            errorMessage,
+            emailProvider: 'nodemailer'
+          }
+        });
+      } catch (createError) {
+        logger.error(`Error al crear registro de email: ${createError.message}`);
+        // Si hay un error específico con la tabla, podemos verificar
+        if (createError.message.includes('does not exist') || 
+            createError.message.includes('no such table')) {
+          logger.warn('La tabla emailLog puede no existir. Verifique las migraciones de Prisma.');
         }
-      });
+      }
     } catch (logError) {
-      logger.error(`Error al registrar envío de correo: ${logError.message}`, { logError });
+      logger.error(`Error general al registrar envío de correo: ${logError.message}`, { logError });
       // No propagamos este error para no interrumpir el flujo principal
     }
   }
 
   /**
-   * Envía un correo de verificación de cuenta
+   * Envía un correo de verificación de cuenta con manejo seguro de errores de BD
    * @param {Object} user - Usuario destinatario
    * @param {string} token - Token de verificación
    * @returns {Promise<void>}
    */
   async sendVerificationEmail(user, token) {
     try {
-      // Buscar plantilla
-      const template = await prisma.notificationTemplate.findFirst({
-        where: {
-          type: 'email',
-          name: 'verificacion_email',
-          isActive: true
-        }
-      });
-
       // URL de verificación
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email/${token}`;
-
-      // Usar plantilla o contenido predeterminado
+      
+      // Variables para contenido
       let emailContent;
       let emailSubject;
+      let templateId = null;
 
-      if (template) {
-        // Reemplazar variables en la plantilla
-        emailContent = template.content
-          .replace(/{{name}}/g, user.username || 'Usuario')
-          .replace(/{{verification_url}}/g, verificationUrl);
-        
-        emailSubject = template.subject;
-      } else {
-        // Contenido predeterminado
+      // Buscar plantilla (con manejo seguro para evitar errores de BD)
+      try {
+        const prisma = getPrisma();
+        const template = await prisma.notificationTemplate.findFirst({
+          where: {
+            type: 'email',
+            name: 'verificacion_email',
+            isActive: true
+          }
+        });
+
+        if (template) {
+          // Reemplazar variables en la plantilla
+          emailContent = template.content
+            .replace(/{{name}}/g, user.username || 'Usuario')
+            .replace(/{{verification_url}}/g, verificationUrl);
+          
+          emailSubject = template.subject;
+          templateId = template.id;
+        }
+      } catch (templateError) {
+        logger.error(`Error al buscar plantilla de email: ${templateError.message}`);
+        // Continuar con contenido predeterminado
+      }
+
+      // Si no se encontró plantilla o hubo error, usar contenido predeterminado
+      if (!emailContent) {
         emailContent = `
           <h1>Bienvenido a TeLoFundi</h1>
           <p>Hola ${user.username || 'Usuario'},</p>
@@ -204,47 +260,57 @@ class EmailService {
         to: user.email,
         subject: emailSubject,
         html: emailContent,
-        templateId: template?.id
+        templateId
       });
     } catch (error) {
       logger.error(`Error al enviar correo de verificación: ${error.message}`, { error });
-      throw new Error(`Error al enviar correo de verificación: ${error.message}`);
+      // No lanzar el error para no interrumpir el flujo de registro
     }
   }
 
   /**
-   * Envía un correo de restablecimiento de contraseña
+   * Envía un correo de restablecimiento de contraseña con manejo seguro de errores de BD
    * @param {Object} user - Usuario destinatario
    * @param {string} token - Token de restablecimiento
    * @returns {Promise<void>}
    */
   async sendPasswordResetEmail(user, token) {
     try {
-      // Buscar plantilla
-      const template = await prisma.notificationTemplate.findFirst({
-        where: {
-          type: 'email',
-          name: 'restablecer_password',
-          isActive: true
-        }
-      });
-
       // URL de restablecimiento
       const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${token}`;
-
-      // Usar plantilla o contenido predeterminado
+      
+      // Variables para contenido
       let emailContent;
       let emailSubject;
+      let templateId = null;
 
-      if (template) {
-        // Reemplazar variables en la plantilla
-        emailContent = template.content
-          .replace(/{{name}}/g, user.username || 'Usuario')
-          .replace(/{{reset_url}}/g, resetUrl);
-        
-        emailSubject = template.subject;
-      } else {
-        // Contenido predeterminado
+      // Buscar plantilla (con manejo seguro)
+      try {
+        const prisma = getPrisma();
+        const template = await prisma.notificationTemplate.findFirst({
+          where: {
+            type: 'email',
+            name: 'restablecer_password',
+            isActive: true
+          }
+        });
+
+        if (template) {
+          // Reemplazar variables en la plantilla
+          emailContent = template.content
+            .replace(/{{name}}/g, user.username || 'Usuario')
+            .replace(/{{reset_url}}/g, resetUrl);
+          
+          emailSubject = template.subject;
+          templateId = template.id;
+        }
+      } catch (templateError) {
+        logger.error(`Error al buscar plantilla de email: ${templateError.message}`);
+        // Continuar con contenido predeterminado
+      }
+
+      // Si no se encontró plantilla o hubo error, usar contenido predeterminado
+      if (!emailContent) {
         emailContent = `
           <h1>Restablecimiento de Contraseña</h1>
           <p>Hola ${user.username || 'Usuario'},</p>
@@ -263,42 +329,52 @@ class EmailService {
         to: user.email,
         subject: emailSubject,
         html: emailContent,
-        templateId: template?.id
+        templateId
       });
     } catch (error) {
       logger.error(`Error al enviar correo de restablecimiento: ${error.message}`, { error });
-      throw new Error(`Error al enviar correo de restablecimiento: ${error.message}`);
+      // No lanzar error para permitir que el flujo continúe
     }
   }
 
   /**
-   * Envía un correo de bienvenida
+   * Envía un correo de bienvenida con manejo seguro de errores de BD
    * @param {Object} user - Usuario destinatario
    * @returns {Promise<void>}
    */
   async sendWelcomeEmail(user) {
     try {
-      // Buscar plantilla
-      const template = await prisma.notificationTemplate.findFirst({
-        where: {
-          type: 'email',
-          name: 'bienvenida',
-          isActive: true
-        }
-      });
-
-      // Usar plantilla o contenido predeterminado
+      // Variables para contenido
       let emailContent;
       let emailSubject;
+      let templateId = null;
 
-      if (template) {
-        // Reemplazar variables en la plantilla
-        emailContent = template.content
-          .replace(/{{name}}/g, user.username || 'Usuario');
-        
-        emailSubject = template.subject;
-      } else {
-        // Contenido predeterminado
+      // Buscar plantilla (con manejo seguro)
+      try {
+        const prisma = getPrisma();
+        const template = await prisma.notificationTemplate.findFirst({
+          where: {
+            type: 'email',
+            name: 'bienvenida',
+            isActive: true
+          }
+        });
+
+        if (template) {
+          // Reemplazar variables en la plantilla
+          emailContent = template.content
+            .replace(/{{name}}/g, user.username || 'Usuario');
+          
+          emailSubject = template.subject;
+          templateId = template.id;
+        }
+      } catch (templateError) {
+        logger.error(`Error al buscar plantilla de email: ${templateError.message}`);
+        // Continuar con contenido predeterminado
+      }
+
+      // Si no se encontró plantilla o hubo error, usar contenido predeterminado
+      if (!emailContent) {
         emailContent = `
           <h1>¡Bienvenido a TeLoFundi!</h1>
           <p>Hola ${user.username || 'Usuario'},</p>
@@ -316,7 +392,7 @@ class EmailService {
         to: user.email,
         subject: emailSubject,
         html: emailContent,
-        templateId: template?.id
+        templateId
       });
     } catch (error) {
       logger.error(`Error al enviar correo de bienvenida: ${error.message}`, { error });
@@ -325,4 +401,5 @@ class EmailService {
   }
 }
 
+// Exportar instancia única
 module.exports = new EmailService();

@@ -1,0 +1,91 @@
+
+├── backend/
+│   ├── docker/
+│   ├── logs/
+│   ├── node_modules/
+│   ├── prisma/
+│   ├── scripts/
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── admin/
+│   │   │   │   ├── admin.controller.js
+│   │   │   │   ├── routes.js
+│   │   │   ├── agency/
+│   │   │   │   ├── agency.controller.js
+│   │   │   │   ├── agency.routes.js
+│   │   │   ├── auth/
+│   │   │   │   ├── auth.controller.js
+│   │   │   │   ├── auth.routes.js
+│   │   │   ├── chat/
+│   │   │   │   ├── chat.controller.js
+│   │   │   │   ├── chat.routes.js
+│   │   │   ├── client/
+│   │   │   │   ├── client.controller.js
+│   │   │   │   ├── client.routes.js
+│   │   │   ├── metrics/
+│   │   │   │   ├── metrics.controller.js
+│   │   │   │   ├── routes.js
+│   │   │   ├── notification/
+│   │   │   │   ├── notification.controller.js
+│   │   │   │   ├── notification.routes.js
+│   │   │   ├── payment/
+│   │   │   │   ├── payment.controller.js
+│   │   │   │   ├── payment.routes.js
+│   │   │   ├── points/
+│   │   │   │   ├── points.controller.js
+│   │   │   │   ├── points.routes.js
+│   │   │   ├── profile/
+│   │   │   │   ├── profile.controller.js
+│   │   │   │   ├── profile.routes.js
+│   │   │   ├── search/
+│   │   │   │   ├── search.controller.js
+│   │   │   │   ├── search.routes.js
+│   │   │   ├── user/
+│   │   │   │   ├── user.controller.js
+│   │   │   │   ├── user.routes.js
+│   │   │   ├── index.js
+│   │   ├── config/
+│   │   │   ├── app.js
+│   │   │   ├── auth.js
+│   │   │   ├── aws.js
+│   │   │   ├── database.js
+│   │   │   ├── prisma.js
+│   │   │   ├── swagger.js
+│   │   ├── middleware/
+│   │   │   ├── auth.js
+│   │   │   ├── error.js
+│   │   │   ├── role.js
+│   │   │   ├── upload.js
+│   │   ├── services/
+│   │   │   ├── adminService.js
+│   │   │   ├── agencyService.js
+│   │   │   ├── authService.js
+│   │   │   ├── chatService.js
+│   │   │   ├── clientService.js
+│   │   │   ├── emailService.js
+│   │   │   ├── metricService.js
+│   │   │   ├── notificationService.js
+│   │   │   ├── paymentService.js
+│   │   │   ├── pointService.js
+│   │   │   ├── profileService.js
+│   │   │   ├── searchService.js
+│   │   │   ├── uploadService.js
+│   │   │   ├── userService.js
+│   │   ├── socket/
+│   │   │   ├── chatHandler.js
+│   │   │   ├── index.js
+│   │   │   ├── notificationHandler.js
+│   │   ├── utils/
+│   │   │   ├── apiConfig.js
+│   │   │   ├── fetchInterceptor.js
+│   │   │   ├── helpers.js
+│   │   │   ├── logger.js
+│   │   │   ├── validators.js
+│   ├── uploads/
+│   ├── .env
+│   ├── .gitignore
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md

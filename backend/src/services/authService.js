@@ -222,6 +222,331 @@ class AuthService {
     }
   }
 
+// Modificación para authService.js - método socialLogin
+
+/**
+ * Inicia sesión o registra un usuario usando un proveedor externo (Google, Facebook, etc.)
+ * @param {Object} userData - Datos del usuario del proveedor externo
+ * @param {string} provider - Nombre del proveedor (google, facebook, etc.)
+ * @param {string} [userType='cliente'] - Rol para registro si es nuevo usuario
+ * @returns {Promise<Object>} - Datos de sesión
+ */
+// Corrección para socialLogin en authService.js - Manejo específico de la restricción única en email
+async socialLogin(userData, provider, userType = 'cliente') {
+  try {
+    // Validar que se recibieron los datos necesarios
+    if (!userData || !userData.id || !userData.email) {
+      throw new Error('Datos de usuario incompletos');
+    }
+
+    logger.info(`Intento de login social: ${provider} para ${userData.email}, tipo: ${userType}`);
+
+    // PRIMERO: Verificar si ya existe un usuario con este email
+    let existingUser = null;
+    try {
+      existingUser = await prisma.user.findUnique({
+        where: { email: userData.email },
+      });
+      
+      if (existingUser) {
+        logger.info(`Usuario existente encontrado por email: ${existingUser.id}`);
+      }
+    } catch (findUserError) {
+      logger.error(`Error al buscar usuario por email: ${findUserError.message}`, { error: findUserError });
+      // Continuamos con el flujo
+    }
+
+    // Si el usuario ya existe, no intentar crearlo de nuevo
+    if (existingUser) {
+      // Buscar si ya existe una autenticación externa para este usuario y proveedor
+      let existingAuth = null;
+      try {
+        existingAuth = await prisma.externalAuth.findFirst({
+          where: {
+            OR: [
+              // Buscar por provider+providerUserId
+              {
+                provider,
+                providerUserId: userData.id,
+              },
+              // O buscar por userId+provider
+              {
+                userId: existingUser.id,
+                provider,
+              }
+            ]
+          },
+          include: {
+            user: true,
+          },
+        });
+      } catch (findAuthError) {
+        logger.error(`Error al buscar autenticación externa: ${findAuthError.message}`, { error: findAuthError });
+      }
+
+      // Si la autenticación externa no existe, crearla
+      if (!existingAuth) {
+        try {
+          // Usar SQL directo con ON CONFLICT DO NOTHING para evitar errores de restricción única
+          const authId = uuidv4();
+          await prisma.$executeRaw`
+            INSERT INTO "ExternalAuth" (
+              "id", "userId", "provider", "providerUserId", "providerEmail", 
+              "accessToken", "profileData", "createdAt", "updatedAt"
+            )
+            VALUES (
+              ${authId}, ${existingUser.id}, ${provider}, ${userData.id}, 
+              ${userData.email}, ${userData.tokenId}, ${JSON.stringify({...userData})}, 
+              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT ("provider", "providerUserId") DO NOTHING;
+          `;
+          logger.info(`Autenticación externa creada o ignorada para usuario existente: ${existingUser.id}`);
+        } catch (createAuthError) {
+          logger.warn(`Error al crear autenticación externa (ignorado): ${createAuthError.message}`);
+          // No es crítico, continuamos con el usuario existente
+        }
+      } else {
+        // Actualizar token si es necesario
+        try {
+          await prisma.externalAuth.update({
+            where: { id: existingAuth.id },
+            data: {
+              accessToken: userData.tokenId,
+              updatedAt: new Date(),
+            },
+          });
+        } catch (updateError) {
+          logger.error(`Error al actualizar token: ${updateError.message}`, { error: updateError });
+          // No es crítico, continuamos con el usuario existente
+        }
+      }
+
+      // Usar el usuario existente
+      return await this.finalizeSocialLogin(existingUser, false, provider, userData.tokenId);
+    }
+
+    // Si llegamos aquí, el usuario no existe y debemos crearlo
+    let user;
+    let isNewUser = true;
+    
+    try {
+      // Crear usuario base con una transacción para asegurar consistencia
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Crear el usuario base
+        const newUser = await tx.user.create({
+          data: {
+            email: userData.email,
+            emailVerified: true,
+            role: userType,
+            profileImageUrl: userData.picture,
+            isActive: true,
+          },
+        });
+
+        // 2. Crear la autenticación externa
+        await tx.externalAuth.create({
+          data: {
+            userId: newUser.id,
+            provider,
+            providerUserId: userData.id,
+            providerEmail: userData.email,
+            accessToken: userData.tokenId,
+            profileData: { ...userData },
+          },
+        });
+
+        // 3. Crear perfil específico según el rol
+        let profile = null;
+        if (userType === 'cliente') {
+          profile = await tx.client.create({
+            data: {
+              id: newUser.id,
+              username: userData.name || `user_${crypto.randomBytes(4).toString('hex')}`,
+              referralCode: crypto.randomBytes(6).toString('hex')
+            },
+          });
+        } else if (userType === 'perfil') {
+          // Para acompañantes, se genera un slug único
+          const slug = this.generateSlug(userData.name || `profile_${crypto.randomBytes(4).toString('hex')}`);
+          
+          profile = await tx.profile.create({
+            data: {
+              id: newUser.id,
+              displayName: userData.name || `Profile ${crypto.randomBytes(4).toString('hex')}`,
+              slug,
+              gender: 'otro', // Valor predeterminado
+              isIndependent: true
+            },
+          });
+        } else if (userType === 'agencia') {
+          // Para agencias, también se genera un slug único
+          const slug = this.generateSlug(userData.name || `agency_${crypto.randomBytes(4).toString('hex')}`);
+          
+          profile = await tx.agency.create({
+            data: {
+              id: newUser.id,
+              name: userData.name || `Agency ${crypto.randomBytes(4).toString('hex')}`,
+              slug
+            },
+          });
+        }
+
+        return { user: newUser, profile };
+      });
+
+      user = result.user;
+      logger.info(`Nuevo usuario creado: ${user.id}, tipo: ${userType}`);
+    } catch (createError) {
+      // Si falla la creación, verificar si es por restricción única en el email
+      if (createError.code === 'P2002' && 
+          createError.meta && 
+          createError.meta.target && 
+          (createError.meta.target.includes('email') || createError.meta.target[0] === 'email')) {
+        
+        logger.warn(`Conflicto de restricción única en email: ${userData.email}. Intentando recuperar usuario...`);
+        
+        // Intentar nuevamente obtener el usuario por email (pudo haber sido creado en una solicitud concurrente)
+        try {
+          const recoveredUser = await prisma.user.findUnique({
+            where: { email: userData.email }
+          });
+          
+          if (recoveredUser) {
+            logger.info(`Usuario recuperado por email después de error P2002: ${recoveredUser.id}`);
+            // Intentar crear la autenticación externa si no existe
+            try {
+              await prisma.$executeRaw`
+                INSERT INTO "ExternalAuth" (
+                  "id", "userId", "provider", "providerUserId", "providerEmail", 
+                  "accessToken", "profileData", "createdAt", "updatedAt"
+                )
+                VALUES (
+                  ${uuidv4()}, ${recoveredUser.id}, ${provider}, ${userData.id}, 
+                  ${userData.email}, ${userData.tokenId}, ${JSON.stringify({...userData})}, 
+                  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                ON CONFLICT ("provider", "providerUserId") DO NOTHING;
+              `;
+            } catch (linkError) {
+              logger.warn(`Error al vincular cuenta recuperada: ${linkError.message}`);
+              // Continuamos con el usuario recuperado
+            }
+            
+            // Continuar el proceso con el usuario recuperado
+            return await this.finalizeSocialLogin(recoveredUser, false, provider, userData.tokenId);
+          }
+        } catch (recoveryError) {
+          logger.error(`Error al intentar recuperar usuario: ${recoveryError.message}`, { error: recoveryError });
+        }
+      }
+      
+      // Si llegamos aquí, es un error que no pudimos manejar
+      logger.error(`Error al crear usuario: ${createError.message}`, { error: createError });
+      throw createError;
+    }
+
+    // Si llegamos hasta aquí, hemos creado exitosamente el usuario
+    return await this.finalizeSocialLogin(user, isNewUser, provider, userData.tokenId);
+  } catch (error) {
+    logger.error(`Error en login social: ${error.message}`, { error });
+    throw error;
+  }
+}
+
+/**
+ * Completa el proceso de login social generando tokens y sesión
+ * Método auxiliar para reducir código duplicado en socialLogin
+ */
+async finalizeSocialLogin(user, isNewUser, provider, tokenId) {
+  // Crear sesión para el usuario
+  const sessionToken = crypto.randomBytes(64).toString('hex');
+  let session;
+  try {
+    session = await prisma.userSession.create({
+      data: {
+        userId: user.id,
+        token: sessionToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
+        ipAddress: user.ipAddress,
+        userAgent: user.userAgent,
+        provider
+      }
+    });
+  } catch (sessionError) {
+    logger.error(`Error al crear sesión: ${sessionError.message}`, { error: sessionError });
+    // Continuamos incluso si falla la creación de sesión
+  }
+
+  // Generar tokens JWT
+  const accessToken = this.generateAccessToken(user);
+  const refreshToken = this.generateRefreshToken(user);
+
+  // Actualizar último login
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLogin: new Date()
+      }
+    });
+  } catch (updateError) {
+    logger.error(`Error al actualizar último login: ${updateError.message}`, { error: updateError });
+    // No es crítico, continuamos
+  }
+
+  // Obtener información del perfil según el tipo de usuario
+  let profileInfo = null;
+  try {
+    if (user.role === 'cliente') {
+      profileInfo = await prisma.client.findUnique({
+        where: { id: user.id },
+        select: {
+          username: true,
+          totalPoints: true,
+          vipUntil: true,
+          verifiedAccount: true
+        }
+      });
+    } else if (user.role === 'perfil') {
+      profileInfo = await prisma.profile.findUnique({
+        where: { id: user.id },
+        select: {
+          displayName: true,
+          slug: true,
+          verificationStatus: true
+        }
+      });
+    } else if (user.role === 'agencia') {
+      profileInfo = await prisma.agency.findUnique({
+        where: { id: user.id },
+        select: {
+          name: true,
+          slug: true,
+          verificationStatus: true
+        }
+      });
+    }
+  } catch (profileError) {
+    logger.error(`Error al obtener información de perfil: ${profileError.message}`, { error: profileError });
+  }
+
+  logger.info(`Login social exitoso para usuario: ${user.id}, es nuevo: ${isNewUser}`);
+
+  return {
+    accessToken,
+    refreshToken,
+    sessionToken: session ? session.token : null,
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    isVip: user.isVip,
+    profileInfo,
+    status: isNewUser ? 'new_user' : 'existing_user'
+  };
+}
+
+
   /**
    * Inicia sesión o registra un usuario usando un proveedor externo (Google, Facebook, etc.)
    * @param {Object} userData - Datos del usuario del proveedor externo
