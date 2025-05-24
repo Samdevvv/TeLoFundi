@@ -1,7 +1,5 @@
-/* src/estilos/ProfileEditInsta.css - Versión oscura mejorada con fixes para botones */
+/* src/estilos/ProfileEdit.css - Vista de edición tipo Instagram con colores naranja */
 :root {
-  /* Colores principales - Tema oscuro */
-  --insta-gradient: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
   --insta-bg: #000000;
   --insta-bg-secondary: #121212;
   --insta-bg-card: #1a1a1a;
@@ -9,12 +7,13 @@
   --insta-text: #ffffff;
   --insta-text-secondary: #a8a8a8;
   --insta-border: #333333;
-  --insta-blue: #0095f6;
+  --insta-orange: #ff5722;        /* Naranja principal (reemplaza azul) */
+  --insta-orange-light: #ff7043;  /* Naranja claro para hover */
+  --insta-orange-dark: #e64a19;   /* Naranja oscuro para botones activos */
   --insta-red: #ed4956;
-  --insta-green: #4cb5f9;
-  --insta-heart: #ed4956;
   --insta-yellow: #f7b731;
   --insta-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --insta-orange-shadow: 0 4px 12px rgba(255, 87, 34, 0.3); /* Sombra naranja */
 }
 
 /* Reset básico y estilos generales */
@@ -52,7 +51,7 @@ body {
   height: 35px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--insta-blue);
+  border-top-color: var(--insta-orange); /* Cambiado a naranja */
   animation: spin 0.8s linear infinite;
 }
 
@@ -66,7 +65,7 @@ body {
   text-align: center;
   margin-top: 100px;
   background-color: var(--insta-bg-secondary);
-  border-radius: 10px;
+  border-radius: 16px; /* Redondeado más estilo IG */
   box-shadow: var(--insta-shadow);
   color: var(--insta-text);
 }
@@ -83,20 +82,20 @@ body {
 
 /* Botones principales */
 .insta-btn-primary {
-  background-color: var(--insta-blue);
+  background-color: var(--insta-orange); /* Cambiado a naranja */
   color: white;
   border: none;
   padding: 8px 16px;
-  border-radius: 4px;
+  border-radius: 8px; /* Más redondeado estilo IG */
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .insta-btn-primary:hover {
-  background-color: #0081e6;
+  background-color: var(--insta-orange-light); /* Naranja más claro */
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 149, 246, 0.3);
+  box-shadow: 0 5px 15px rgba(255, 87, 34, 0.3); /* Sombra naranja */
 }
 
 /* Header (navbar y perfil) */
@@ -119,12 +118,8 @@ body {
 .insta-header h1 {
   font-size: 24px;
   font-weight: 700;
-  cursor: pointer;
-  background: var(--insta-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: var(--insta-text);
+  font-family: 'Instagram Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .insta-header-actions {
@@ -133,34 +128,41 @@ body {
 }
 
 .insta-header-actions button {
-  background-color: rgba(255, 255, 255, 0.1);
   border: none;
-  font-size: 20px;
-  color: var(--insta-text);
   cursor: pointer;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
   transition: all 0.3s;
 }
 
+/* Estilo especial para el botón de editar perfil en el header */
+
 .insta-header-actions button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4);
 }
 
-/* FIX: Mejorar visibilidad de botones en el header */
+.insta-edit-btn:hover {
+  background: linear-gradient(45deg, #ff9800, #ff5722) !important; /* Gradiente invertido al hover */
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4) !important;
+}
+
 .insta-edit-btn {
-  color: var(--insta-blue) !important;
-  background-color: rgba(0, 149, 246, 0.15) !important;
+  color: white !important;
+  background: linear-gradient(45deg, #ff5722, #ff9800) !important; /* Gradiente naranja estilo IG */
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 2px 10px rgba(255, 87, 34, 0.3) !important;
+  transition: all 0.3s ease !important;
 }
 
 .insta-save-btn {
-  color: var(--insta-green) !important;
-  background-color: rgba(76, 181, 249, 0.15) !important;
+  color: var(--insta-orange) !important; /* Cambiado a naranja */
+  background-color: rgba(255, 87, 34, 0.15) !important; /* Fondo naranja */
 }
 
 .insta-cancel-btn {
@@ -174,9 +176,14 @@ body {
   align-items: center;
   padding: 12px 20px;
   margin: 0 20px;
-  border-radius: 8px;
+  border-radius: 12px; /* Más redondeado estilo IG */
   animation: fadeInDown 0.3s ease-out;
   backdrop-filter: blur(10px);
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
 }
 
 .insta-notification-icon {
@@ -184,16 +191,15 @@ body {
 }
 
 .insta-success {
-  background-color: rgba(76, 181, 249, 0.15);
-  border: 1px solid rgba(76, 181, 249, 0.3);
+  background-color: rgba(255, 87, 34, 0.15); /* Cambiado a naranja */
+  border: 1px solid rgba(255, 87, 34, 0.3); /* Borde naranja */
   color: var(--insta-text);
 }
 
 .insta-success .insta-notification-icon {
-  color: var(--insta-blue);
+  color: var(--insta-orange); /* Cambiado a naranja */
 }
 
-/* FIX: Corregir conflicto entre clase error */
 .insta-error-notification {
   background-color: rgba(237, 73, 86, 0.15);
   border: 1px solid rgba(237, 73, 86, 0.3);
@@ -205,32 +211,26 @@ body {
 }
 
 @keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* Perfil información */
 .insta-profile-info {
   display: flex;
-  padding: 30px 20px;
+  padding: 20px;
   max-width: 935px;
   margin: 0 auto;
 }
 
 .insta-profile-avatar {
-  width: 150px;
-  height: 150px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
-  margin-right: 30px;
+  margin-right: 20px;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 0 20px rgba(131, 58, 180, 0.3);
+  box-shadow: 0 0 15px rgba(255, 87, 34, 0.3); /* Sombra naranja */
 }
 
 .insta-profile-avatar::after {
@@ -241,18 +241,16 @@ body {
   right: 0;
   bottom: 0;
   border-radius: 50%;
-  border: 3px solid transparent;
-  background: var(--insta-gradient) border-box;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  border: 2px solid var(--insta-orange); /* Cambiado a naranja */
+  background: linear-gradient(45deg, #ff5722, #ff9800); /* Gradiente de IG naranja */
+  opacity: 0.2;
 }
 
 .insta-profile-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s;
+  transition: transform 0.3s;
 }
 
 .insta-profile-avatar:hover img {
@@ -266,12 +264,12 @@ body {
 .insta-profile-name {
   display: flex;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .insta-profile-name h2 {
-  font-size: 28px;
-  font-weight: 300;
+  font-size: 20px;
+  font-weight: 600;
   margin-right: 8px;
   color: var(--insta-text);
 }
@@ -280,34 +278,36 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  background-color: var(--insta-blue);
+  width: 16px;
+  height: 16px;
+  background-color: var(--insta-orange); /* Cambiado a naranja */
   color: white;
   border-radius: 50%;
-  font-size: 10px;
-  box-shadow: 0 0 10px rgba(0, 149, 246, 0.5);
+  font-size: 9px;
+  box-shadow: 0 0 8px rgba(255, 87, 34, 0.5); /* Sombra naranja */
 }
 
 .insta-profile-stats {
   display: flex;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
+  gap: 12px; /* Más espaciado estilo IG */
 }
 
 .insta-stat {
-  margin-right: 40px;
+  margin-right: 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
   background-color: rgba(255, 255, 255, 0.05);
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 14px; /* Más padding */
+  border-radius: 10px; /* Más redondeado */
   transition: all 0.3s;
 }
 
 .insta-stat:hover {
   background-color: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .insta-stat strong {
@@ -321,10 +321,10 @@ body {
 }
 
 .insta-profile-bio {
-  max-width: 400px;
+  max-width: 300px;
   background-color: rgba(255, 255, 255, 0.03);
-  padding: 15px;
-  border-radius: 8px;
+  padding: 12px;
+  border-radius: 12px; /* Más redondeado */
 }
 
 .insta-real-name {
@@ -334,8 +334,10 @@ body {
 }
 
 .insta-description {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--insta-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .insta-location {
@@ -343,100 +345,57 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .insta-location svg {
-  color: var(--insta-blue);
-}
-
-/* Tabs */
-.insta-tabs {
-  display: flex;
-  justify-content: space-around;
-  border-top: 1px solid var(--insta-border);
-  background-color: var(--insta-bg-secondary);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.insta-tab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px 0;
-  border: none;
-  background: none;
-  color: var(--insta-text-secondary);
-  font-size: 18px;
-  cursor: pointer;
-  transition: all 0.3s;
-  border-bottom: 1px solid transparent;
-}
-
-.insta-tab.active {
-  color: var(--insta-blue);
-  border-bottom: 2px solid var(--insta-blue);
-}
-
-.insta-tab:hover:not(.active) {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--insta-text);
+  color: var(--insta-orange); /* Cambiado a naranja */
 }
 
 /* Contenido principal */
 .insta-content {
-  padding: 20px;
+  padding: 15px;
   max-width: 935px;
   margin: 0 auto;
-}
-
-.insta-tab-content {
-  background-color: var(--insta-bg-secondary);
-  border-radius: 8px;
-  box-shadow: var(--insta-shadow);
-  overflow: hidden;
 }
 
 /* Galería */
 .insta-gallery-tab {
   background-color: var(--insta-bg);
-  border-radius: 8px;
-  box-shadow: var(--insta-shadow);
-  padding-bottom: 20px;
+  border-radius: 12px; /* Más redondeado */
+  padding-bottom: 15px;
 }
 
 .insta-upload-area {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
+  padding: 14px 18px; /* Más padding */
   background-color: var(--insta-bg-secondary);
-  border-radius: 8px;
-  margin-bottom: 20px;
+  border-radius: 12px; /* Más redondeado */
+  margin-bottom: 15px;
   border: 1px solid var(--insta-border);
 }
 
 .insta-upload-btn {
-  background: var(--insta-blue);
+  background: var(--insta-orange); /* Cambiado a naranja */
+  background: linear-gradient(45deg, #ff5722, #ff9800); /* Gradiente estilo IG */
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 8px; /* Más redondeado */
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.3s;
 }
 
 .insta-upload-btn:hover {
-  background-color: #0081e6;
+  background: linear-gradient(45deg, #ff9800, #ff5722); /* Gradiente invertido */
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 149, 246, 0.3);
+  box-shadow: 0 5px 15px rgba(255, 87, 34, 0.3); /* Sombra naranja */
 }
 
 .insta-upload-btn:disabled {
@@ -448,17 +407,17 @@ body {
 
 .insta-image-counter {
   color: var(--insta-text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   background-color: rgba(255, 255, 255, 0.05);
-  padding: 5px 10px;
-  border-radius: 20px;
+  padding: 6px 10px; /* Más padding */
+  border-radius: 20px; /* Más redondeado estilo IG */
 }
 
 .insta-gallery-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  padding: 0 3px;
+  gap: 4px; /* Aumentado gap */
+  padding: 0 2px;
 }
 
 .insta-gallery-item {
@@ -466,7 +425,7 @@ body {
   overflow: hidden;
   position: relative;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 8px; /* Más redondeado */
 }
 
 .insta-gallery-item::before {
@@ -502,9 +461,9 @@ body {
   top: 8px;
   right: 8px;
   background-color: rgba(0, 0, 0, 0.6);
-  color: var(--insta-yellow);
-  width: 25px;
-  height: 25px;
+  color: var(--insta-orange); /* Cambiado a naranja */
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -519,43 +478,40 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 50px 15px; /* Más padding */
   text-align: center;
   background-color: var(--insta-bg-secondary);
-  border-radius: 8px;
+  border-radius: 12px; /* Más redondeado */
   border: 1px solid var(--insta-border);
 }
 
 .insta-no-photos-icon {
-  font-size: 60px;
-  color: var(--insta-text-secondary);
+  font-size: 60px; /* Más grande */
+  color: var(--insta-orange); /* Cambiado a naranja */
   margin-bottom: 20px;
-  opacity: 0.5;
-  background: var(--insta-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  opacity: 0.7;
 }
 
 .insta-no-photos h3 {
-  font-size: 20px;
+  font-size: 20px; /* Más grande */
   margin-bottom: 10px;
   color: var(--insta-text);
 }
 
 .insta-no-photos p {
-  max-width: 400px;
-  margin-bottom: 20px;
+  max-width: 300px;
+  margin-bottom: 20px; /* Más margen */
   color: var(--insta-text-secondary);
+  font-size: 14px; /* Más grande */
 }
 
 .insta-upload-btn-large {
-  background: var(--insta-gradient);
+  background: var(--insta-orange); /* Cambiado a naranja */
+  background: linear-gradient(45deg, #ff5722, #ff9800); /* Gradiente estilo IG */
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 10px 20px; /* Más padding */
+  border-radius: 8px; /* Más redondeado */
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -566,7 +522,8 @@ body {
 
 .insta-upload-btn-large:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(255, 87, 34, 0.3); /* Sombra naranja */
+  background: linear-gradient(45deg, #ff9800, #ff5722); /* Gradiente invertido */
 }
 
 /* Visualizador de imágenes */
@@ -599,7 +556,7 @@ body {
 .insta-image-viewer-content img {
   max-width: 100%;
   max-height: 90vh;
-  border-radius: 8px;
+  border-radius: 12px; /* Más redondeado */
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
@@ -619,20 +576,51 @@ body {
   transform: scale(1.2);
 }
 
+.insta-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(255, 255, 255, 0.2);
+  color: var(--insta-text);
+  border: none;
+  padding: 12px; /* Más padding */
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.insta-nav-btn:hover {
+  background-color: rgba(255, 87, 34, 0.3); /* Fondo naranja */
+  transform: translateY(-50%) scale(1.1);
+}
+
+.insta-prev-btn {
+  left: 15px; /* Más separado */
+}
+
+.insta-next-btn {
+  right: 15px; /* Más separado */
+}
+
+.insta-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .insta-image-viewer-actions {
   display: flex;
   justify-content: center;
   gap: 15px;
-  margin-top: 15px;
+  margin-top: 20px; /* Más margen */
 }
 
-/* FIX: Mejorar visibilidad de botones en el visor de imágenes */
 .insta-action-btn {
   background-color: rgba(255, 255, 255, 0.2);
   color: var(--insta-text);
   border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 10px 18px; /* Más padding */
+  border-radius: 8px; /* Más redondeado */
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -640,9 +628,8 @@ body {
   gap: 8px;
   transition: all 0.3s;
   backdrop-filter: blur(5px);
-  font-size: 14px;
-  letter-spacing: 0.5px;
-  min-width: 180px;
+  font-size: 14px; /* Más grande */
+  min-width: 160px; /* Más ancho */
   justify-content: center;
 }
 
@@ -661,85 +648,128 @@ body {
   background-color: rgba(237, 73, 86, 0.4);
 }
 
-/* Estilos de formularios */
-.insta-section {
-  padding: 20px;
-  border-bottom: 1px solid var(--insta-border);
-  background-color: var(--insta-bg-secondary);
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.insta-section:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-}
-
-.insta-section:last-child {
-  border-bottom: none;
-}
-
-.insta-section h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 15px;
+/* Modal de edición */
+.insta-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.insta-edit-modal-content {
+  background-color: var(--insta-bg-secondary);
+  border-radius: 16px; /* Más redondeado estilo IG */
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  padding: 24px; /* Más padding */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.insta-edit-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.insta-edit-modal-header h2 {
+  font-size: 22px; /* Más grande */
+  font-weight: 600;
   color: var(--insta-text);
 }
 
-.insta-section h3 svg {
-  color: var(--insta-blue);
+.insta-edit-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Pestañas del modal */
+.insta-edit-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--insta-border);
+  margin-bottom: 24px; /* Más margen */
+}
+
+.insta-edit-tab {
+  flex: 1;
+  padding: 12px; /* Más padding */
+  border: none;
+  background: none;
+  color: var(--insta-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.insta-edit-tab.active {
+  color: var(--insta-orange); /* Cambiado a naranja */
+  border-bottom: 2px solid var(--insta-orange); /* Cambiado a naranja */
+}
+
+.insta-edit-tab:hover:not(.active) {
+  color: var(--insta-text);
+}
+
+/* Contenido del modal */
+.insta-edit-modal-body {
+  padding: 10px 0;
+}
+
+.insta-section {
+  padding: 10px 0;
 }
 
 .insta-form-group {
-  margin-bottom: 15px;
+  margin-bottom: 18px; /* Más margen */
 }
 
 .insta-form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 8px; /* Más margen */
   font-weight: 500;
   color: var(--insta-text);
+  font-size: 14px; /* Más grande */
 }
 
-.insta-input, .insta-select, .insta-textarea {
+.insta-form-error {
+  color: var(--insta-red);
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+.insta-input, .insta-textarea {
   width: 100%;
-  padding: 12px;
+  padding: 12px; /* Más padding */
   font-size: 14px;
   border: 1px solid var(--insta-border);
-  border-radius: 8px;
+  border-radius: 8px; /* Más redondeado */
   background-color: var(--insta-bg-input);
   color: var(--insta-text);
   transition: all 0.3s;
 }
 
-.insta-input:focus, .insta-select:focus, .insta-textarea:focus {
+.insta-input:focus, .insta-textarea:focus {
   outline: none;
-  border-color: var(--insta-blue);
-  box-shadow: 0 0 0 2px rgba(0, 149, 246, 0.2);
-}
-
-.insta-input:disabled, .insta-select:disabled, .insta-textarea:disabled {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--insta-text-secondary);
-  cursor: not-allowed;
+  border-color: var(--insta-orange); /* Cambiado a naranja */
+  box-shadow: 0 0 0 2px rgba(255, 87, 34, 0.2); /* Sombra naranja */
 }
 
 .insta-textarea {
   resize: vertical;
-  min-height: 60px;
-}
-
-.insta-form-row {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.insta-form-row .insta-form-group {
-  flex: 1;
-  margin-bottom: 0;
+  min-height: 90px; /* Más alto */
 }
 
 .insta-char-counter {
@@ -747,154 +777,6 @@ body {
   font-size: 12px;
   color: var(--insta-text-secondary);
   margin-top: 4px;
-}
-
-.insta-form-hint {
-  font-size: 12px;
-  color: var(--insta-text-secondary);
-  margin-top: 8px;
-  font-style: italic;
-}
-
-.insta-checkbox-group {
-  display: flex;
-  align-items: center;
-}
-
-.insta-checkbox-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  color: var(--insta-text);
-}
-
-.insta-checkbox {
-  margin-right: 10px;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--insta-blue);
-}
-
-.insta-input-group {
-  display: flex;
-}
-
-.insta-input-group .insta-input {
-  flex: 1;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.insta-currency-select {
-  width: 70px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: none;
-}
-
-/* Tags para servicios y destinos */
-.insta-service-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 15px 0;
-}
-
-.insta-service-tag {
-  background: linear-gradient(to right, rgba(76, 181, 249, 0.2), rgba(76, 181, 249, 0.1));
-  border: 1px solid rgba(76, 181, 249, 0.3);
-  color: var(--insta-text);
-  padding: 8px 15px;
-  border-radius: 20px;
-  font-size: 13px;
-  display: inline-flex;
-  align-items: center;
-  transition: all 0.3s;
-}
-
-.insta-service-tag:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  background: linear-gradient(to right, rgba(76, 181, 249, 0.3), rgba(76, 181, 249, 0.2));
-}
-
-.insta-destinations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 15px 0;
-}
-
-.insta-destination-tag {
-  background: linear-gradient(to right, rgba(193, 53, 132, 0.2), rgba(193, 53, 132, 0.1));
-  border: 1px solid rgba(193, 53, 132, 0.3);
-  color: var(--insta-text);
-  padding: 8px 15px;
-  border-radius: 20px;
-  font-size: 13px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  transition: all 0.3s;
-}
-
-.insta-destination-tag:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  background: linear-gradient(to right, rgba(193, 53, 132, 0.3), rgba(193, 53, 132, 0.2));
-}
-
-.insta-destination-tag svg {
-  color: #e1306c;
-}
-
-/* Tarjetas de precios */
-.insta-price-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 15px;
-  margin-top: 15px;
-}
-
-.insta-price-card {
-  background: linear-gradient(135deg, var(--insta-bg-input), var(--insta-bg-card));
-  padding: 20px;
-  border-radius: 12px;
-  text-align: center;
-  transition: all 0.3s;
-  border: 1px solid var(--insta-border);
-}
-
-.insta-price-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-  border-color: var(--insta-blue);
-}
-
-.insta-price-card h4 {
-  font-size: 14px;
-  margin-bottom: 10px;
-  color: var(--insta-text-secondary);
-}
-
-.insta-price {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--insta-text);
-  background: var(--insta-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-.insta-no-data {
-  color: var(--insta-text-secondary);
-  font-style: italic;
-  padding: 15px 0;
-  text-align: center;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
 }
 
 /* Responsive */
@@ -907,25 +789,26 @@ body {
   
   .insta-profile-avatar {
     margin-right: 0;
-    margin-bottom: 20px;
-    width: 120px;
-    height: 120px;
+    margin-bottom: 15px;
+    width: 80px;
+    height: 80px;
   }
   
   .insta-profile-stats {
     justify-content: center;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
   }
   
   .insta-stat {
     margin-right: 0;
-    min-width: 100px;
+    min-width: 80px;
   }
   
   .insta-profile-bio {
     text-align: center;
     margin: 0 auto;
+    max-width: 250px;
   }
   
   .insta-location {
@@ -933,15 +816,6 @@ body {
   }
   
   .insta-gallery-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .insta-form-row {
-    flex-direction: column;
-    gap: 15px;
-  }
-  
-  .insta-price-cards {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -954,17 +828,13 @@ body {
   .insta-upload-area {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
   }
   
   .insta-image-counter {
     order: -1;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     align-self: center;
-  }
-  
-  .insta-price-cards {
-    grid-template-columns: 1fr;
   }
   
   .insta-profile-stats {
@@ -975,8 +845,6 @@ body {
   .insta-stat {
     margin-right: 0;
     width: 48%;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 }

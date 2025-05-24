@@ -13,7 +13,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "manage-agencies": "node scripts/manageAgencyRequests.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -21,17 +21,15 @@ const Header = ({ onNavigate, userLoggedIn = false, handleLogout }) => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const tipoUsuario = user.tipoUsuario || "cliente";
     
-    console.log("Tipo de usuario detectado:", tipoUsuario); // Para debug
+    console.log("Tipo de usuario detectado:", tipoUsuario);
     
     if (tipoUsuario === "cliente") {
       handleNavigation("perfilCliente");
     } else if (tipoUsuario === "agencia") {
       handleNavigation("perfilAgencia");
     } else if (tipoUsuario === "perfil" || tipoUsuario === "acompanante") {
-      // Modificado para aceptar "perfil" o "acompanante" como tipo de usuario
       handleNavigation("perfilAcompanante");
     } else {
-      // Caso por defecto, navegar a homepage
       console.log("Tipo de usuario no reconocido:", tipoUsuario);
       handleNavigation("homepage");
     }

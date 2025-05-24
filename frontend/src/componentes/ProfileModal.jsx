@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaPhone, FaWhatsapp, FaEnvelope, FaHeart, FaRegHeart, FaMapMarkerAlt, FaCheck, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import '../estilos/ProfileModal.css';
-import '../estilos/Global.css';
+
 
 const ProfileModal = ({ profile, onClose, baseUrl, userLoggedIn, onFavoriteToggle, appConfig }) => {
   const [selectedImage, setSelectedImage] = useState(0);

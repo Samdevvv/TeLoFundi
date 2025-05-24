@@ -1304,6 +1304,23 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model AgencyApprovalRequest {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  agencyId       String    @map("agency_id")
+  status         String    @default("pendiente")
+  requestEmail   String    @map("request_email")
+  requestData    Json?     @map("request_data")
+  approvedBy     String?   @map("approved_by")
+  approvedAt     DateTime? @map("approved_at")
+  notes          String?
+  ipAddress      String?   @map("ip_address")
+  userAgent      String?   @map("user_agent")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  
+  @@map("agency_approval_requests")
+}
+
 enum UserRole {
   cliente
   perfil

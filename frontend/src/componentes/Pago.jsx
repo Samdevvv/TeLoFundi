@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaLock, FaCreditCard, FaUser, FaMapMarkerAlt, FaEnvelope, FaCity, FaArrowLeft } from 'react-icons/fa';
 import '../estilos/Pago.css';
 
-const PaymentPageV2 = ({ setMenu = () => {} }) => {
+const PaymentPageV2 = ({ setMenu = () => {}, onLoginSuccess = () => {} }) => {
   const [formData, setFormData] = useState({
     cardNumber: '',
     expiry: '',
@@ -20,7 +20,6 @@ const PaymentPageV2 = ({ setMenu = () => {} }) => {
   const [loading, setLoading] = useState(false);
   const [cardType, setCardType] = useState('');
 
-  // Formato para número de tarjeta
   const formatCardNumber = (value) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
     const matches = v.match(/\d{4,16}/g);
@@ -123,20 +122,62 @@ const PaymentPageV2 = ({ setMenu = () => {} }) => {
     }
 
     setLoading(true);
-    // Simular proceso de pago
-    setTimeout(() => {
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Retrieve temporary agency data
+      const tempAgencyData = JSON.parse(localStorage.getItem("tempAgencyData") || "{}");
+      if (tempAgencyData && tempAgencyData.tipoUsuario === "agencia") {
+        // Simulate login after payment
+        const userData = {
+          ...tempAgencyData,
+          nombre: tempAgencyData.username,
+          tipoUsuario: "agencia",
+          fotoPerfil: "https://via.placeholder.com/150",
+          ubicacion: "Santo Domingo, República Dominicana",
+          descripcion: "Agencia premium ofreciendo servicios de acompañamiento de alto nivel.",
+          telefono: "+1 809-555-1234",
+          email: tempAgencyData.email,
+          fechaRegistro: "Mayo 2025",
+          servicios: ["Eventos exclusivos", "Cenas privadas", "Viajes internacionales"],
+          horarioAtencion: "Lunes a Sábado: 9:00 - 20:00",
+          redes: {
+            instagram: "elite_companions",
+            twitter: "elitecomp",
+            facebook: "elitecompanions"
+          },
+          acompanantes: [
+            { nombre: "Maria Gomez", edad: 28, genero: "Femenino", foto: "https://via.placeholder.com/200" },
+            { nombre: "Juan Perez", edad: 32, genero: "Masculino", foto: "https://via.placeholder.com/200" },
+            { nombre: "Sofia Martinez", edad: 25, genero: "Femenino", foto: "https://via.placeholder.com/200" }
+          ]
+        };
+        
+        // Store user data and clear temporary data
+        localStorage.setItem("user", JSON.stringify(userData));
+        localStorage.setItem("accessToken", "mock-access-token");
+        localStorage.setItem("refreshToken", "mock-refresh-token");
+        localStorage.removeItem("tempAgencyData");
+        
+        // Trigger login success
+        onLoginSuccess(userData);
+        setMenu('perfilAgencia');
+      } else {
+        throw new Error("No se encontraron datos de registro de agencia.");
+      }
+    } catch (err) {
+      setErrors({ general: err.message });
+      console.error("Error al procesar el pago:", err);
+    } finally {
       setLoading(false);
-      // Aquí iría la lógica real de pago
-      console.log('Procesando pago:', formData);
-      setMenu('mainpage');
-    }, 2000);
+    }
   };
 
   return (
     <div className="payment-page-container">
       <div className="payment-card-container">
         <div className="payment-form-wrapper">
-          {/* Formulario de pago */}
           <div className="payment-form-section">
             <button
               className="payment-back-button"
@@ -147,7 +188,7 @@ const PaymentPageV2 = ({ setMenu = () => {} }) => {
             </button>
 
             <h2 className="payment-title">Detalles de Pago</h2>
-            <p className="payment-subtitle">Completa tu información para finalizar la compra</p>
+            <p className="payment-subtitle">Completa tu información para activar tu cuenta de agencia</p>
 
             <div className="payment-form" onSubmit={handleSubmit}>
               <div className="payment-input-group">
@@ -302,30 +343,29 @@ const PaymentPageV2 = ({ setMenu = () => {} }) => {
                 <FaLock className="payment-security-icon" />
                 <p>Tu información está segura y encriptada</p>
               </div>
+              {errors.general && <span className="payment-error">{errors.general}</span>}
             </div>
           </div>
 
-          {/* Lado del logo */}
           <div className="payment-logo-section">
             <div className="payment-logo-wrapper">
               <img 
-                src="src\assets\logo png.png" 
+                src="src/assets/logo png.png" 
                 alt="Telo Fundi Logo" 
                 className="payment-logo"
               />
             </div>
             
             <div className="payment-product-info">
-              <h3>Subscripción Premium</h3>
+              <h3>Subscripción Agencia</h3>
               <p className="payment-price">RD$999.00 al mes</p>
               <ul className="payment-features">
-                <li>Acceso ilimitado</li>
-                <li>Contenido exclusivo</li>
-                <li>Sin publicidad</li>
+                <li>Acceso a dashboard de gestión</li>
+                <li>Gestión de acompañantes</li>
+                <li>Administración de contratos</li>
               </ul>
             </div>
 
-            {/* Elementos decorativos */}
             <div className="payment-decorative-shape shape-1"></div>
             <div className="payment-decorative-shape shape-2"></div>
             <div className="payment-decorative-shape shape-3"></div>

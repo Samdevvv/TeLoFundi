@@ -1,16 +1,10 @@
 import { useState, useEffect } from "react";
-import {
-  FaArrowLeft,
-  FaEnvelope,
-  FaLock,
-  FaUser
-} from "react-icons/fa";
+import { FaArrowLeft, FaEnvelope, FaLock, FaUser } from "react-icons/fa";
 import { createPortal } from "react-dom";
 import "../estilos/registr.css";
 import loginImage from "../assets/logo png.png";
 import googleAuthService from "./googleAuthService";
 
-// Configuración de la API - Ajusta según tu estructura de proyecto
 const API_CONFIG = {
   BASE_URL: "http://localhost:5000"
 };
@@ -37,7 +31,6 @@ const GoogleIcon = () => (
 );
 
 const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => {
-  // Cambiado el valor inicial de userType a "cliente"
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -50,7 +43,6 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
   const [shouldAnimate, setShouldAnimate] = useState(!transitionDirection);
 
   useEffect(() => {
-    // Inicializar el servicio de Google Auth
     const initGoogleAuth = async () => {
       try {
         await googleAuthService.initialize();
@@ -59,7 +51,6 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
         console.error("Error al inicializar Google Auth:", err);
       }
     };
-
     initGoogleAuth();
   }, []);
 
@@ -100,7 +91,6 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
 
   useEffect(() => {
     createFireParticles();
-    // Recrear partículas cada 5 segundos para mantener el efecto
     const interval = setInterval(createFireParticles, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -126,13 +116,10 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Mejorada para incluir logging y actualizar la UI
   const handleUserTypeChange = (e) => {
     const newUserType = e.target.value;
     console.log(`Tipo de usuario cambiado a: ${newUserType}`);
     setFormData(prev => ({ ...prev, userType: newUserType }));
-    
-    // Si hay un error visible, limpiarlo al cambiar de tipo de usuario
     if (error) {
       setError(null);
     }
@@ -166,55 +153,38 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
 
   const validateForm = () => {
     const { username, email, password } = formData;
-    
     if (!username || username.trim().length < 3) {
       return "El nombre de usuario debe tener al menos 3 caracteres.";
     }
-    
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!email || !emailRegex.test(email.trim())) {
       return "Por favor, ingrese un correo electrónico válido (ejemplo: user@domain.com).";
     }
-    
     if (!password || password.trim().length < 6) {
       return "La contraseña debe tener al menos 6 caracteres.";
     }
-    
     return null;
   };
 
-  // Función simplificada para registro con Google usando redirección
   const handleGoogleLogin = () => {
     if (loading) return;
-    
     try {
       setLoading(true);
       setError(null);
-      
-      // Mostrar tipo de usuario que se está registrando
       console.log(`Iniciando registro con Google como: ${formData.userType}`);
-      
-      // Guardar el tipo de usuario para recuperarlo después de la redirección
       localStorage.setItem("googleAuthUserType", formData.userType);
-      
-      // Usar directamente el método de redirección
       googleAuthService.signInWithRedirect();
-      
-      // No necesitamos más código aquí ya que la redirección nos sacará de la página
     } catch (err) {
       console.error("Error en redirección de Google:", err);
-      
       setError({
         title: "Error de Registro",
         message: "No se pudo iniciar el proceso de autenticación con Google.",
         details: err.toString()
       });
-      
       setLoading(false);
     }
   };
 
-  // Función handleSubmit para registro manual
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -231,21 +201,18 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
     }
 
     try {
-      // Creamos el payload base
       const payload = {
         username: formData.username.trim(),
         email: formData.email.trim(),
         password: formData.password.trim(),
       };
 
-      // Añadir información específica según el tipo de usuario
       if (formData.userType === "acompanante") {
-        payload.gender = "otro"; // Campo requerido para acompañantes
+        payload.gender = "otro";
       } else if (formData.userType === "agencia") {
-        payload.name = formData.username.trim(); // Para agencias, name = username
+        payload.name = formData.username.trim();
       }
 
-      // Usar las rutas correctas del nuevo backend según el tipo seleccionado
       let endpoint = '';
       switch (formData.userType) {
         case "cliente":
@@ -261,7 +228,6 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
           endpoint = '/api/auth/register';
       }
 
-      // Agregar logs para debugging
       console.log(`Tipo de usuario seleccionado: ${formData.userType}`);
       console.log(`Endpoint seleccionado: ${endpoint}`);
       console.log(`Payload a enviar:`, payload);
@@ -294,21 +260,26 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
 
       const data = await response.json();
       console.log("Respuesta exitosa:", data);
-      
-      if (formData.userType === "cliente") {
-        setError({
-          title: "Registro Exitoso",
-          message: `Cliente registrado con éxito. ID: ${data.userId || data.Id}. Por favor, inicia sesión.`,
-        });
-      } else if (formData.userType === "acompanante") {
-        setError({
-          title: "Registro Exitoso",
-          message: `Acompañante registrado con éxito. ID: ${data.userId || data.profileId || data.AcompananteId}. Por favor, inicia sesión.`,
-        });
-      } else if (formData.userType === "agencia") {
+
+      if (formData.userType === "agencia") {
+        // Store temporary registration data and redirect to payment
+        localStorage.setItem("tempAgencyData", JSON.stringify({
+          ...payload,
+          agencyId: data.agencyId || data.userId || data.solicitudId,
+          tipoUsuario: "agencia"
+        }));
         setError({
           title: "Solicitud Enviada",
-          message: `Tu solicitud ha sido enviada con ID: ${data.userId || data.agencyId || data.solicitudId}. Está en proceso de revisión. Te notificaremos por email cuando haya sido procesada.`,
+          message: `Tu solicitud ha sido enviada con ID: ${data.userId || data.agencyId || data.solicitudId}. Por favor, completa el pago para activar tu cuenta.`,
+          isAgencyRequest: true
+        });
+        setMenu("pago");
+      } else {
+        setError({
+          title: "Registro Exitoso",
+          message: formData.userType === "cliente"
+            ? `Cliente registrado con éxito. ID: ${data.userId || data.Id}. Por favor, inicia sesión.`
+            : `Acompañante registrado con éxito. ID: ${data.userId || data.profileId || data.AcompananteId}. Por favor, inicia sesión.`,
         });
       }
     } catch (err) {
@@ -330,16 +301,10 @@ const Registro = ({ setMenu, onClose, transitionDirection, onLoginSuccess }) => 
 
   const closeModal = () => {
     if (!error?.title.includes("Error")) {
-      if (error?.title === "Inicio de Sesión" || error?.title === "Registro Exitoso") {
-        // Si se registró e inició sesión con Google o solo inició sesión, ir a homepage
-        if (setMenu) setMenu("homepage");
-        else if (onClose) onClose();
-      } else if (formData.userType === "agencia") {
-        if (setMenu) setMenu("mainpage");
-        else if (onClose) onClose();
+      if (error?.isAgencyRequest || formData.userType === "agencia") {
+        setMenu("pago");
       } else {
-        if (setMenu) setMenu("login");
-        else if (onClose) onClose();
+        setMenu("login");
       }
     }
     setError(null);

@@ -13,7 +13,7 @@ const ExploreProfiles = ({ setMenu, userLoggedIn, handleLogout, appConfig }) => 
         handleLogout={handleLogout} 
       />
       <div className="explore-profiles-content">
-        <h1 className="explore-title">Explora Perfiles</h1>
+
         <ProfileGrid 
           setMenu={setMenu} 
           userLoggedIn={userLoggedIn}

@@ -1,15 +1,29 @@
 /* Importando fuentes */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap");
+
+/* Variables para colores y temas */
+:root {
+  --dark-bg: #1a1a1a;
+  --text-light: #ffffff;
+  --text-secondary: #b0b0b0;
+  --accent-color: #ff4d4d;
+  --card-bg: #2a2a2a;
+  --border-color: #444444;
+  --button-bg: #ff4d4d;
+  --button-hover: #e03c3c;
+}
 
 /* Estilos generales */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Inter', 'Poppins', Arial, sans-serif;
+  font-family: "Inter", "Poppins", Arial, sans-serif;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -29,415 +43,242 @@ body {
 .perfil-container {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 50px);
+  min-height: 100vh;
   width: 100%;
   background-color: var(--dark-bg);
 }
 
+/* Contenido del perfil */
 .perfil-content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 2rem;
   width: 100%;
 }
 
-/* Cabecera del perfil */
+/* Encabezado del perfil */
 .perfil-header {
   display: flex;
-  gap: 20px;
-  margin-bottom: 30px;
-  padding: 20px;
-  background-color: var(--dark-card);
-  border-radius: 15px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border-color);
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
 .perfil-foto-container {
-  flex-shrink: 0;
+  position: relative;
+  width: 150px;
+  height: 150px;
 }
 
 .perfil-foto {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border: 3px solid var(--primary-color);
-  box-shadow: 0 10px 20px rgba(159, 41, 16, 0.2);
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+}
+
+.perfil-foto-upload {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  opacity: 0.7;
+  cursor: pointer;
 }
 
 .perfil-info-header {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .perfil-name-buttons {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .perfil-name-buttons h1 {
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 700;
-  color: var(--text-light);
-}
-
-.perfil-contact-icons {
-  display: flex;
-  gap: 12px;
-  margin-top: 5px;
-}
-
-.contact-icon {
-  font-size: 1.5rem;
-  transition: transform 0.3s ease;
-}
-
-.contact-icon:hover {
-  transform: scale(1.15);
-}
-
-.contact-icon.instagram {
-  color: #E1306C;
-}
-
-.contact-icon.whatsapp {
-  color: var(--whatsapp-color);
-}
-
-.perfil-action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-unirse-agencia,
-.btn-editar-perfil,
-.btn-ver-perfil {
-  padding: 8px 16px;
-  border-radius: 25px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-  transition: all 0.3s ease;
-}
-
-.btn-unirse-agencia,
-.btn-ver-perfil {
-  background: var(--gradient-primary);
-  color: white;
-}
-
-.btn-editar-perfil {
-  background-color: transparent;
-  border: 1px solid var(--text-light);
-  color: var(--text-light);
-}
-
-.btn-unirse-agencia:hover,
-.btn-editar-perfil:hover,
-.btn-ver-perfil:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
 .perfil-ubicacion {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.perfil-contact-icons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.contact-icon {
+  font-size: 1.5rem;
+  color: var(--text-light);
+  transition: color 0.3s;
+}
+
+.contact-icon.instagram:hover {
+  color: #e1306c;
+}
+
+.contact-icon.whatsapp:hover {
+  color: #25d366;
 }
 
 .perfil-datos-rapidos {
   display: flex;
-  gap: 15px;
-  margin-top: 5px;
+  gap: 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .perfil-datos-rapidos span {
   display: flex;
   align-items: center;
-  gap: 5px;
-  color: var(--text-light);
-  font-size: 0.9rem;
+  gap: 0.5rem;
 }
 
-/* Pestañas del perfil */
+/* Pestañas de navegación */
 .perfil-tabs {
   display: flex;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 20px;
-  overflow-x: auto;
+  margin-bottom: 2rem;
 }
 
 .perfil-tab {
-  padding: 12px 20px;
-  background-color: transparent;
+  padding: 0.75rem 1.5rem;
+  background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  white-space: nowrap;
-}
-
-.perfil-tab.active {
-  color: var(--primary-color);
-}
-
-.perfil-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--primary-color);
+  transition: all 0.3s;
 }
 
 .perfil-tab:hover {
-  color: var(--primary-color);
+  color: var(--text-light);
+}
+
+.perfil-tab.active {
+  color: var(--text-light);
+  border-bottom: 2px solid var(--accent-color);
 }
 
 /* Contenido de las pestañas */
 .perfil-tab-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
+  padding: 1rem 0;
 }
 
-/* Sección de información */
 .perfil-informacion {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 1fr;
 }
 
 .perfil-seccion {
-  background-color: var(--dark-card);
-  border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
 }
 
 .perfil-seccion h3 {
-  margin-bottom: 12px;
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
   color: var(--text-light);
-  font-size: 1.1rem;
-  font-weight: 600;
-  position: relative;
-  padding-bottom: 6px;
 }
 
-.perfil-seccion h3::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 30px;
-  height: 2px;
-  background: var(--gradient-primary);
-}
-
-.perfil-seccion p {
-  color: var(--text-muted);
+.perfil-sobre-mi p {
+  color: var(--text-secondary);
   line-height: 1.6;
-  font-size: 0.95rem;
 }
-
 
 .perfil-detalles-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 1rem;
 }
 
 .perfil-detalle-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 1rem;
+  align-items: center;
 }
 
 .detalle-label {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-light);
-  font-size: 0.9rem;
-}
-
-.perfil-detalle-item span:not(.detalle-label) {
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  min-width: 120px;
 }
 
 .perfil-servicios-list {
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 5px;
+  color: var(--text-secondary);
 }
 
 .perfil-servicios-list li {
-  background-color: var(--darker-bg);
-  padding: 6px 12px;
-  border-radius: 15px;
-  color: var(--text-light);
-  font-size: 0.85rem;
-  border: 1px solid var(--border-color);
+  margin-bottom: 0.5rem;
 }
 
 .perfil-contacto-info {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .perfil-contacto-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-muted);
+  gap: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .perfil-contacto-icon {
-  color: var(--primary-color);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  color: var(--accent-color);
 }
 
 .perfil-redes-sociales {
   display: flex;
-  gap: 12px;
+  gap: 1rem;
+  align-items: center;
 }
 
 .red-social-icon {
   font-size: 1.5rem;
-  transition: transform 0.3s ease;
-}
-
-.red-social-icon:hover {
-  transform: scale(1.15);
-}
-
-.instagram {
-  color: #E1306C;
-}
-
-.twitter {
-  color: #1DA1F2;
-}
-
-.facebook {
-  color: #4267B2;
-}
-
-/* Sección de acompañantes (dashboard) */
-.perfil-acompanantes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.perfil-acompanante-card {
-  background-color: var(--dark-card);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  padding-bottom: 15px;
-}
-
-.perfil-acompanante-card img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-}
-
-.perfil-acompanante-card h4 {
-  margin: 10px 0;
   color: var(--text-light);
-  font-size: 1rem;
+  transition: color 0.3s;
 }
 
-.perfil-acompanante-card .btn-ver-perfil {
-  margin: 0 auto;
-  display: block;
-  width: fit-content;
+.red-social-icon.instagram:hover {
+  color: #e1306c;
 }
 
-/* Responsividad */
-@media (max-width: 768px) {
-  .perfil-container {
-    min-height: calc(100vh - 80px);
-  }
-
-  .perfil-content {
-    padding-top: 20px;
-  }
-
-  .perfil-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .perfil-foto {
-    width: 100px;
-    height: 100px;
-  }
-
-  .perfil-name-buttons {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .perfil-contact-icons {
-    justify-content: center;
-  }
-
-  .perfil-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-  }
-
-  .perfil-acompanantes {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
+.red-social-icon.twitter:hover {
+  color: #1da1f2;
 }
 
-@media (max-width: 480px) {
-  .perfil-container {
-    min-height: calc(100vh - 100px);
-  }
-
-  .perfil-content {
-    padding: 10px;
-    padding-top: 30px;
-  }
-
-  .perfil-name-buttons h1 {
-    font-size: 1.5rem;
-  }
+.red-social-icon.facebook:hover {
+  color: #3b5998;
 }
+
+/* Estilos para edición */
 .perfil-edit-input,
 .perfil-edit-textarea {
-  background-color: var(--darker-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  padding: 8px;
-  color: var(--text-light);
   width: 100%;
-  font-size: 0.95rem;
+  padding: 0.5rem;
+  background: #333;
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+  border-radius: 4px;
+  font-size: 1rem;
 }
 
 .perfil-edit-textarea {
@@ -445,11 +286,227 @@ body {
   resize: vertical;
 }
 
-.perfil-foto-upload {
-  margin-top: 10px;
-  background-color: var(--darker-bg);
+/* Botones */
+.btn-editar-perfil,
+.btn-unirse-agencia,
+.btn-ver-perfil {
+  padding: 0.5rem 1rem;
+  background: var(--button-bg);
+  color: var(--text-light);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.3s;
+}
+
+.btn-editar-perfil:hover,
+.btn-unirse-agencia:hover,
+.btn-ver-perfil:hover {
+  background: var(--button-hover);
+}
+
+.btn-ver-perfil {
+  background: #555;
+}
+
+.btn-ver-perfil:hover {
+  background: #666;
+}
+
+/* Sección de acompañantes */
+.perfil-acompanantes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.perfil-acompanante-card {
+  background: var(--card-bg);
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.perfil-acompanante-card img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.perfil-acompanante-card h4 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-light);
+}
+
+/* Sección de dashboard */
+.perfil-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.perfil-dashboard .perfil-acompanantes {
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.perfil-dashboard .perfil-acompanante-card {
+  padding: 1.5rem;
+}
+
+.perfil-dashboard .perfil-acompanante-card p {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.perfil-dashboard .btn-unirse-agencia {
+  align-self: flex-start;
+  margin-bottom: 1rem;
+}
+
+/* Sección de contratos */
+.perfil-contracts {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.contract-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.contract-form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.contract-form-group {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.contract-form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+}
+
+.contract-form-group input,
+.contract-form-group select {
+  padding: 0.5rem;
+  background: #333;
   border: 1px solid var(--border-color);
   color: var(--text-light);
-  padding: 5px;
-  border-radius: 5px;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.contract-form-group input:focus,
+.contract-form-group select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.contract-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.contract-item {
+  background: var(--card-bg);
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.contract-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.contract-details span {
+  font-size: 0.9rem;
+}
+
+.contract-details strong {
+  color: var(--text-light);
+}
+
+.contract-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Media Queries para responsividad */
+@media (max-width: 768px) {
+  .perfil-content {
+    padding: 1rem;
+  }
+
+  .perfil-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .perfil-foto-container {
+    width: 120px;
+    height: 120px;
+  }
+
+  .perfil-name-buttons {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .perfil-tabs {
+    flex-wrap: wrap;
+  }
+
+  .perfil-tab {
+    flex: 1;
+    text-align: center;
+  }
+
+  .contract-form-row {
+    flex-direction: column;
+  }
+
+  .contract-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .perfil-name-buttons h1 {
+    font-size: 1.5rem;
+  }
+
+  .perfil-acompanantes {
+    grid-template-columns: 1fr;
+  }
+
+  .perfil-dashboard .perfil-acompanantes {
+    grid-template-columns: 1fr;
+  }
 }

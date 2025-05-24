@@ -1,13 +1,12 @@
 /* Importando fuentes */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
-
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap");
 
 /* Estilos generales */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Inter', 'Poppins', Arial, sans-serif;
+  font-family: "Inter", "Poppins", Arial, sans-serif;
 }
 
 .perfil-container {
@@ -55,7 +54,7 @@
 }
 
 .perfil-tab.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   left: 0;

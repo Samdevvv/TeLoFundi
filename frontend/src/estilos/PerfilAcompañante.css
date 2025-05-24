@@ -5,7 +5,7 @@
   max-width: 1000px;
   margin: 0 auto;
   padding: 20px;
-  font-family: 'Poppins', Arial, sans-serif;
+  font-family: "Poppins", Arial, sans-serif;
   color: #333;
   background-color: #f8f9fa;
   box-sizing: border-box;
@@ -64,7 +64,9 @@
 }
 
 /* Botones de edición */
-.edit-button, .save-button, .cancel-button {
+.edit-button,
+.save-button,
+.cancel-button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -134,7 +136,7 @@
 }
 
 .profile-section h2::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 50%;
@@ -204,7 +206,9 @@
   margin-bottom: 12px;
 }
 
-.profile-age, .profile-gender, .profile-location {
+.profile-age,
+.profile-gender,
+.profile-location {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -318,7 +322,8 @@
   opacity: 1;
 }
 
-.set-main-button, .delete-image-button {
+.set-main-button,
+.delete-image-button {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -815,29 +820,29 @@ small {
   .profile-editor-container {
     padding: 10px;
   }
-  
+
   .profile-editor-content {
     padding: 15px;
   }
-  
+
   .profile-basic-info {
     flex-direction: column;
     align-items: center;
     text-align: center;
   }
-  
+
   .profile-attributes {
     justify-content: center;
   }
-  
+
   .form-row {
     flex-direction: column;
   }
-  
+
   .profile-images-grid {
     grid-template-columns: repeat(3, 1fr);
   }
-  
+
   .characteristics-grid,
   .prices-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -849,22 +854,22 @@ small {
   .profile-editor-header h1 {
     font-size: 20px;
   }
-  
+
   .editor-actions {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .form-grid,
   .characteristics-grid,
   .prices-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .profile-images-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .status-message {
     max-width: 250px;
     right: 10px;

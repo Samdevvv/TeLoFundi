@@ -1,5 +1,5 @@
 /* Importando fuentes */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap");
 
 /* Variables de colores - Esquema oscuro con naranja oscuro */
 
@@ -8,10 +8,12 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Inter', 'Poppins', Arial, sans-serif;
+  font-family: "Inter", "Poppins", Arial, sans-serif;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -106,7 +108,7 @@ body {
 }
 
 .contact-icon.instagram {
-  color: #E1306C;
+  color: #e1306c;
 }
 
 .contact-icon.whatsapp {
@@ -179,7 +181,7 @@ body {
 }
 
 .perfil-tab.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   left: 0;
@@ -225,7 +227,7 @@ body {
 }
 
 .perfil-seccion h3::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -239,8 +241,6 @@ body {
   line-height: 1.6;
   font-size: 0.95rem;
 }
-
-
 
 .perfil-preferencias-list {
   list-style: none;
@@ -292,15 +292,15 @@ body {
 }
 
 .instagram {
-  color: #E1306C;
+  color: #e1306c;
 }
 
 .twitter {
-  color: #1DA1F2;
+  color: #1da1f2;
 }
 
 .facebook {
-  color: #4267B2;
+  color: #4267b2;
 }
 
 /* Responsividad */

@@ -974,4 +974,86 @@ body {
 .registro-input-box select option {
   background-color: #222;
   color: #fff;
+}/* Añadir al archivo registr.css - Estilos para el componente de registro */
+
+/* Estilos para la validación de email */
+.validating-email {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #ffffff;
+  margin-top: 4px;
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+  margin-right: 5px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.valid-email-message {
+  color: #4cd964;
+  font-size: 0.8rem;
+  margin-top: 4px;
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.invalid-email-message {
+  color: #ff3b30;
+  font-size: 0.8rem;
+  margin-top: 4px;
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.registro-input-box .form-control.valid-email {
+  border-color: #4cd964;
+  box-shadow: 0 0 0 1px #4cd964;
+}
+
+.registro-input-box .form-control.invalid-email {
+  border-color: #ff3b30;
+  box-shadow: 0 0 0 1px #ff3b30;
+}
+
+/* Aviso de agencia */
+.registro-notice {
+  background-color: rgba(255, 193, 7, 0.15);
+  border-left: 3px solid #ffc107;
+  padding: 12px;
+  margin: 12px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.registro-notice p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Ajustes para el botón deshabilitado */
+.registro-fire-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #808080, #606060);
+}
+
+/* Estilos para la animación de fuego apagado cuando el botón está deshabilitado */
+.registro-fire-button:disabled + #registro-fire-particles .registro-particle {
+  opacity: 0.3;
+  animation-duration: 3s;
 }
