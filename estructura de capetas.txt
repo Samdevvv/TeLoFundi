@@ -1,0 +1,86 @@
+backend/
+├── 📁 src/
+│   ├── 📁 config/
+│   │   ├── 📄 database.js          # Configuración Prisma
+│   │   ├── 📄 auth.js              # Configuración JWT y Google OAuth
+│   │   ├── 📄 swagger.js           # Configuración Swagger
+│   │   └── 📄 multer.js            # Configuración subida archivos
+│   │
+│   ├── 📁 controllers/
+│   │   ├── 📄 authController.js    # Login, registro, Google OAuth
+│   │   ├── 📄 userController.js    # Perfil, usuarios, favoritos
+│   │   ├── 📄 postController.js    # CRUD posts, likes, feed
+│   │   ├── 📄 chatController.js    # Chat, mensajes
+│   │   ├── 📄 agencyController.js  # Gestión agencias, verificaciones
+│   │   ├── 📄 adminController.js   # Panel admin, baneos, stats
+│   │   └── 📄 paymentController.js # Stripe, boost, puntos
+│   │   └── 📄 favoritesController.js 
+│   │
+│   ├── 📁 middleware/
+│   │   ├── 📄 auth.js              # Verificación JWT
+│   │   ├── 📄 cors.js              # Configuración CORS
+│   │   ├── 📄 upload.js            # Multer middleware
+│   │   ├── 📄 validation.js        # Validación Joi
+│   │   ├── 📄 rateLimiter.js       # Rate limiting
+│   │   └── 📄 errorHandler.js      # Manejo errores global
+│   │
+│   ├── 📁 routes/
+│   │   ├── 📄 index.js             # Router principal
+│   │   ├── 📄 auth.js              # Rutas autenticación
+│   │   ├── 📄 users.js             # Rutas usuarios
+│   │   ├── 📄 posts.js             # Rutas posts/anuncios
+│   │   ├── 📄 chat.js              # Rutas chat
+│   │   ├── 📄 agency.js            # Rutas agencias
+│   │   ├── 📄 admin.js             # Rutas admin
+│   │   ├── 📄 favorites.js         # Rutas favoritos
+│   │   └── 📄 payments.js          # Rutas pagos
+│   │
+│   ├── 📁 services/
+│   │   ├── 📄 authService.js       # Lógica autenticación
+│   │   ├── 📄 userService.js       # Lógica usuarios
+│   │   ├── 📄 postService.js       # Lógica posts
+│   │   ├── 📄 chatService.js       # Lógica chat
+│   │   ├── 📄 agencyService.js     # Lógica agencias
+│   │   ├── 📄 uploadService.js     # Lógica subida archivos
+│   │   ├── 📄 paymentService.js    # Lógica Stripe
+│   │   └── 📄 notificationService.js # Lógica notificaciones
+│   │
+│   ├── 📁 utils/
+│   │   ├── 📄 validators.js        # Esquemas validación
+│   │   ├── 📄 helpers.js           # Funciones auxiliares
+│   │   ├── 📄 constants.js         # Constantes
+│   │   ├── 📄 logger.js            # Configuración logs
+│   │   └── 📄 scheduler.js         # Tareas programadas (boost)
+│   │
+│   ├── 📁 sockets/
+│   │   ├── 📄 chatSocket.js        # Socket chat
+│   │   └── 📄 socketAuth.js        # Autenticación socket
+│   │   └── 📄 index.js       
+│   │
+│   └── 📄 app.js                   # Configuración Express
+│
+├── 📁 prisma/
+│   ├── 📄 schema.prisma            # Esquema base datos
+│   ├── 📁 migrations/              # Migraciones auto-generadas
+│   └── 📄 seed.js                  # Datos iniciales (opcional)
+│
+├── 📁 imagenes/
+│   ├── 📁 avatars/                 # Fotos perfil
+│   ├── 📁 posts/                   # Imágenes anuncios
+│   ├── 📁 temp/                    # Archivos temporales
+│   └── 📄 .gitkeep                 # Mantener carpeta en git
+│
+├── 📁 docs/
+│   ├── 📄 api.md                   # Documentación API
+│   └── 📄 deployment.md            # Guía despliegue
+│
+├── 📁 tests/
+│   ├── 📄 test.db.js
+│
+├── 📄 .env                         # Variables entorno
+├── 📄 .env.example                 # Ejemplo variables
+├── 📄 .gitignore                   # Archivos ignorar git
+├── 📄 package.json                 # Dependencias npm
+├── 📄 server.js                    # Entrada aplicación
+├── 📄 ecosystem.config.js          # Configuración PM2
+└── 📄 README.md                    # Documentación proyecto

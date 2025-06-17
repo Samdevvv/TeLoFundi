@@ -1,0 +1,1526 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Sistema de localización
+model Location {
+  id        String @id @default(cuid())
+  country   String
+  state     String?
+  city      String
+  latitude  Float?
+  longitude Float?
+  
+  // Relations
+  users     User[]
+  posts     Post[]
+  
+  @@unique([country, state, city])
+  @@index([country, city])
+  @@map("locations")
+}
+
+// Tabla principal de usuarios
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  username    String   @unique
+  firstName   String
+  lastName    String
+  password    String
+  avatar      String?
+  phone       String?
+  bio         String?
+  website     String? // Para agencias
+  userType    UserType
+  isActive    Boolean  @default(true)
+  isBanned    Boolean  @default(false)
+  banReason   String?
+  profileViews Int     @default(0)
+  
+  // Campos de autenticación y verificación
+  passwordResetToken      String?
+  passwordResetExpiry     DateTime?
+  emailVerificationToken  String?
+  emailVerified          Boolean  @default(false)
+  emailVerifiedAt        DateTime?
+  
+  // Localización
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id])
+  
+  // Configuraciones adicionales
+  timezone    String? @default("UTC")
+  language    String? @default("en")
+  lastLoginIP String?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLogin   DateTime?
+  lastActiveAt DateTime?
+  deletedAt   DateTime? // Soft delete
+  deletionReason String? // Razón de eliminación de cuenta
+  
+  // Relations específicas por tipo de usuario
+  escort      Escort?
+  agency      Agency?
+  client      Client?
+  admin       Admin?
+  
+  // Relations generales
+  posts       Post[]
+  sentMessages    Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages") 
+  chatMembers     ChatMember[]
+  favorites       Favorite[]
+  likes           Like[]
+  reports         Report[] @relation("ReportAuthor")
+  reportsReceived Report[] @relation("ReportTarget")
+  notifications   Notification[]
+  boosts          Boost[]
+  banHistory      Ban[]
+  interactions    UserInteraction[] @relation("InteractionAuthor")
+  receivedInteractions UserInteraction[] @relation("InteractionTarget")
+  chatRateLimits  ChatRateLimit[]
+  reputation      UserReputation?
+  settings        UserSettings?
+  deviceTokens    DeviceToken[]
+  searchHistory   SearchHistory[]
+  blockedUsers    UserBlock[] @relation("UserBlocker")
+  blockedBy       UserBlock[] @relation("UserBlocked")
+  subscriptions   Subscription[]
+  identityVerification IdentityVerification?
+  
+  @@index([userType, isActive, createdAt])
+  @@index([userType, isActive, lastLogin])
+  @@index([userType, isActive, lastActiveAt])
+  @@index([createdAt])
+  @@index([lastLogin])
+  @@index([isActive, userType])
+  @@index([profileViews])
+  @@index([locationId])
+  @@index([emailVerificationToken])
+  @@index([passwordResetToken])
+  @@index([emailVerified])
+  @@map("users")
+}
+
+// Configuraciones de usuario
+model UserSettings {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  user                  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Notificaciones
+  emailNotifications    Boolean @default(true)
+  pushNotifications     Boolean @default(true)
+  messageNotifications  Boolean @default(true)
+  likeNotifications     Boolean @default(true)
+  boostNotifications    Boolean @default(true)
+  
+  // Privacidad
+  showOnline            Boolean @default(true)
+  showLastSeen          Boolean @default(true)
+  allowDirectMessages   Boolean @default(true)
+  showPhoneNumber       Boolean @default(false)
+  
+  // Descubrimiento
+  showInDiscovery       Boolean @default(true)
+  showInTrending        Boolean @default(true)
+  showInSearch          Boolean @default(true)
+  
+  // Filtros de contenido
+  contentFilter         ContentFilterLevel @default(MODERATE)
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  @@map("user_settings")
+}
+
+// Tokens de dispositivos para notificaciones push
+model DeviceToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique
+  platform    String   // "ios", "android", "web"
+  deviceInfo  Json?    // Información adicional del dispositivo
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastUsedAt  DateTime @default(now())
+  
+  @@index([userId, isActive])
+  @@index([platform, isActive])
+  @@map("device_tokens")
+}
+
+// Historial de búsquedas
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query     String
+  filters   Json?    // Filtros aplicados
+  results   Int      @default(0) // Cantidad de resultados
+  clicked   Boolean  @default(false) // Si hizo click en algún resultado
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId, createdAt])
+  @@index([query])
+  @@map("search_history")
+}
+
+// Sistema de bloqueos entre usuarios
+model UserBlock {
+  id          String   @id @default(cuid())
+  blockerId   String
+  blocker     User     @relation("UserBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId   String
+  blocked     User     @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  reason      String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
+// Verificación de identidad
+model IdentityVerification {
+  id              String @id @default(cuid())
+  userId          String @unique
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  documentType    String // "passport", "id_card", "driver_license"
+  documentNumber  String
+  documentImages  String[] @default([]) // URLs de imágenes
+  selfieImage     String?
+  
+  status          VerificationStatus @default(PENDING)
+  verifiedBy      String? // Admin ID
+  rejectionReason String?
+  notes           String?
+  
+  submittedAt     DateTime @default(now())
+  completedAt     DateTime?
+  expiresAt       DateTime? // Algunos documentos expiran
+  
+  @@index([status])
+  @@index([documentType])
+  @@map("identity_verifications")
+}
+
+// Sistema de suscripciones
+model SubscriptionPlan {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String
+  price       Float
+  duration    Int     // días
+  features    Json    // Array de features
+  isActive    Boolean @default(true)
+  userType    UserType // ESCORT, AGENCY, CLIENT
+  priority    Int     @default(0) // Para ordenar planes
+  
+  // Límites específicos del plan
+  maxPosts    Int?
+  maxImages   Int?
+  maxBoosts   Int?
+  
+  // Relations
+  subscriptions Subscription[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userType, isActive])
+  @@index([price, userType])
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        SubscriptionPlan @relation(fields: [planId], references: [id])
+  status      SubscriptionStatus @default(ACTIVE)
+  
+  // Información de pago
+  stripeSubscriptionId String?
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  
+  // Control de uso
+  postsUsed   Int @default(0)
+  imagesUsed  Int @default(0)
+  boostsUsed  Int @default(0)
+  
+  startsAt    DateTime
+  endsAt      DateTime
+  cancelledAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, status])
+  @@index([status, endsAt])
+  @@index([planId, status])
+  @@map("subscriptions")
+}
+
+// Sistema de tags
+model Tag {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  color       String?   // Hex color for UI
+  icon        String?   // Icon name or emoji
+  isActive    Boolean   @default(true)
+  usageCount  Int       @default(0) // Cuántas veces se ha usado
+  
+  // Categorización
+  category    TagCategory @default(GENERAL)
+  priority    Int         @default(0) // Para featured tags
+  
+  // Relations
+  posts       PostTag[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([isActive, usageCount])
+  @@index([category, isActive])
+  @@index([priority, isActive])
+  @@map("tags")
+}
+
+model PostTag {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
+}
+
+// Tabla específica para administradores
+model Admin {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        AdminRole @default(MODERATOR)
+  permissions Json?    // Array de permisos específicos
+  
+  // Estadísticas de actividad
+  totalBans   Int      @default(0)
+  totalReports Int     @default(0)
+  totalVerifications Int @default(0)
+  
+  // Configuraciones de admin
+  canDeletePosts   Boolean @default(false)
+  canBanUsers      Boolean @default(false)
+  canModifyPrices  Boolean @default(false)
+  canAccessMetrics Boolean @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([role])
+  @@map("admins")
+}
+
+// Sistema de reputación mejorado
+model UserReputation {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  overallScore Float   @default(0)
+  responseRate Float   @default(0) // % de mensajes respondidos
+  averageResponseTime Int? // en minutos
+  profileCompleteness Float @default(0) // % del perfil completado
+  trustScore      Float @default(0) // Basado en verificaciones y reseñas
+  
+  // Métricas de engagement
+  totalViews      Int @default(0)
+  totalLikes      Int @default(0)
+  totalMessages   Int @default(0)
+  totalFavorites  Int @default(0)
+  
+  // Factores para algoritmo de descubrimiento
+  discoveryScore  Float @default(0)
+  trendingScore   Float @default(0)
+  qualityScore    Float @default(0) // Basado en calidad de posts y perfil
+  lastScoreUpdate DateTime @default(now())
+  
+  // Penalizaciones
+  spamScore       Float @default(0)
+  reportScore     Float @default(0) // Basado en reportes recibidos
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([overallScore])
+  @@index([trustScore])
+  @@index([discoveryScore])
+  @@index([trendingScore])
+  @@map("user_reputations")
+}
+
+// Tabla específica para escorts
+model Escort {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isVerified  Boolean  @default(false)
+  verifiedAt  DateTime?
+  verifiedBy  String?  // ID de la agencia que verificó
+  rating      Float    @default(0.0)
+  totalRatings Int     @default(0)
+  
+  // Información física
+  age         Int?
+  height      String?
+  weight      String?
+  bodyType    String?
+  ethnicity   String?
+  hairColor   String?
+  eyeColor    String?
+  
+  // Información profesional
+  services    String[] @default([])
+  rates       Json?    // Tarifas por tiempo {"1h": 100, "2h": 180}
+  availability Json?   // Horarios {"mon": ["9-17"], "tue": ["10-18"]}
+  languages   String[] @default([])
+  
+  // Límites específicos de escorts
+  maxPosts    Int      @default(5) // Límite explícito para escorts
+  currentPosts Int     @default(0) // Contador actual de posts activos
+  
+  // Estadísticas específicas
+  totalBookings Int    @default(0)
+  completedBookings Int @default(0)
+  
+  // Relations
+  agencyMemberships AgencyMembership[]
+  reviews           Review[] @relation("ReviewTarget")
+  reviewsGiven      Review[] @relation("ReviewAuthor")
+  clientReviews     ClientReview[] @relation("EscortReviewed")
+  agencyInvitations AgencyInvitation[]
+  verifications     EscortVerification[]
+  
+  @@index([isVerified, rating])
+  @@index([rating, totalRatings])
+  @@index([currentPosts, maxPosts])
+  @@index([age])
+  @@map("escorts")
+}
+
+// Tabla específica para agencias
+model Agency {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isVerified  Boolean  @default(false)
+  verifiedAt  DateTime?
+  
+  // Información adicional
+  businessLicense String?
+  taxId          String?
+  
+  // Configuración de límites (ilimitado para agencias)
+  maxPosts    Int?     // null = ilimitado para agencias
+  
+  // Estadísticas de la agencia
+  totalEscorts Int    @default(0)
+  verifiedEscorts Int @default(0)
+  totalVerifications Int @default(0) // Cuántas verificaciones han hecho
+  activeEscorts Int   @default(0)
+  
+  // Configuraciones de comisiones
+  defaultCommissionRate Float @default(0.1) // 10% por defecto
+  
+  // Relations
+  memberships AgencyMembership[]
+  invitations AgencyInvitation[]
+  verifications EscortVerification[]
+  
+  @@index([isVerified])
+  @@index([totalEscorts])
+  @@index([activeEscorts])
+  @@map("agencies")
+}
+
+// Tabla específica para clientes
+model Client {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points      Int      @default(0)
+  isPremium   Boolean  @default(false)
+  premiumUntil DateTime?
+  premiumTier PremiumTier @default(BASIC)
+  
+  // Configuraciones de cliente por tier
+  dailyMessageLimit Int @default(10) // BASIC: 10, PREMIUM: 50, VIP: ilimitado
+  canViewPhoneNumbers Boolean @default(false) // Solo PREMIUM y VIP
+  canSendImages Boolean @default(false) // Solo PREMIUM y VIP
+  canSendVoiceMessages Boolean @default(false) // Solo VIP
+  canAccessPremiumProfiles Boolean @default(false) // Solo PREMIUM y VIP
+  prioritySupport Boolean @default(false) // Solo VIP
+  canSeeOnlineStatus Boolean @default(false) // Solo PREMIUM y VIP
+  
+  // Estadísticas de uso
+  totalMessagesUsed Int @default(0)
+  messagesUsedToday Int @default(0)
+  lastMessageReset DateTime @default(now())
+  totalPointsSpent Int @default(0)
+  totalPointsPurchased Int @default(0)
+  
+  // Preferencias
+  agePreferenceMin Int?
+  agePreferenceMax Int?
+  locationPreference String?
+  
+  // Relations
+  payments    Payment[]
+  pointTransactions PointTransaction[]
+  clientReviews ClientReview[] @relation("ClientReviewer")
+  
+  @@index([isPremium, premiumTier])
+  @@index([points])
+  @@index([premiumUntil])
+  @@index([totalPointsSpent])
+  @@map("clients")
+}
+
+// Sistema de reseñas de clientes a escorts
+model ClientReview {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 estrellas
+  comment   String?
+  
+  // Criterios específicos de evaluación
+  communication Int? // 1-5
+  punctuality  Int?  // 1-5
+  appearance   Int?  // 1-5
+  overall      Int?  // 1-5
+  service      Int?  // 1-5
+  value        Int?  // 1-5
+  
+  // Información adicional
+  isAnonymous Boolean @default(false)
+  isVerified  Boolean @default(false) // Si el cliente verificó que tuvo el encuentro
+  
+  clientId  String
+  client    Client   @relation("ClientReviewer", fields: [clientId], references: [id], onDelete: Cascade)
+  escortId  String
+  escort    Escort   @relation("EscortReviewed", fields: [escortId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete
+  
+  @@unique([clientId, escortId])
+  @@index([escortId, rating])
+  @@index([rating, createdAt])
+  @@index([createdAt])
+  @@index([isVerified, rating])
+  @@map("client_reviews")
+}
+
+// Sistema de baneos mejorado
+model Ban {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason      String
+  bannedBy    String   // ID del admin
+  adminId     String?  // Referencia al admin que hizo el ban
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  severity    BanSeverity @default(WARNING)
+  
+  // Información adicional
+  evidence    Json?    // URLs de evidencia, screenshots, etc.
+  appeals     BanAppeal[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, isActive])
+  @@index([isActive, expiresAt])
+  @@index([severity, isActive])
+  @@index([bannedBy])
+  @@map("bans")
+}
+
+// Apelaciones de baneos
+model BanAppeal {
+  id          String   @id @default(cuid())
+  banId       String
+  ban         Ban      @relation(fields: [banId], references: [id], onDelete: Cascade)
+  reason      String
+  evidence    Json?    // Evidencia para la apelación
+  status      AppealStatus @default(PENDING)
+  
+  reviewedBy  String?  // Admin que revisó
+  reviewNotes String?
+  
+  createdAt   DateTime @default(now())
+  reviewedAt  DateTime?
+  
+  @@index([banId])
+  @@index([status])
+  @@map("ban_appeals")
+}
+
+// Sistema de transacciones de puntos mejorado
+model PointTransaction {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount      Int      // Positivo para compra, negativo para uso
+  type        PointTransactionType
+  description String?
+  cost        Float?   // Costo en dinero real (para compras)
+  
+  // Referencias opcionales
+  postId      String?  // Si fue usado en un post específico
+  messageId   String?  // Si fue usado para enviar mensaje
+  paymentId   String?  // Referencia al pago relacionado
+  
+  // Información adicional
+  balanceBefore Int    // Saldo antes de la transacción
+  balanceAfter  Int    // Saldo después de la transacción
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([clientId, createdAt])
+  @@index([type, createdAt])
+  @@index([amount, type])
+  @@map("point_transactions")
+}
+
+// Sistema de interacciones para algoritmos mejorado
+model UserInteraction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("InteractionAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  targetUserId String?
+  targetUser   User?    @relation("InteractionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  type        InteractionType
+  weight      Float    @default(1)
+  duration    Int?     // Duración en segundos (para views)
+  
+  // Contexto adicional para algoritmos
+  deviceType  String?  // mobile, desktop, tablet
+  source      String?  // feed, discover, trending, search
+  location    String?  // País/ciudad desde donde se hizo la interacción
+  
+  // Información de sesión
+  sessionId   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, type, createdAt])
+  @@index([targetUserId, type])
+  @@index([postId, type])
+  @@index([type, createdAt])
+  @@index([type, weight, createdAt])
+  @@index([source, type])
+  @@map("user_interactions")
+}
+
+// Rate limiting para chat mejorado
+model ChatRateLimit {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+  limitType   RateLimitType @default(DAILY_MESSAGES)
+  
+  @@unique([userId, limitType])
+  @@index([windowStart, limitType])
+  @@map("chat_rate_limits")
+}
+
+// Membresías de escorts en agencias
+model AgencyMembership {
+  id          String   @id @default(cuid())
+  escortId    String
+  escort      Escort   @relation(fields: [escortId], references: [id], onDelete: Cascade)
+  agencyId    String
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  status      MembershipStatus @default(PENDING)
+  role        AgencyRole @default(MEMBER)
+  
+  // Configuraciones de comisión
+  commissionRate Float? @default(0.1) // 10% por defecto
+  
+  // Permisos específicos
+  canPostForAgency Boolean @default(false)
+  canManageEscorts Boolean @default(false)
+  canAccessFinances Boolean @default(false)
+  
+  // Campos para auditoría
+  approvedBy  String?  // ID del usuario de la agencia que aprobó
+  approvedAt  DateTime?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  
+  @@unique([escortId, agencyId])
+  @@index([agencyId, status])
+  @@index([status, createdAt])
+  @@map("agency_memberships")
+}
+
+// Invitaciones de agencias a escorts
+model AgencyInvitation {
+  id          String   @id @default(cuid())
+  agencyId    String
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  escortId    String
+  escort      Escort   @relation(fields: [escortId], references: [id], onDelete: Cascade)
+  status      InvitationStatus @default(PENDING)
+  message     String?
+  
+  // Términos propuestos
+  proposedCommission Float? @default(0.1)
+  proposedRole AgencyRole @default(MEMBER)
+  proposedBenefits Json? // Beneficios adicionales propuestos
+  
+  // Campos de auditoría
+  invitedBy   String   // ID del usuario de la agencia que invitó
+  respondedAt DateTime?
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  expiresAt   DateTime // Las invitaciones expiran en 7 días
+  deletedAt   DateTime? // Soft delete
+  
+  @@unique([agencyId, escortId])
+  @@index([escortId, status])
+  @@index([status, createdAt])
+  @@index([expiresAt, status])
+  @@map("agency_invitations")
+}
+
+// Verificaciones de escorts por agencias (solo miembros)
+model EscortVerification {
+  id          String   @id @default(cuid())
+  agencyId    String
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  escortId    String
+  escort      Escort   @relation(fields: [escortId], references: [id], onDelete: Cascade)
+  pricingId   String
+  pricing     VerificationPricing @relation(fields: [pricingId], references: [id])
+  status      VerificationStatus @default(PENDING)
+  
+  // Restricción: solo escorts miembros pueden ser verificados
+  membershipId String? // Referencia a AgencyMembership
+  
+  // Documentos requeridos
+  documentsSubmitted Json? // Array de URLs de documentos
+  verificationNotes String?
+  rejectionReason   String?
+  
+  // Información del proceso
+  verificationSteps Json? // Pasos completados en el proceso
+  expiresAt        DateTime? // Algunas verificaciones expiran
+  
+  // Auditoría
+  verifiedBy  String?  // ID del usuario de la agencia que verificó
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  deletedAt   DateTime? // Soft delete
+  
+  @@index([escortId, status])
+  @@index([agencyId, status])
+  @@index([status, createdAt])
+  @@map("escort_verifications")
+}
+
+// Precios de verificación - AGREGADO PARA COMPATIBILIDAD CON CONTROLADORES
+model VerificationPricing {
+  id          String @id @default(cuid())
+  name        String // "Basic", "Premium", "Gold"
+  cost        Float  // Precio en USD
+  description String
+  isActive    Boolean @default(true)
+  
+  // Beneficios incluidos
+  features    Json? // Array de features incluidos
+  duration    Int?  // Duración de la verificación en días
+  
+  // Relations
+  verifications EscortVerification[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([isActive])
+  @@index([cost, isActive])
+  @@map("verification_pricing")
+}
+
+// Precios de boosts mejorado
+model BoostPricing {
+  id        String    @id @default(cuid())
+  type      BoostType
+  duration  Int       // Duración en horas
+  price     Float
+  isActive  Boolean   @default(true)
+  
+  // Beneficios del boost
+  multiplier Float    @default(1.5) // Multiplicador de visibilidad
+  features   Json?    // Features adicionales
+  maxBoosts  Int?     // Máximo de boosts por usuario por día
+  
+  // Relations
+  boosts    Boost[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  @@index([type, isActive])
+  @@index([price, isActive])
+  @@index([isActive])
+  @@map("boost_pricing")
+}
+
+// Anuncios/Posts mejorado
+model Post {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  images      String[] @default([])
+  phone       String
+  isActive    Boolean  @default(true)
+  views       Int      @default(0)
+  viewsToday  Int      @default(0)
+  clicks      Int      @default(0)
+  clicksToday Int      @default(0)
+  score       Float    @default(0) // Para ranking y trending
+  engagementRate Float @default(0) // Tasa de engagement
+  lastBoosted DateTime?
+  
+  // Localización específica del post
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id])
+  
+  // Información adicional para escorts
+  services    String[] @default([])
+  rates       Json?    // Tarifas específicas para este post
+  availability Json?   // Disponibilidad específica
+  
+  // Configuración de trending
+  trendingScore Float @default(0)
+  isTrending    Boolean @default(false)
+  isFeatured    Boolean @default(false) // Posts destacados
+  
+  // Algoritmo de descubrimiento
+  discoveryScore Float @default(0)
+  qualityScore   Float @default(0) // Basado en engagement y calidad
+  lastScoreUpdate DateTime @default(now())
+  
+  // Configuraciones de privacidad
+  isPrivate      Boolean @default(false)
+  premiumOnly    Boolean @default(false) // Solo para clientes premium
+  
+  // Estadísticas detalladas
+  uniqueViews    Int @default(0) // Vistas únicas
+  totalTime      Int @default(0) // Tiempo total de visualización en segundos
+  bounceRate     Float @default(0) // Tasa de rebote
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  expiresAt   DateTime? // Posts que expiran automáticamente
+  
+  // Relations
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  favorites   Favorite[]
+  likes       Like[]
+  reports     Report[]
+  boosts      Boost[]
+  interactions UserInteraction[]
+  trendingHistory TrendingHistory[]
+  tags        PostTag[]
+  
+  @@index([isActive, createdAt])
+  @@index([authorId, isActive])
+  @@index([score, isActive])
+  @@index([trendingScore, isTrending, isActive])
+  @@index([lastBoosted, isActive])
+  @@index([score, lastBoosted, isActive])
+  @@index([views, isActive])
+  @@index([engagementRate, isActive])
+  @@index([discoveryScore, isActive])
+  @@index([locationId, isActive])
+  @@index([isFeatured, isActive])
+  @@index([premiumOnly, isActive])
+  @@map("posts")
+}
+
+// Trending histórico
+model TrendingHistory {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  position  Int      // Posición en trending
+  score     Float    // Score en ese momento
+  category  String?  // Categoría de trending
+  
+  date      DateTime @default(now())
+  
+  @@index([date, position])
+  @@index([postId, date])
+  @@index([category, date])
+  @@map("trending_history")
+}
+
+// Sistema de chat
+model Chat {
+  id          String   @id @default(cuid())
+  isGroup     Boolean  @default(false)
+  name        String?
+  description String?
+  avatar      String?
+  
+  // Configuraciones del chat
+  isArchived  Boolean  @default(false)
+  mutedUntil  DateTime?
+  maxMembers  Int?     @default(100)
+  
+  // Configuraciones de privacidad
+  isPrivate   Boolean  @default(true)
+  requireApproval Boolean @default(false)
+  
+  // Configuraciones de mensajes
+  allowFiles  Boolean  @default(true)
+  allowImages Boolean  @default(true)
+  allowVoice  Boolean  @default(true)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  lastActivity DateTime @default(now())
+  
+  // Relations
+  members     ChatMember[]
+  messages    Message[]
+  
+  @@index([isGroup, isArchived])
+  @@index([lastActivity])
+  @@map("chats")
+}
+
+model ChatMember {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  // Settings
+  joinedAt    DateTime @default(now())
+  lastRead    DateTime @default(now())
+  isMuted     Boolean  @default(false)
+  role        ChatRole @default(MEMBER)
+  
+  // Permisos específicos
+  canAddMembers    Boolean @default(false)
+  canDeleteMessages Boolean @default(false)
+  canManageChat    Boolean @default(false)
+  
+  // Estadísticas
+  messagesCount Int @default(0)
+  
+  @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
+  @@index([lastRead])
+  @@map("chat_members")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  content     String?
+  messageType MessageType @default(TEXT)
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  mimeType    String?
+  isRead      Boolean  @default(false)
+  
+  // Mensaje premium/puntos
+  costPoints  Int?     // Puntos que costó enviar este mensaje
+  isPremiumMessage Boolean @default(false)
+  
+  // Configuraciones del mensaje
+  isEdited    Boolean  @default(false)
+  editedAt    DateTime?
+  isForwarded Boolean  @default(false)
+  replyToId   String?  // ID del mensaje al que responde
+  
+  // Configuraciones de privacidad
+  isEncrypted Boolean  @default(false)
+  expiresAt   DateTime? // Mensajes que se autodestruyen
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  readAt      DateTime? // Cuándo fue leído
+  
+  // Relations
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String?
+  receiver    User?    @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  @@index([chatId, createdAt])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([isPremiumMessage])
+  @@index([isRead, chatId])
+  @@index([replyToId])
+  @@map("messages")
+}
+
+// Sistema de favoritos y likes
+model Favorite {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  // Información adicional
+  isNotified  Boolean  @default(true) // Si quiere notificaciones de este post
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+  @@index([createdAt])
+  @@map("favorites")
+}
+
+model Like {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([userId, postId])
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("likes")
+}
+
+// Sistema de reviews entre escorts
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int      // 1-5 stars
+  comment     String?
+  
+  // Criterios específicos
+  professionalism Int? // 1-5
+  communication  Int?  // 1-5
+  reliability    Int?  // 1-5
+  appearance     Int?  // 1-5
+  service        Int?  // 1-5
+  
+  // Información adicional
+  isAnonymous Boolean @default(false)
+  isVerified  Boolean @default(false)
+  helpfulVotes Int    @default(0) // Votos de "útil" de otros usuarios
+  
+  authorId    String
+  author      Escort   @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetId    String
+  target      Escort   @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  
+  @@unique([authorId, targetId])
+  @@index([targetId, rating])
+  @@index([rating, createdAt])
+  @@index([createdAt])
+  @@index([isVerified, rating])
+  @@map("reviews")
+}
+
+// Sistema de reportes
+model Report {
+  id          String   @id @default(cuid())
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(PENDING)
+  
+  // Evidencia del reporte
+  evidence    Json?    // Screenshots, URLs, etc.
+  category    String?  // Categoría específica del reporte
+  severity    ReportSeverity @default(LOW)
+  
+  // Resolución del reporte
+  resolution  String?
+  resolvedBy  String? // ID del admin que resolvió
+  resolvedAt  DateTime?
+  actionTaken String? // Acción tomada como resultado
+  
+  authorId    String
+  author      User     @relation("ReportAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetUserId String?
+  targetUser   User?    @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  
+  @@index([status, createdAt])
+  @@index([reason, status])
+  @@index([authorId])
+  @@index([resolvedBy])
+  @@index([severity, status])
+  @@map("reports")
+}
+
+// Sistema de notificaciones
+model Notification {
+  id          String   @id @default(cuid())
+  title       String
+  message     String
+  type        NotificationType
+  isRead      Boolean  @default(false)
+  data        Json?
+  
+  // Prioridad y configuración
+  priority    NotificationPriority @default(NORMAL)
+  expiresAt   DateTime?
+  
+  // Configuraciones de entrega
+  isSent      Boolean  @default(false)
+  sentAt      DateTime?
+  deliveryMethod String[] @default([]) // ["push", "email", "sms"]
+  
+  // Configuraciones de acción
+  actionUrl   String?  // URL a la que redirigir al hacer click
+  actionText  String?  // Texto del botón de acción
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  deletedAt   DateTime? // Soft delete
+  
+  @@index([userId, isRead, createdAt])
+  @@index([priority, createdAt])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@index([type, isRead])
+  @@map("notifications")
+}
+
+// Sistema de pagos
+model Payment {
+  id          String   @id @default(cuid())
+  amount      Float
+  currency    String   @default("USD")
+  status      PaymentStatus @default(PENDING)
+  type        PaymentType
+  description String?
+  stripePaymentId String?
+  
+  // Información adicional del pago
+  metadata    Json?
+  failureReason String?
+  refundReason String?
+  
+  // Información de procesamiento
+  processorFee Float?  // Comisión del procesador
+  netAmount   Float?   // Cantidad neta recibida
+  
+  // Información fiscal
+  taxAmount   Float?   // Impuestos aplicados
+  taxRate     Float?   // Tasa de impuesto
+  
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  completedAt DateTime? // Cuándo se completó el pago
+  
+  @@index([clientId, status])
+  @@index([status, createdAt])
+  @@index([type, status])
+  @@index([amount, type])
+  @@index([stripePaymentId])
+  @@map("payments")
+}
+
+// Sistema de boosts
+model Boost {
+  id          String   @id @default(cuid())
+  pricingId   String
+  pricing     BoostPricing @relation(fields: [pricingId], references: [id])
+  isActive    Boolean  @default(true)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  // Métricas del boost
+  viewsBefore Int      @default(0)
+  viewsAfter  Int      @default(0)
+  clicksBefore Int     @default(0)
+  clicksAfter Int      @default(0)
+  
+  // Métricas adicionales
+  engagementBefore Float @default(0)
+  engagementAfter  Float @default(0)
+  conversionRate   Float @default(0)
+  
+  // Configuraciones del boost
+  targetAudience   Json? // Audiencia objetivo
+  geography        String? // Geografía específica
+  
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  deletedAt   DateTime? // Soft delete
+  
+  @@index([isActive, expiresAt])
+  @@index([postId, isActive])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("boosts")
+}
+
+// Métricas globales de la aplicación para admin
+model AppMetrics {
+  id              String   @id @default(cuid())
+  totalUsers      Int      @default(0)
+  totalEscorts    Int      @default(0)
+  totalAgencies   Int      @default(0)
+  totalClients    Int      @default(0)
+  totalAdmins     Int      @default(0)
+  totalPosts      Int      @default(0)
+  totalPayments   Float    @default(0)
+  totalRevenue    Float    @default(0)
+  activeUsers     Int      @default(0)
+  bannedUsers     Int      @default(0)
+  verifiedEscorts Int      @default(0)
+  premiumClients  Int      @default(0)
+  
+  // Métricas adicionales
+  totalMessages   Int      @default(0)
+  totalBoosts     Int      @default(0)
+  averageSessionTime Float @default(0)
+  conversionRate  Float    @default(0) // Visitors to registered users
+  churnRate       Float    @default(0) // Tasa de abandono
+  revenuePerUser  Float    @default(0) // Ingreso promedio por usuario
+  
+  // Métricas por tipo de cliente
+  basicClients    Int      @default(0)
+  premiumClientsTier Int   @default(0)
+  vipClients      Int      @default(0)
+  
+  // Métricas de engagement
+  dailyActiveUsers Int     @default(0)
+  weeklyActiveUsers Int    @default(0)
+  monthlyActiveUsers Int   @default(0)
+  
+  // Métricas geográficas
+  topCountries    Json?    // Top países por usuarios
+  topCities       Json?    // Top ciudades por usuarios
+  
+  // Timestamps
+  date            DateTime @default(now())
+  createdAt       DateTime @default(now())
+  
+  @@index([date])
+  @@map("app_metrics")
+}
+
+// Enums existentes + nuevos
+enum UserType {
+  ESCORT
+  AGENCY
+  CLIENT
+  ADMIN
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+}
+
+enum PremiumTier {
+  BASIC      // Gratuito
+  PREMIUM    // Tier medio
+  VIP        // Tier alto
+}
+
+enum RateLimitType {
+  DAILY_MESSAGES
+  HOURLY_MESSAGES
+  PHONE_ACCESS
+  IMAGE_MESSAGES
+  VOICE_MESSAGES
+  FILE_UPLOADS
+}
+
+enum MembershipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum VerificationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum AgencyRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum ChatRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  VIDEO
+  SYSTEM
+  LOCATION
+  CONTACT
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE_CONTENT
+  FAKE_PROFILE
+  SCAM
+  HARASSMENT
+  COPYRIGHT
+  UNDERAGE
+  VIOLENCE
+  FRAUD
+  IMPERSONATION
+  ADULT_CONTENT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+  ESCALATED
+}
+
+enum ReportSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AppealStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  UNDER_REVIEW
+}
+
+enum NotificationType {
+  MESSAGE
+  LIKE
+  FAVORITE
+  REVIEW
+  BOOST_EXPIRED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  AGENCY_INVITE
+  VERIFICATION_COMPLETED
+  MEMBERSHIP_REQUEST
+  SYSTEM
+  TRENDING
+  PROMOTION
+  SECURITY_ALERT
+  SUBSCRIPTION_EXPIRING
+  NEW_FOLLOWER
+  POST_APPROVED
+  POST_REJECTED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+  DISPUTED
+  PROCESSING
+}
+
+enum PaymentType {
+  BOOST
+  PREMIUM
+  POINTS
+  VERIFICATION
+  SUBSCRIPTION
+  TIP
+  COMMISSION
+}
+
+enum BoostType {
+  BASIC      // 24 horas
+  PREMIUM    // 48 horas  
+  FEATURED   // 72 horas
+  SUPER      // 7 días
+  MEGA       // 30 días
+}
+
+enum PointTransactionType {
+  PURCHASE
+  CHAT_MESSAGE
+  PROFILE_VIEW
+  PREMIUM_FEATURE
+  BOOST_PURCHASE
+  VERIFICATION_FEE
+  PHONE_NUMBER_ACCESS
+  IMAGE_MESSAGE
+  PRIORITY_SUPPORT
+  TIP
+  REFUND
+  BONUS
+  REFERRAL_REWARD
+}
+
+enum InteractionType {
+  VIEW
+  LIKE
+  CHAT
+  PROFILE_VISIT
+  POST_CLICK
+  FAVORITE
+  SHARE
+  REPORT
+  BOOST_VIEW
+  CONTACT_CLICK
+  IMAGE_VIEW
+  PHONE_VIEW
+  LOCATION_VIEW
+}
+
+enum BanSeverity {
+  WARNING
+  TEMPORARY
+  PERMANENT
+  SHADOW // Usuario puede usar la app pero con restricciones
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAUSED
+  PENDING
+  PAST_DUE
+}
+
+enum TagCategory {
+  GENERAL
+  SERVICE
+  LOCATION
+  PHYSICAL
+  PREFERENCE
+  SPECIAL
+}
+
+enum ContentFilterLevel {
+  NONE
+  MODERATE
+  STRICT
+}
