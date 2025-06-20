@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const morgan = require('morgan');
 require('dotenv').config();
 
 const app = require('./src/app');
@@ -12,7 +13,77 @@ const { configureCloudinary } = require('./src/config/cloudinary');
 
 const PORT = process.env.PORT || 3000;
 
-// INICIALIZAR CLOUDINARY AL ARRANCAR
+// ✅ MIDDLEWARE DE LOGGING SIMPLIFICADO PARA EVITAR CONFLICTOS
+const setupRequestLogging = () => {
+  // Solo logging básico en desarrollo
+  if (process.env.NODE_ENV === 'development') {
+    // ✅ REMOVIDO EL MIDDLEWARE QUE INTERCEPTABA res.send
+    // Eso estaba causando problemas con el parsing de JSON
+    
+    // Solo log de requests críticos
+    app.use((req, res, next) => {
+      if (req.method === 'PUT' && req.originalUrl.includes('/profile')) {
+        logger.info('📨 PROFILE UPDATE REQUEST:', {
+          method: req.method,
+          url: req.originalUrl,
+          contentType: req.get('Content-Type'),
+          contentLength: req.get('Content-Length'),
+          hasBody: !!req.body,
+          bodyKeys: Object.keys(req.body || {}),
+          timestamp: new Date().toISOString()
+        });
+      }
+      next();
+    });
+  }
+};
+
+// MIDDLEWARE PARA CAPTURAR ERRORES DE PARSING - SIMPLIFICADO
+const setupErrorLogging = () => {
+  // Error de parsing JSON
+  app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+      logger.error('💥 JSON PARSING ERROR:', {
+        message: err.message,
+        url: req.originalUrl,
+        method: req.method,
+        contentType: req.get('Content-Type'),
+        contentLength: req.get('Content-Length'),
+        ip: req.ip
+      });
+      
+      return res.status(400).json({
+        success: false,
+        message: 'JSON inválido en el body de la petición',
+        errorCode: 'INVALID_JSON'
+      });
+    }
+    next(err);
+  });
+
+  // Handler de errores global simplificado
+  app.use((err, req, res, next) => {
+    // Solo log errores realmente importantes
+    if (err.status >= 500 || !err.status) {
+      logger.error('💥 SERVER ERROR:', {
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        url: req.originalUrl,
+        method: req.method,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.status(err.status || 500).json({
+      success: false,
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Error interno del servidor',
+      errorCode: err.errorCode || 'INTERNAL_ERROR',
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
+  });
+};
+
+// INICIALIZAR SERVICIOS
 const initializeServices = async () => {
   try {
     // Configurar Cloudinary
@@ -49,6 +120,11 @@ const initializeServices = async () => {
       }
     });
 
+    // ✅ CONFIGURAR LOGGING DE REQUESTS - SIMPLIFICADO
+    setupRequestLogging();
+    setupErrorLogging();
+    logger.info('✅ Request logging configurado (simplificado)');
+
   } catch (error) {
     logger.error('Error inicializando servicios:', error);
     process.exit(1);
@@ -68,6 +144,31 @@ const io = socketIo(server, {
   transports: ['websocket', 'polling'],
   pingTimeout: 60000,
   pingInterval: 25000
+});
+
+// ✅ LOGGING PARA SOCKET.IO - SIMPLIFICADO
+io.on('connection', (socket) => {
+  logger.info('🔌 SOCKET CONNECTED:', {
+    socketId: socket.id,
+    ip: socket.handshake.address,
+    timestamp: new Date().toISOString()
+  });
+
+  socket.on('disconnect', (reason) => {
+    logger.info('🔌 SOCKET DISCONNECTED:', {
+      socketId: socket.id,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  socket.on('error', (error) => {
+    logger.error('💥 SOCKET ERROR:', {
+      socketId: socket.id,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  });
 });
 
 // Configurar autenticación de sockets
@@ -93,6 +194,7 @@ const startServer = async () => {
       logger.info(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`🔌 Socket.IO: Habilitado`);
       logger.info(`💾 Base de datos: Conectada`);
+      logger.info(`📋 Request logging: Simplificado para evitar conflictos`);
       
       // Log de servicios externos
       const services = [];
@@ -104,6 +206,8 @@ const startServer = async () => {
         logger.info(`🔗 Servicios externos: ${services.join(', ')}`);
       }
 
+      logger.info('=====================================');
+      logger.info('🧪 Prueba tu API con: curl -X POST http://localhost:' + PORT + '/api/test/json -H "Content-Type: application/json" -d \'{"test":"data"}\'');
       logger.info('=====================================');
     });
 
@@ -136,11 +240,10 @@ server.on('error', (error) => {
   }
 });
 
-// MANEJO DE CIERRE GRACEFUL MEJORADO
+// MANEJO DE CIERRE GRACEFUL
 const gracefulShutdown = (signal) => {
   logger.info(`📡 ${signal} recibido, iniciando cierre graceful...`);
   
-  // Cerrar servidor HTTP
   server.close((err) => {
     if (err) {
       logger.error('Error cerrando servidor HTTP:', err);
@@ -149,15 +252,9 @@ const gracefulShutdown = (signal) => {
     
     logger.info('✅ Servidor HTTP cerrado');
     
-    // Cerrar conexiones de Socket.IO
     io.close(() => {
       logger.info('✅ Socket.IO cerrado');
     });
-
-    // Aquí podrías agregar limpieza de otros recursos:
-    // - Cerrar conexiones de base de datos
-    // - Cancelar tareas programadas
-    // - Limpiar archivos temporales
     
     logger.info('✅ Aplicación cerrada correctamente');
     process.exit(0);
@@ -174,7 +271,7 @@ const gracefulShutdown = (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// MANEJO DE ERRORES NO CAPTURADOS MEJORADO
+// MANEJO DE ERRORES NO CAPTURADOS
 process.on('uncaughtException', (error) => {
   logger.error('💥 Error no capturado:', {
     message: error.message,
@@ -182,7 +279,6 @@ process.on('uncaughtException', (error) => {
     timestamp: new Date().toISOString()
   });
   
-  // En desarrollo, mostrar el error completo
   if (process.env.NODE_ENV === 'development') {
     console.error(error);
   }
@@ -194,30 +290,15 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('💥 Promise rechazada no manejada:', {
     reason: reason instanceof Error ? reason.message : reason,
     stack: reason instanceof Error ? reason.stack : undefined,
-    promise: promise.toString(),
     timestamp: new Date().toISOString()
   });
   
-  // En desarrollo, mostrar el error completo
   if (process.env.NODE_ENV === 'development') {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   }
   
   process.exit(1);
 });
-
-// MONITOREO DE MEMORIA (OPCIONAL)
-if (process.env.NODE_ENV === 'development') {
-  setInterval(() => {
-    const memUsage = process.memoryUsage();
-    logger.debug('Uso de memoria:', {
-      rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
-      heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
-      heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
-      external: `${Math.round(memUsage.external / 1024 / 1024)}MB`
-    });
-  }, 30000); // Cada 30 segundos
-}
 
 // INICIAR LA APLICACIÓN
 startServer();

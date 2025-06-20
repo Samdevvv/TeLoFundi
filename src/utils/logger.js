@@ -1,7 +1,7 @@
 const winston = require('winston');
 const path = require('path');
 
-// Definir niveles de log personalizados
+// ✅ NIVELES OPTIMIZADOS
 const levels = {
   error: 0,
   warn: 1,
@@ -10,90 +10,83 @@ const levels = {
   debug: 4,
 };
 
-// Definir colores para cada nivel
 const colors = {
   error: 'red',
-  warn: 'yellow',
+  warn: 'yellow', 
   info: 'green',
   http: 'magenta',
   debug: 'white',
 };
 
-// Agregar colores a winston
 winston.addColors(colors);
 
-// Formato para logs en consola (desarrollo)
+// ✅ FORMATO CONCISO PARA CONSOLA - SIN TIMESTAMPS LARGOS
 const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+  winston.format.timestamp({ format: 'HH:mm:ss' }), // ✅ Solo hora
   winston.format.colorize({ all: true }),
-  winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`
-  )
+  winston.format.printf((info) => {
+    // ✅ FORMATO MÁS COMPACTO
+    const { timestamp, level, message, ...meta } = info;
+    
+    let output = `${timestamp} ${level}: ${message}`;
+    
+    // Solo mostrar metadata si es relevante
+    if (Object.keys(meta).length > 0 && process.env.LOG_VERBOSE === 'true') {
+      output += ` ${JSON.stringify(meta)}`;
+    }
+    
+    return output;
+  })
 );
 
-// Formato para logs en archivos (producción)
+// Formato para archivos (sin cambios)
 const fileFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
   winston.format.json()
 );
 
-// Función para determinar el nivel de log basado en el entorno
+// ✅ NIVEL MÁS RESTRICTIVO
 const level = () => {
   const env = process.env.NODE_ENV || 'development';
-  const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'warn';
+  if (env === 'production') return 'warn';
+  if (env === 'test') return 'error';
+  return process.env.LOG_LEVEL || 'info'; // ✅ Cambiar de 'debug' a 'info'
 };
 
-// Transports para diferentes entornos
+// Transports optimizados
 const transports = [];
 
-// Console transport (siempre presente)
+// Console transport
 transports.push(
   new winston.transports.Console({
     level: level(),
-    format: consoleFormat
+    format: consoleFormat,
+    silent: process.env.NODE_ENV === 'test' // ✅ Silenciar en tests
   })
 );
 
-// File transports (solo en producción o si se especifica)
-if (process.env.NODE_ENV === 'production' || process.env.ENABLE_FILE_LOGGING === 'true') {
-  // Crear directorio de logs si no existe
+// File transports solo en producción
+if (process.env.NODE_ENV === 'production') {
   const fs = require('fs');
   const logsDir = path.join(process.cwd(), 'logs');
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
 
-  // Log de errores
   transports.push(
     new winston.transports.File({
       filename: path.join(logsDir, 'error.log'),
       level: 'error',
       format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
-
-  // Log combinado
-  transports.push(
+      maxsize: 5242880,
+      maxFiles: 3, // ✅ Reducir archivos
+    }),
     new winston.transports.File({
       filename: path.join(logsDir, 'combined.log'),
       format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
-
-  // Log de acceso HTTP
-  transports.push(
-    new winston.transports.File({
-      filename: path.join(logsDir, 'access.log'),
-      level: 'http',
-      format: fileFormat,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
+      maxsize: 5242880,
+      maxFiles: 3, // ✅ Reducir archivos
     })
   );
 }
@@ -104,116 +97,134 @@ const logger = winston.createLogger({
   levels,
   format: fileFormat,
   transports,
-  exitOnError: false
+  exitOnError: false,
+  silent: process.env.NODE_ENV === 'test'
 });
 
-// Función helper para logs estructurados
-logger.logWithContext = (level, message, context = {}) => {
-  const logData = {
-    message,
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    ...context
-  };
-  
-  logger.log(level, message, logData);
-};
+// ✅ FUNCIONES HELPER OPTIMIZADAS - MÁS CONCISAS
 
-// Función para log de requests HTTP
+// Función para log de requests HTTP - SIMPLIFICADA
 logger.logRequest = (req, res, responseTime) => {
-  const logData = {
-    method: req.method,
-    url: req.originalUrl,
-    statusCode: res.statusCode,
-    responseTime: `${responseTime}ms`,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    userId: req.user?.id || 'anonymous',
-    userType: req.user?.userType || 'none'
-  };
-
-  const level = res.statusCode >= 400 ? 'warn' : 'http';
-  logger.log(level, `${req.method} ${req.originalUrl} ${res.statusCode} - ${responseTime}ms`, logData);
+  // Solo log requests importantes o errores
+  if (res.statusCode >= 400 || responseTime > 1000) {
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'http';
+    
+    logger.log(level, `${req.method} ${req.originalUrl} ${res.statusCode} - ${responseTime}ms`, {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      time: `${responseTime}ms`,
+      user: req.user?.id || 'anonymous'
+    });
+  }
 };
 
-// Función para log de errores con stack trace
+// Función para log de errores - CONCISA
 logger.logError = (error, context = {}) => {
-  const errorData = {
-    message: error.message,
-    stack: error.stack,
+  logger.error(`💥 ${error.message}`, {
     name: error.name,
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     ...context
-  };
-
-  logger.error('Application Error', errorData);
+  });
 };
 
-// Función para log de autenticación
-logger.logAuth = (action, userId, email, success, details = {}) => {
-  const authData = {
+// Función para log de autenticación - SIMPLIFICADA
+logger.logAuth = (action, email, success, details = {}) => {
+  const emoji = success ? '✅' : '❌';
+  const level = success ? 'info' : 'warn';
+  
+  logger.log(level, `${emoji} Auth ${action}: ${email}`, {
     action,
-    userId,
     email,
     success,
-    timestamp: new Date().toISOString(),
     ...details
-  };
-
-  const level = success ? 'info' : 'warn';
-  logger.log(level, `Auth ${action}: ${email} - ${success ? 'SUCCESS' : 'FAILED'}`, authData);
+  });
 };
 
-// Función para log de actividades de usuario
-logger.logUserActivity = (userId, action, details = {}) => {
-  const activityData = {
-    userId,
-    action,
-    timestamp: new Date().toISOString(),
-    ...details
+// ✅ NUEVA: Log de actividades específicas con emojis
+logger.logActivity = (category, action, details = {}) => {
+  const emojis = {
+    auth: '🔐',
+    profile: '👤', 
+    post: '📝',
+    chat: '💬',
+    payment: '💳',
+    upload: '📁',
+    admin: '🛡️',
+    db: '🗄️'
   };
-
-  logger.info(`User Activity: ${action}`, activityData);
+  
+  const emoji = emojis[category] || '🔍';
+  logger.info(`${emoji} ${category.toUpperCase()}: ${action}`, details);
 };
 
-// Función para log de métricas de performance
+// Log de performance - SOLO PARA CASOS IMPORTANTES
 logger.logPerformance = (operation, duration, details = {}) => {
-  const perfData = {
-    operation,
-    duration: `${duration}ms`,
-    timestamp: new Date().toISOString(),
-    ...details
-  };
-
-  const level = duration > 1000 ? 'warn' : 'debug';
-  logger.log(level, `Performance: ${operation} took ${duration}ms`, perfData);
+  // Solo log si es lento
+  if (duration > 1000) {
+    logger.warn(`🐌 Slow ${operation}: ${duration}ms`, {
+      operation,
+      duration: `${duration}ms`,
+      ...details
+    });
+  }
 };
 
-// Función para log de seguridad
+// Log de seguridad - CONCISO
 logger.logSecurity = (event, severity, details = {}) => {
-  const securityData = {
+  const emojis = { high: '🚨', medium: '⚠️', low: '🔍' };
+  const emoji = emojis[severity] || '🔍';
+  const level = severity === 'high' ? 'error' : severity === 'medium' ? 'warn' : 'info';
+  
+  logger.log(level, `${emoji} Security: ${event}`, {
     event,
     severity,
-    timestamp: new Date().toISOString(),
     ...details
-  };
-
-  const level = severity === 'high' ? 'error' : severity === 'medium' ? 'warn' : 'info';
-  logger.log(level, `Security Event: ${event}`, securityData);
+  });
 };
 
-// Función para log de pagos
-logger.logPayment = (userId, action, amount, status, details = {}) => {
-  const paymentData = {
-    userId,
+// Log de pagos - CONCISO
+logger.logPayment = (action, amount, status, details = {}) => {
+  const emoji = status === 'success' ? '✅' : status === 'failed' ? '❌' : '🔄';
+  const level = status === 'failed' ? 'error' : 'info';
+  
+  logger.log(level, `${emoji} Payment ${action}: $${amount} - ${status}`, {
     action,
     amount,
     status,
-    timestamp: new Date().toISOString(),
     ...details
-  };
+  });
+};
 
-  const level = status === 'failed' ? 'error' : 'info';
-  logger.log(level, `Payment ${action}: ${amount} - ${status}`, paymentData);
+// ✅ NUEVA: Log especializado para posts
+logger.logPost = (action, postId, userId, details = {}) => {
+  logger.logActivity('post', `${action} - Post:${postId?.substring(0,8)} User:${userId?.substring(0,8)}`, details);
+};
+
+// ✅ NUEVA: Log especializado para uploads  
+logger.logUpload = (type, filename, size, userId) => {
+  logger.logActivity('upload', `${type} uploaded: ${filename} (${Math.round(size/1024)}KB)`, {
+    type,
+    filename,
+    size: `${Math.round(size/1024)}KB`,
+    userId: userId?.substring(0,8)
+  });
+};
+
+// ✅ FUNCIÓN PARA ALTERNAR MODO VERBOSE
+logger.setVerbose = (verbose) => {
+  process.env.LOG_VERBOSE = verbose ? 'true' : 'false';
+  logger.info(`🔧 Verbose logging: ${verbose ? 'enabled' : 'disabled'}`);
+};
+
+// ✅ FUNCIÓN PARA STATS DE LOGGING
+logger.getStats = () => {
+  return {
+    level: logger.level,
+    transports: logger.transports.length,
+    verbose: process.env.LOG_VERBOSE === 'true',
+    environment: process.env.NODE_ENV
+  };
 };
 
 module.exports = logger;

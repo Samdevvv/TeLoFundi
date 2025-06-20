@@ -12,7 +12,7 @@ const favoritesRoutes = require('./favorites');
 const paymentRoutes = require('./payments');
 
 // Importar middlewares
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 // Middleware para logging de requests
@@ -122,17 +122,8 @@ router.get('/status', async (req, res) => {
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/metrics', authenticate, async (req, res) => {
+router.get('/metrics', authenticate, requireAdmin, async (req, res) => {
   try {
-    // Solo admins pueden ver métricas completas
-    if (req.user.userType !== 'ADMIN') {
-      return res.status(403).json({
-        success: false,
-        message: 'Permisos insuficientes',
-        errorCode: 'INSUFFICIENT_PERMISSIONS'
-      });
-    }
-
     const { getDatabaseStats } = require('../config/database');
     const dbStats = await getDatabaseStats();
     
@@ -162,19 +153,19 @@ router.get('/metrics', authenticate, async (req, res) => {
   }
 });
 
-// Rutas de autenticación (públicas)
+// ✅ RUTAS PÚBLICAS (sin autenticación)
 router.use('/auth', authRoutes);
 
-// Rutas que requieren autenticación
-router.use('/users', authenticate, userRoutes);
-router.use('/posts', authenticate, postRoutes);
-router.use('/chat', authenticate, chatRoutes);
-router.use('/agency', authenticate, agencyRoutes);
-router.use('/favorites', authenticate, favoritesRoutes);
-router.use('/payments', authenticate, paymentRoutes);
+// ✅ RUTAS CON AUTENTICACIÓN REQUERIDA
+router.use('/users', userRoutes); // Ya maneja auth internamente
+router.use('/posts', postRoutes); // Ya maneja auth/optionalAuth internamente
+router.use('/chat', authenticate, chatRoutes); // Todas requieren auth
+router.use('/agency', agencyRoutes); // Ya maneja auth internamente (/search es pública)
+router.use('/favorites', authenticate, favoritesRoutes); // Todas requieren auth
+router.use('/payments', authenticate, paymentRoutes); // Todas requieren auth
 
-// Rutas de administración (requieren rol admin)
-router.use('/admin', authenticate, adminRoutes);
+// ✅ RUTAS DE ADMINISTRACIÓN (requieren rol admin)
+router.use('/admin', authenticate, requireAdmin, adminRoutes);
 
 // Middleware para capturar rutas no encontradas en /api
 router.use('*', (req, res) => {
@@ -183,17 +174,19 @@ router.use('*', (req, res) => {
     message: `Endpoint ${req.originalUrl} no encontrado`,
     errorCode: 'ENDPOINT_NOT_FOUND',
     availableRoutes: [
-      'GET /api/status',
-      'GET /api/metrics',
-      'POST /api/auth/login',
-      'POST /api/auth/register',
-      'GET /api/users/profile',
-      'GET /api/posts',
-      'GET /api/chat',
-      'GET /api/agency',
-      'GET /api/favorites',
-      'GET /api/payments',
-      'GET /api/admin'
+      'GET /api/status - Sistema: Estado de salud',
+      'GET /api/metrics - Sistema: Métricas (Admin)',
+      'POST /api/auth/login - Auth: Iniciar sesión',
+      'POST /api/auth/register - Auth: Registrarse',
+      'GET /api/auth/google - Auth: OAuth Google',
+      'GET /api/users/profile - Usuarios: Mi perfil',
+      'GET /api/posts/feed - Posts: Feed principal',
+      'GET /api/posts/trending - Posts: Trending (público)',
+      'GET /api/chat - Chat: Mis chats',
+      'GET /api/agency/search - Agencias: Buscar (público)',
+      'GET /api/favorites - Favoritos: Mis favoritos',
+      'GET /api/payments/boost/pricing - Pagos: Precios boost',
+      'GET /api/admin/metrics - Admin: Métricas de app'
     ],
     documentation: '/api-docs',
     timestamp: new Date().toISOString()

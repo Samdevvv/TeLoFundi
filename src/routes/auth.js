@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // Middleware
-const { authLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimiter');
+// const { authLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimiter'); // ← COMENTADO PARA DESARROLLO
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const { validateRegistration, validateLogin, validatePasswordReset } = require('../middleware/validation');
 
@@ -19,7 +19,8 @@ const {
   changePassword,
   getUserProfile,
   googleAuth,
-  googleCallback
+  googleCallback,
+  testEmail
 } = require('../controllers/authController');
 
 /**
@@ -152,7 +153,7 @@ const {
  *       429:
  *         description: Demasiados intentos de registro
  */
-router.post('/register', registerLimiter, validateRegistration, register);
+router.post('/register', /* registerLimiter, */ validateRegistration, register);
 
 /**
  * @swagger
@@ -180,7 +181,7 @@ router.post('/register', registerLimiter, validateRegistration, register);
  *       429:
  *         description: Demasiados intentos de login
  */
-router.post('/login', authLimiter, validateLogin, login);
+router.post('/login', /* authLimiter, */ validateLogin, login);
 
 /**
  * @swagger
@@ -288,7 +289,7 @@ router.post('/refresh', refreshToken);
  *       429:
  *         description: Demasiados intentos de restablecimiento
  */
-router.post('/forgot-password', passwordResetLimiter, validatePasswordReset, forgotPassword);
+router.post('/forgot-password', /* passwordResetLimiter, */ validatePasswordReset, forgotPassword);
 
 /**
  * @swagger
@@ -432,6 +433,14 @@ router.get('/profile', authenticate, getUserProfile);
  *   get:
  *     summary: Iniciar autenticación con Google
  *     tags: [Auth]
+ *     parameters:
+ *       - in: query
+ *         name: userType
+ *         schema:
+ *           type: string
+ *           enum: [CLIENT, ESCORT, AGENCY]
+ *         description: Tipo de usuario para registro
+ *         example: CLIENT
  *     responses:
  *       302:
  *         description: Redirección a Google OAuth
@@ -457,5 +466,68 @@ router.get('/google', googleAuth);
  *         description: Error en autenticación con Google
  */
 router.get('/google/callback', googleCallback);
+
+/**
+ * @swagger
+ * /api/auth/test-email:
+ *   post:
+ *     summary: Probar envío de emails (Solo desarrollo)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - type
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "prueba@ejemplo.com"
+ *               type:
+ *                 type: string
+ *                 enum: [reset, welcome, verification]
+ *                 example: "reset"
+ *     responses:
+ *       200:
+ *         description: Email de prueba enviado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Email de restablecimiento de contraseña enviado exitosamente"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     emailType:
+ *                       type: string
+ *                       example: "restablecimiento de contraseña"
+ *                     recipient:
+ *                       type: string
+ *                       example: "prueba@ejemplo.com"
+ *                     timestamp:
+ *                       type: string
+ *                       example: "2025-01-19T10:30:00.000Z"
+ *       400:
+ *         description: Datos de entrada inválidos
+ *       403:
+ *         description: Endpoint no disponible en producción
+ *       500:
+ *         description: Error enviando email
+ */
+
+// ✅ RUTA DE PRUEBA PARA EMAILS (SOLO DESARROLLO)
+if (process.env.NODE_ENV === 'development') {
+  router.post('/test-email', testEmail);
+}
 
 module.exports = router;

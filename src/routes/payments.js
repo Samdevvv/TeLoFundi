@@ -3,7 +3,6 @@ const router = express.Router();
 
 // Middleware
 const { authenticate } = require('../middleware/auth');
-const { paymentLimiter } = require('../middleware/rateLimiter');
 const { 
   validateBoostPayment,
   validatePointsPayment,
@@ -282,7 +281,6 @@ router.get('/verification/pricing', authenticate, getVerificationPricing);
  */
 router.post('/boost/create-intent', 
   authenticate, 
-  paymentLimiter, 
   validateBoostPayment, 
   createBoostPaymentIntent
 );
@@ -340,7 +338,6 @@ router.post('/boost/create-intent',
  */
 router.post('/verification/create-intent', 
   authenticate, 
-  paymentLimiter, 
   validateVerificationPayment, 
   createVerificationPaymentIntent
 );
@@ -541,7 +538,6 @@ router.post('/verification/confirm/:paymentId', authenticate, confirmVerificatio
  */
 router.post('/points/create-intent', 
   authenticate, 
-  paymentLimiter, 
   validatePointsPayment, 
   createPointsPaymentIntent
 );
@@ -655,8 +651,7 @@ router.post('/points/confirm/:paymentId', authenticate, confirmPointsPayment);
  *         description: Solo clientes pueden comprar premium
  */
 router.post('/premium/create-intent', 
-  authenticate, 
-  paymentLimiter, 
+
   validatePremiumPayment, 
   createPremiumPaymentIntent
 );

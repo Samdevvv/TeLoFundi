@@ -23,7 +23,9 @@ const configureJwtStrategy = () => {
           agency: true,
           client: true,
           admin: true,
-          settings: true
+          settings: true,
+          reputation: true,
+          location: true
         }
       });
 
@@ -47,11 +49,11 @@ const configureJwtStrategy = () => {
   }));
 };
 
-// Configurar estrategia de Google OAuth
+// ✅ GOOGLE OAUTH STRATEGY COMPLETA Y FUNCIONAL
 const configureGoogleStrategy = () => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    logger.warn('Google OAuth no configurado - faltan variables de entorno');
-    return;
+    logger.warn('🔴 Google OAuth no configurado - faltan variables de entorno');
+    return false;
   }
 
   const googleOptions = {
@@ -64,9 +66,10 @@ const configureGoogleStrategy = () => {
 
   passport.use(new GoogleStrategy(googleOptions, async (req, accessToken, refreshToken, profile, done) => {
     try {
-      logger.info('Google OAuth callback received', {
+      logger.info('🟢 Google OAuth callback received', {
         profileId: profile.id,
-        email: profile.emails?.[0]?.value
+        email: profile.emails?.[0]?.value,
+        userType: req.session?.pendingUserType || 'CLIENT'
       });
 
       const email = profile.emails?.[0]?.value;
@@ -75,6 +78,7 @@ const configureGoogleStrategy = () => {
       const avatar = profile.photos?.[0]?.value || null;
 
       if (!email) {
+        logger.error('❌ No se pudo obtener el email de Google');
         return done(new Error('No se pudo obtener el email de Google'), null);
       }
 
@@ -86,71 +90,84 @@ const configureGoogleStrategy = () => {
           agency: true,
           client: true,
           admin: true,
-          settings: true
+          settings: true,
+          reputation: true,
+          location: true
         }
       });
 
       if (user) {
-        // Usuario ya existe - actualizar información de Google si es necesario
+        // ✅ USUARIO EXISTENTE - LOGIN CON GOOGLE
+        logger.info('✅ Usuario existente encontrado, actualizando login:', user.username);
+
+        // Actualizar información de Google si es necesario
+        const updateData = {
+          lastLogin: new Date(),
+          lastActiveAt: new Date(),
+          lastLoginIP: req.ip || 'unknown'
+        };
+
+        // Solo actualizar avatar si no tiene uno
         if (!user.avatar && avatar) {
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { 
-              avatar,
-              lastLogin: new Date(),
-              lastActiveAt: new Date()
-            },
-            include: {
-              escort: true,
-              agency: true,
-              client: true,
-              admin: true,
-              settings: true
-            }
-          });
-        } else {
-          // Solo actualizar timestamps
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { 
-              lastLogin: new Date(),
-              lastActiveAt: new Date()
-            },
-            include: {
-              escort: true,
-              agency: true,
-              client: true,
-              admin: true,
-              settings: true
-            }
-          });
+          updateData.avatar = avatar;
         }
 
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: updateData,
+          include: {
+            escort: true,
+            agency: true,
+            client: true,
+            admin: true,
+            settings: true,
+            reputation: true,
+            location: true
+          }
+        });
+
+        // Verificaciones de seguridad
         if (!user.isActive) {
+          logger.warn('❌ Cuenta desactivada:', user.email);
           return done(new Error('Cuenta desactivada'), null);
         }
 
         if (user.isBanned) {
+          logger.warn('❌ Cuenta suspendida:', user.email);
           return done(new Error('Cuenta suspendida'), null);
         }
 
+        // Log exitoso
         logger.logAuth('google_login', user.id, user.email, true, {
           method: 'google_oauth',
-          existing_user: true
+          existing_user: true,
+          ip: req.ip
         });
 
         return done(null, user);
       }
 
-      // Usuario no existe - determinar tipo de usuario desde la sesión o query params
+      // ✅ NUEVO USUARIO - REGISTRO CON GOOGLE
       const userType = req.session?.pendingUserType || req.query?.userType || 'CLIENT';
       
       if (!['ESCORT', 'AGENCY', 'CLIENT'].includes(userType)) {
+        logger.error('❌ Tipo de usuario no válido:', userType);
         return done(new Error('Tipo de usuario no válido'), null);
       }
 
+      logger.info('🆕 Creando nuevo usuario con Google OAuth:', {
+        email,
+        userType,
+        firstName,
+        lastName
+      });
+
       // Generar username único basado en el email
       let username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (username.length < 3) {
+        username = `user${Date.now()}`;
+      }
+
       let usernameExists = true;
       let counter = 0;
 
@@ -165,9 +182,15 @@ const configureGoogleStrategy = () => {
           usernameExists = false;
         }
         counter++;
+
+        // Prevenir bucle infinito
+        if (counter > 100) {
+          username = `user${Date.now()}${Math.floor(Math.random() * 1000)}`;
+          break;
+        }
       }
 
-      // Crear nuevo usuario con Google OAuth
+      // ✅ CREAR USUARIO CON GOOGLE OAUTH
       user = await prisma.user.create({
         data: {
           email: email.toLowerCase(),
@@ -178,36 +201,87 @@ const configureGoogleStrategy = () => {
           userType,
           password: 'google_oauth', // Placeholder - no se usa para OAuth
           isActive: true,
+          emailVerified: true, // Google ya verificó el email
+          emailVerifiedAt: new Date(),
           lastLogin: new Date(),
           lastActiveAt: new Date(),
-          // Crear registros específicos según el tipo de usuario
+          lastLoginIP: req.ip || 'unknown',
+
+          // ✅ CREAR PERFIL ESPECÍFICO SEGÚN TIPO DE USUARIO
           ...(userType === 'ESCORT' && {
             escort: {
               create: {
                 maxPosts: 5,
-                currentPosts: 0
+                currentPosts: 0,
+                isVerified: false,
+                age: null,
+                services: [],
+                rates: {},
+                availability: {}
               }
             }
           }),
+
           ...(userType === 'AGENCY' && {
             agency: {
-              create: {}
+              create: {
+                isVerified: false,
+                totalEscorts: 0,
+                verifiedEscorts: 0,
+                totalVerifications: 0,
+                activeEscorts: 0
+              }
             }
           }),
+
           ...(userType === 'CLIENT' && {
             client: {
               create: {
                 points: 10, // Puntos de bienvenida
+                isPremium: false,
                 premiumTier: 'BASIC',
-                dailyMessageLimit: 10
+                dailyMessageLimit: 10,
+                canViewPhoneNumbers: false,
+                canSendImages: false,
+                canSendVoiceMessages: false,
+                canAccessPremiumProfiles: false,
+                prioritySupport: false,
+                canSeeOnlineStatus: false,
+                messagesUsedToday: 0,
+                lastMessageReset: new Date()
               }
             }
           }),
+
+          // ✅ CONFIGURACIONES POR DEFECTO
           settings: {
             create: {
               emailNotifications: true,
               pushNotifications: true,
-              showInDiscovery: userType !== 'CLIENT' // Clientes ocultos por defecto
+              messageNotifications: true,
+              likeNotifications: true,
+              boostNotifications: true,
+              showOnline: true,
+              showLastSeen: true,
+              allowDirectMessages: true,
+              showPhoneNumber: false,
+              showInDiscovery: userType !== 'CLIENT',
+              showInTrending: userType !== 'CLIENT',
+              showInSearch: true,
+              contentFilter: 'MODERATE'
+            }
+          },
+
+          // ✅ REPUTACIÓN INICIAL
+          reputation: {
+            create: {
+              overallScore: 50.0,
+              responseRate: 0.0,
+              profileCompleteness: 60.0, // Mayor porque ya tiene nombre e imagen
+              trustScore: 35.0, // Más alto por verificación de Google
+              discoveryScore: 15.0,
+              trendingScore: 0.0,
+              qualityScore: 40.0
             }
           }
         },
@@ -216,30 +290,52 @@ const configureGoogleStrategy = () => {
           agency: true,
           client: true,
           admin: true,
-          settings: true
+          settings: true,
+          reputation: true,
+          location: true
         }
       });
 
+      logger.info('✅ Usuario creado exitosamente con Google OAuth:', {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        userType: user.userType
+      });
+
+      // Log de registro exitoso
       logger.logAuth('google_register', user.id, user.email, true, {
         method: 'google_oauth',
         userType,
-        new_user: true
+        new_user: true,
+        ip: req.ip
       });
 
       return done(null, user);
 
     } catch (error) {
-      logger.error('Error en Google OAuth Strategy:', error);
-      logger.logAuth('google_auth', null, profile.emails?.[0]?.value, false, {
+      logger.error('💥 Error en Google OAuth Strategy:', {
         error: error.message,
-        profileId: profile.id
+        stack: error.stack,
+        profileId: profile?.id,
+        email: profile?.emails?.[0]?.value
       });
+
+      logger.logAuth('google_auth', null, profile?.emails?.[0]?.value, false, {
+        error: error.message,
+        profileId: profile?.id,
+        ip: req.ip
+      });
+
       return done(error, null);
     }
   }));
+
+  logger.info('✅ Google OAuth Strategy configurada correctamente');
+  return true;
 };
 
-// Serialización para sesiones (aunque usaremos JWT principalmente)
+// ✅ SERIALIZACIÓN PARA SESIONES
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
@@ -253,24 +349,37 @@ passport.deserializeUser(async (id, done) => {
         agency: true,
         client: true,
         admin: true,
-        settings: true
+        settings: true,
+        reputation: true,
+        location: true
       }
     });
     done(null, user);
   } catch (error) {
+    logger.error('Error en deserializeUser:', error);
     done(error, null);
   }
 });
 
-// Función principal para configurar todas las estrategias
+// ✅ FUNCIÓN PRINCIPAL DE CONFIGURACIÓN
 const configurePassport = () => {
-  configureJwtStrategy();
-  configureGoogleStrategy();
-  
-  logger.info('🔐 Passport configurado correctamente');
+  try {
+    configureJwtStrategy();
+    const googleConfigured = configureGoogleStrategy();
+    
+    logger.info('🔐 Passport configurado correctamente:', {
+      jwt: true,
+      google: googleConfigured
+    });
+
+    return { jwt: true, google: googleConfigured };
+  } catch (error) {
+    logger.error('💥 Error configurando Passport:', error);
+    throw error;
+  }
 };
 
-// Middleware para autenticación opcional con Passport
+// ✅ MIDDLEWARE PARA AUTENTICACIÓN OPCIONAL CON PASSPORT
 const optionalPassportAuth = (req, res, next) => {
   passport.authenticate('jwt', { session: false }, (err, user, info) => {
     if (err) {
@@ -286,7 +395,7 @@ const optionalPassportAuth = (req, res, next) => {
   })(req, res, next);
 };
 
-// Middleware para autenticación requerida con Passport
+// ✅ MIDDLEWARE PARA AUTENTICACIÓN REQUERIDA CON PASSPORT
 const requiredPassportAuth = (req, res, next) => {
   passport.authenticate('jwt', { session: false }, (err, user, info) => {
     if (err) {
@@ -294,7 +403,8 @@ const requiredPassportAuth = (req, res, next) => {
       return res.status(500).json({
         success: false,
         message: 'Error interno de autenticación',
-        errorCode: 'AUTH_INTERNAL_ERROR'
+        errorCode: 'AUTH_INTERNAL_ERROR',
+        timestamp: new Date().toISOString()
       });
     }
     
@@ -302,7 +412,8 @@ const requiredPassportAuth = (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: info?.message || 'Token de acceso inválido',
-        errorCode: 'INVALID_TOKEN'
+        errorCode: 'INVALID_TOKEN',
+        timestamp: new Date().toISOString()
       });
     }
     
@@ -311,9 +422,15 @@ const requiredPassportAuth = (req, res, next) => {
   })(req, res, next);
 };
 
-// Función para iniciar flujo de Google OAuth
+// ✅ FUNCIÓN PARA INICIAR FLUJO DE GOOGLE OAUTH
 const initiateGoogleAuth = (userType = 'CLIENT') => {
   return (req, res, next) => {
+    logger.info('🚀 Iniciando Google OAuth:', {
+      userType,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
     // Guardar el tipo de usuario para después del callback
     req.session.pendingUserType = userType;
     
@@ -325,47 +442,90 @@ const initiateGoogleAuth = (userType = 'CLIENT') => {
   };
 };
 
-// Función para manejar callback de Google OAuth
+// ✅ FUNCIÓN PARA MANEJAR CALLBACK DE GOOGLE OAUTH
 const handleGoogleCallback = (req, res, next) => {
   passport.authenticate('google', { session: false }, (err, user, info) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+
     if (err) {
-      logger.error('Error en Google OAuth callback:', err);
+      logger.error('💥 Error en Google OAuth callback:', err);
+      
+      // Limpiar sesión
+      delete req.session.pendingUserType;
       
       // Redirigir al frontend con error
       const errorMessage = encodeURIComponent(err.message || 'Error en autenticación con Google');
-      const redirectUrl = `${process.env.FRONTEND_URL}/auth/error?message=${errorMessage}`;
+      const redirectUrl = `${frontendUrl}/?auth=error&message=${errorMessage}`;
       return res.redirect(redirectUrl);
     }
     
     if (!user) {
-      logger.warn('Google OAuth callback sin usuario:', info);
+      logger.warn('⚠️ Google OAuth callback sin usuario:', info);
+      
+      // Limpiar sesión
+      delete req.session.pendingUserType;
       
       const errorMessage = encodeURIComponent('No se pudo autenticar con Google');
-      const redirectUrl = `${process.env.FRONTEND_URL}/auth/error?message=${errorMessage}`;
+      const redirectUrl = `${frontendUrl}/?auth=error&message=${errorMessage}`;
       return res.redirect(redirectUrl);
     }
     
-    // Generar JWT para el usuario
-    const { generateToken } = require('../middleware/auth');
-    const token = generateToken(user.id);
-    
-    // Limpiar datos de sesión
-    delete req.session.pendingUserType;
-    
-    // Redirigir al frontend con el token
-    const redirectUrl = `${process.env.FRONTEND_URL}/auth/success?token=${token}&user=${encodeURIComponent(JSON.stringify({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      userType: user.userType,
-      avatar: user.avatar
-    }))}`;
-    
-    logger.logAuth('google_oauth_complete', user.id, user.email, true);
-    
-    res.redirect(redirectUrl);
+    try {
+      // ✅ GENERAR JWT PARA EL USUARIO
+      const { generateToken, generateRefreshToken } = require('../middleware/auth');
+      const token = generateToken(user.id);
+      const refreshToken = generateRefreshToken(user.id);
+      
+      // Limpiar datos de sesión
+      delete req.session.pendingUserType;
+      
+      // ✅ PREPARAR DATOS DEL USUARIO (SIN DATOS SENSIBLES)
+      const userData = {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: user.userType,
+        avatar: user.avatar,
+        isActive: user.isActive,
+        createdAt: user.createdAt
+      };
+
+      // ✅ REDIRIGIR AL FRONTEND CON EL TOKEN Y DATOS
+      const queryParams = new URLSearchParams({
+        auth: 'success',
+        token: token,
+        refreshToken: refreshToken,
+        user: JSON.stringify(userData)
+      });
+
+      const redirectUrl = `${frontendUrl}/?${queryParams.toString()}`;
+      
+      logger.info('✅ Google OAuth completado exitosamente:', {
+        userId: user.id,
+        username: user.username,
+        userType: user.userType,
+        redirectUrl: `${frontendUrl}/?auth=success`
+      });
+
+      logger.logAuth('google_oauth_complete', user.id, user.email, true, {
+        userType: user.userType,
+        ip: req.ip
+      });
+      
+      res.redirect(redirectUrl);
+
+    } catch (error) {
+      logger.error('💥 Error generando tokens para Google OAuth:', error);
+      
+      // Limpiar sesión
+      delete req.session.pendingUserType;
+      
+      const errorMessage = encodeURIComponent('Error interno del servidor');
+      const redirectUrl = `${frontendUrl}/?auth=error&message=${errorMessage}`;
+      res.redirect(redirectUrl);
+    }
   })(req, res, next);
 };
 

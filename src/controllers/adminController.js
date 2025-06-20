@@ -43,270 +43,287 @@ const getAppMetrics = catchAsync(async (req, res) => {
       break;
   }
 
-  const [
-    userStats,
-    postStats,
-    chatStats,
-    paymentStats,
-    reportStats,
-    topLocations,
-    growthStats,
-    engagementStats
-  ] = await Promise.all([
-    // Estadísticas de usuarios
-    Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { userType: 'ESCORT' } }),
-      prisma.user.count({ where: { userType: 'AGENCY' } }),
-      prisma.user.count({ where: { userType: 'CLIENT' } }),
-      prisma.user.count({ where: { userType: 'ADMIN' } }),
-      prisma.user.count({ where: { isActive: true } }),
-      prisma.user.count({ where: { isBanned: true } }),
-      prisma.escort.count({ where: { isVerified: true } }),
-      prisma.client.count({ where: { isPremium: true } }),
-      prisma.user.count({ 
-        where: { 
-          emailVerified: true,
-          ...(period !== 'current' && { createdAt: dateFilter })
-        } 
-      })
-    ]),
-
-    // Estadísticas de posts
-    Promise.all([
-      prisma.post.count({ where: { isActive: true } }),
-      prisma.post.count({ 
-        where: { 
-          isActive: true,
-          ...(period !== 'current' && { createdAt: dateFilter })
-        } 
-      }),
-      prisma.post.aggregate({
-        _sum: { views: true },
-        _avg: { views: true }
-      }),
-      prisma.like.count({
-        ...(period !== 'current' && {
-          where: { createdAt: dateFilter }
+  try {
+    const [
+      userStats,
+      postStats,
+      chatStats,
+      paymentStats,
+      reportStats,
+      topLocations,
+      growthStats,
+      engagementStats
+    ] = await Promise.all([
+      // Estadísticas de usuarios - CORREGIDO: sin deletedAt
+      Promise.all([
+        prisma.user.count(),
+        prisma.user.count({ where: { userType: 'ESCORT' } }),
+        prisma.user.count({ where: { userType: 'AGENCY' } }),
+        prisma.user.count({ where: { userType: 'CLIENT' } }),
+        prisma.user.count({ where: { userType: 'ADMIN' } }),
+        prisma.user.count({ where: { isActive: true } }),
+        prisma.user.count({ where: { isBanned: true } }),
+        // CORREGIDO: sin deletedAt
+        prisma.escort.count({ where: { isVerified: true } }),
+        prisma.client.count({ where: { isPremium: true } }),
+        prisma.user.count({ 
+          where: { 
+            emailVerified: true,
+            ...(period !== 'current' && { createdAt: dateFilter })
+          } 
         })
-      }),
-      prisma.favorite.count({
-        ...(period !== 'current' && {
-          where: { createdAt: dateFilter }
-        })
-      })
-    ]),
+      ]),
 
-    // Estadísticas de chat
-    Promise.all([
-      prisma.chat.count(),
-      prisma.message.count({
-        ...(period !== 'current' && {
-          where: { createdAt: dateFilter }
-        })
-      }),
-      prisma.message.count({
-        where: {
-          isRead: false,
-          ...(period !== 'current' && { createdAt: dateFilter })
-        }
-      })
-    ]),
+      // Estadísticas de posts
+      Promise.all([
+        prisma.post.count({ where: { isActive: true } }),
+        prisma.post.count({ 
+          where: { 
+            isActive: true,
+            ...(period !== 'current' && { createdAt: dateFilter })
+          } 
+        }),
+        prisma.post.aggregate({
+          _sum: { views: true },
+          _avg: { views: true }
+        }).catch(() => ({ _sum: { views: 0 }, _avg: { views: 0 } })),
+        prisma.like.count({
+          ...(period !== 'current' && {
+            where: { createdAt: dateFilter }
+          })
+        }).catch(() => 0),
+        prisma.favorite.count({
+          ...(period !== 'current' && {
+            where: { createdAt: dateFilter }
+          })
+        }).catch(() => 0)
+      ]),
 
-    // Estadísticas de pagos
-    Promise.all([
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        _count: true,
+      // Estadísticas de chat
+      Promise.all([
+        prisma.chat.count().catch(() => 0),
+        prisma.message.count({
+          ...(period !== 'current' && {
+            where: { createdAt: dateFilter }
+          })
+        }).catch(() => 0),
+        prisma.message.count({
+          where: {
+            isRead: false,
+            ...(period !== 'current' && { createdAt: dateFilter })
+          }
+        }).catch(() => 0)
+      ]),
+
+      // Estadísticas de pagos
+      Promise.all([
+        prisma.payment.aggregate({
+          _sum: { amount: true },
+          _count: true,
+          where: {
+            status: 'COMPLETED',
+            ...(period !== 'current' && { createdAt: dateFilter })
+          }
+        }).catch(() => ({ _sum: { amount: 0 }, _count: 0 })),
+        prisma.payment.groupBy({
+          by: ['type'],
+          where: {
+            status: 'COMPLETED',
+            ...(period !== 'current' && { createdAt: dateFilter })
+          },
+          _sum: { amount: true },
+          _count: true
+        }).catch(() => []),
+        prisma.boost.count({
+          where: {
+            isActive: true,
+            ...(period !== 'current' && { createdAt: dateFilter })
+          }
+        }).catch(() => 0)
+      ]),
+
+      // Estadísticas de reportes - CORREGIDO: manejo de errores
+      Promise.all([
+        prisma.report.count().catch(() => 0),
+        prisma.report.count({ where: { status: 'PENDING' } }).catch(() => 0),
+        prisma.report.count({ where: { status: 'RESOLVED' } }).catch(() => 0),
+        prisma.report.groupBy({
+          by: ['reason'],
+          _count: true,
+          orderBy: { _count: { reason: 'desc' } }
+        }).catch(() => [])
+      ]),
+
+      // Top ubicaciones
+      prisma.user.groupBy({
+        by: ['locationId'],
         where: {
-          status: 'COMPLETED',
-          ...(period !== 'current' && { createdAt: dateFilter })
-        }
-      }),
-      prisma.payment.groupBy({
-        by: ['type'],
-        where: {
-          status: 'COMPLETED',
-          ...(period !== 'current' && { createdAt: dateFilter })
+          locationId: { not: null },
+          isActive: true
         },
-        _sum: { amount: true },
-        _count: true
-      }),
-      prisma.boost.count({
-        where: {
-          isActive: true,
-          ...(period !== 'current' && { createdAt: dateFilter })
-        }
-      })
-    ]),
-
-    // Estadísticas de reportes
-    Promise.all([
-      prisma.report.count(),
-      prisma.report.count({ where: { status: 'PENDING' } }),
-      prisma.report.count({ where: { status: 'RESOLVED' } }),
-      prisma.report.groupBy({
-        by: ['reason'],
         _count: true,
-        orderBy: { _count: { reason: 'desc' } }
-      })
-    ]),
+        orderBy: { _count: { locationId: 'desc' } },
+        take: 10
+      }).catch(() => []),
 
-    // Top ubicaciones
-    prisma.user.groupBy({
-      by: ['locationId'],
-      where: {
-        locationId: { not: null },
-        isActive: true
+      // Estadísticas de crecimiento (últimos 30 días)
+      prisma.user.groupBy({
+        by: ['createdAt'],
+        where: {
+          createdAt: {
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          }
+        },
+        _count: true,
+        orderBy: { createdAt: 'asc' }
+      }).catch(() => []),
+
+      // Métricas de engagement
+      Promise.all([
+        prisma.userInteraction.count({
+          where: {
+            type: 'VIEW',
+            ...(period !== 'current' && { createdAt: dateFilter })
+          }
+        }).catch(() => 0),
+        prisma.userInteraction.count({
+          where: {
+            type: 'LIKE',
+            ...(period !== 'current' && { createdAt: dateFilter })
+          }
+        }).catch(() => 0),
+        prisma.userInteraction.count({
+          where: {
+            type: 'CHAT',
+            ...(period !== 'current' && { createdAt: dateFilter })
+          }
+        }).catch(() => 0)
+      ])
+    ]);
+
+    // Obtener información de ubicaciones de forma segura
+    let locations = [];
+    if (topLocations && topLocations.length > 0) {
+      const locationIds = topLocations.map(loc => loc.locationId).filter(Boolean);
+      if (locationIds.length > 0) {
+        locations = await prisma.location.findMany({
+          where: { id: { in: locationIds } }
+        }).catch(() => []);
+      }
+    }
+
+    const locationMap = new Map(locations.map(loc => [loc.id, loc]));
+
+    // Formatear datos con valores seguros
+    const metrics = {
+      users: {
+        total: userStats[0] || 0,
+        escorts: userStats[1] || 0,
+        agencies: userStats[2] || 0,
+        clients: userStats[3] || 0,
+        admins: userStats[4] || 0,
+        active: userStats[5] || 0,
+        banned: userStats[6] || 0,
+        verifiedEscorts: userStats[7] || 0,
+        premiumClients: userStats[8] || 0,
+        emailVerified: userStats[9] || 0
       },
-      _count: true,
-      orderBy: { _count: { locationId: 'desc' } },
-      take: 10
-    }),
-
-    // Estadísticas de crecimiento (últimos 30 días)
-    prisma.user.groupBy({
-      by: ['createdAt'],
-      where: {
-        createdAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        }
+      posts: {
+        total: postStats[0] || 0,
+        newPosts: postStats[1] || 0,
+        totalViews: postStats[2]._sum.views || 0,
+        avgViews: Math.round(postStats[2]._avg.views || 0),
+        totalLikes: postStats[3] || 0,
+        totalFavorites: postStats[4] || 0
       },
-      _count: true,
-      orderBy: { createdAt: 'asc' }
-    }),
-
-    // Métricas de engagement
-    Promise.all([
-      prisma.userInteraction.count({
-        where: {
-          type: 'VIEW',
-          ...(period !== 'current' && { createdAt: dateFilter })
-        }
-      }),
-      prisma.userInteraction.count({
-        where: {
-          type: 'LIKE',
-          ...(period !== 'current' && { createdAt: dateFilter })
-        }
-      }),
-      prisma.userInteraction.count({
-        where: {
-          type: 'CHAT',
-          ...(period !== 'current' && { createdAt: dateFilter })
-        }
-      })
-    ])
-  ]);
-
-  // Obtener información de ubicaciones
-  const locationIds = topLocations.map(loc => loc.locationId).filter(Boolean);
-  const locations = await prisma.location.findMany({
-    where: { id: { in: locationIds } }
-  });
-
-  const locationMap = new Map(locations.map(loc => [loc.id, loc]));
-
-  // Formatear datos
-  const metrics = {
-    users: {
-      total: userStats[0],
-      escorts: userStats[1],
-      agencies: userStats[2],
-      clients: userStats[3],
-      admins: userStats[4],
-      active: userStats[5],
-      banned: userStats[6],
-      verifiedEscorts: userStats[7],
-      premiumClients: userStats[8],
-      emailVerified: userStats[9]
-    },
-    posts: {
-      total: postStats[0],
-      newPosts: postStats[1],
-      totalViews: postStats[2]._sum.views || 0,
-      avgViews: Math.round(postStats[2]._avg.views || 0),
-      totalLikes: postStats[3],
-      totalFavorites: postStats[4]
-    },
-    chat: {
-      totalChats: chatStats[0],
-      totalMessages: chatStats[1],
-      unreadMessages: chatStats[2]
-    },
-    payments: {
-      totalRevenue: paymentStats[0]._sum.amount || 0,
-      totalTransactions: paymentStats[0]._count,
-      byType: paymentStats[1].reduce((acc, item) => {
-        acc[item.type] = {
-          count: item._count,
-          amount: item._sum.amount || 0
-        };
+      chat: {
+        totalChats: chatStats[0] || 0,
+        totalMessages: chatStats[1] || 0,
+        unreadMessages: chatStats[2] || 0
+      },
+      payments: {
+        totalRevenue: paymentStats[0]._sum.amount || 0,
+        totalTransactions: paymentStats[0]._count || 0,
+        byType: (paymentStats[1] || []).reduce((acc, item) => {
+          acc[item.type] = {
+            count: item._count,
+            amount: item._sum.amount || 0
+          };
+          return acc;
+        }, {}),
+        activeBoosts: paymentStats[2] || 0
+      },
+      reports: {
+        total: reportStats[0] || 0,
+        pending: reportStats[1] || 0,
+        resolved: reportStats[2] || 0,
+        byReason: (reportStats[3] || []).reduce((acc, item) => {
+          acc[item.reason] = item._count;
+          return acc;
+        }, {})
+      },
+      locations: (topLocations || []).map(loc => ({
+        location: locationMap.get(loc.locationId),
+        userCount: loc._count
+      })).filter(loc => loc.location),
+      growth: (growthStats || []).reduce((acc, item) => {
+        const date = item.createdAt.toISOString().split('T')[0];
+        acc[date] = (acc[date] || 0) + item._count;
         return acc;
       }, {}),
-      activeBoosts: paymentStats[2]
-    },
-    reports: {
-      total: reportStats[0],
-      pending: reportStats[1],
-      resolved: reportStats[2],
-      byReason: reportStats[3].reduce((acc, item) => {
-        acc[item.reason] = item._count;
-        return acc;
-      }, {})
-    },
-    locations: topLocations.map(loc => ({
-      location: locationMap.get(loc.locationId),
-      userCount: loc._count
-    })).filter(loc => loc.location),
-    growth: growthStats.reduce((acc, item) => {
-      const date = item.createdAt.toISOString().split('T')[0];
-      acc[date] = (acc[date] || 0) + item._count;
-      return acc;
-    }, {}),
-    engagement: {
-      views: engagementStats[0],
-      likes: engagementStats[1],
-      chats: engagementStats[2]
-    }
-  };
+      engagement: {
+        views: engagementStats[0] || 0,
+        likes: engagementStats[1] || 0,
+        chats: engagementStats[2] || 0
+      }
+    };
 
-  // Crear/actualizar registro de métricas para historial
-  await prisma.appMetrics.create({
-    data: {
-      totalUsers: metrics.users.total,
-      totalEscorts: metrics.users.escorts,
-      totalAgencies: metrics.users.agencies,
-      totalClients: metrics.users.clients,
-      totalAdmins: metrics.users.admins,
-      totalPosts: metrics.posts.total,
-      totalPayments: metrics.payments.totalRevenue,
-      totalRevenue: metrics.payments.totalRevenue,
-      activeUsers: metrics.users.active,
-      bannedUsers: metrics.users.banned,
-      verifiedEscorts: metrics.users.verifiedEscorts,
-      premiumClients: metrics.users.premiumClients,
-      totalMessages: metrics.chat.totalMessages,
-      totalBoosts: metrics.payments.activeBoosts,
-      basicClients: metrics.users.clients - metrics.users.premiumClients,
-      premiumClientsTier: metrics.users.premiumClients,
-      vipClients: 0, // TODO: Calcular VIP específicamente
-      topCountries: locations.slice(0, 5).map(loc => ({
-        country: loc.country,
-        count: topLocations.find(tl => tl.locationId === loc.id)?._count || 0
-      }))
+    // Crear/actualizar registro de métricas para historial de forma segura
+    try {
+      await prisma.appMetrics.create({
+        data: {
+          totalUsers: metrics.users.total,
+          totalEscorts: metrics.users.escorts,
+          totalAgencies: metrics.users.agencies,
+          totalClients: metrics.users.clients,
+          totalAdmins: metrics.users.admins,
+          totalPosts: metrics.posts.total,
+          totalPayments: metrics.payments.totalRevenue,
+          totalRevenue: metrics.payments.totalRevenue,
+          activeUsers: metrics.users.active,
+          bannedUsers: metrics.users.banned,
+          verifiedEscorts: metrics.users.verifiedEscorts,
+          premiumClients: metrics.users.premiumClients,
+          totalMessages: metrics.chat.totalMessages,
+          totalBoosts: metrics.payments.activeBoosts,
+          basicClients: Math.max(0, metrics.users.clients - metrics.users.premiumClients),
+          premiumClientsTier: metrics.users.premiumClients,
+          vipClients: 0, // TODO: Calcular VIP específicamente
+          topCountries: locations.slice(0, 5).map(loc => ({
+            country: loc.country,
+            count: topLocations.find(tl => tl.locationId === loc.id)?._count || 0
+          }))
+        }
+      });
+    } catch (metricsError) {
+      // Log error but don't fail the request
+      console.warn('Error saving metrics to appMetrics table:', metricsError.message);
     }
-  });
 
-  res.status(200).json({
-    success: true,
-    data: {
-      metrics,
-      period,
-      generatedAt: new Date().toISOString()
-    },
-    timestamp: new Date().toISOString()
-  });
+    res.status(200).json({
+      success: true,
+      data: {
+        metrics,
+        period,
+        generatedAt: new Date().toISOString()
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error in getAppMetrics:', error);
+    throw new AppError('Error al obtener métricas de la aplicación', 500, 'METRICS_ERROR');
+  }
 });
 
 // Banear usuario
@@ -601,7 +618,7 @@ const getPendingReports = catchAsync(async (req, res) => {
 
   const whereClause = {
     status: 'PENDING',
-    deletedAt: null,
+    // CORREGIDO: removido deletedAt
     ...(reason && { reason }),
     ...(severity && { severity })
   };

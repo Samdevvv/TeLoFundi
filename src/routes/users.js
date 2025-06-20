@@ -1,8 +1,10 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 
-// Middleware de autenticación y validación
+// ✅ MIDDLEWARES DE AUTENTICACIÓN
 const { 
+  authenticate,
   requireUserType, 
   requireOwnership, 
   checkClientLimits 
@@ -11,19 +13,8 @@ const {
   validateUpdateProfile, 
   validatePagination 
 } = require('../middleware/validation');
-const { uploadLimiter } = require('../middleware/rateLimiter');
 
-// NUEVOS MIDDLEWARES DE UPLOAD INTEGRADOS CON CLOUDINARY
-const {
-  uploadAvatar,
-  processAndUploadToCloud,
-  validateFileTypes,
-  cleanFileMetadata,
-  addUploadInfo,
-  handleMulterError
-} = require('../middleware/upload');
-
-// Controllers - NOMBRES CORREGIDOS
+// Controllers
 const {
   getUserProfile,
   updateUserProfile,
@@ -41,8 +32,95 @@ const {
   getUserSettings,
   deleteUserAccount,
   reportUser,
-  getCloudinaryStats // NUEVO: Para admins
+  getCloudinaryStats
 } = require('../controllers/userController');
+
+// ✅ CONFIGURACIÓN DIRECTA DE MULTER PARA AVATARS
+const storage = multer.memoryStorage();
+
+const fileFilter = (req, file, cb) => {
+  console.log('🔍 AVATAR File filter - Processing file:', {
+    fieldname: file.fieldname,
+    originalname: file.originalname,
+    mimetype: file.mimetype
+  });
+
+  // Tipos de archivo permitidos para avatars
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}`), false);
+  }
+};
+
+// ✅ MULTER PARA AVATARS (una sola imagen)
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 3 * 1024 * 1024, // 3MB para avatars
+    files: 1 // Máximo 1 imagen
+  }
+});
+
+const uploadAvatar = upload.single('avatar');
+
+// ✅ MIDDLEWARE DE DEBUG PARA AVATARS
+const debugAvatar = (req, res, next) => {
+  console.log('🔍 === AVATAR DEBUG ===');
+  console.log('🔍 URL:', req.originalUrl);
+  console.log('🔍 Method:', req.method);
+  console.log('🔍 Content-Type:', req.get('content-type'));
+  console.log('🔍 Content-Length:', req.get('content-length'));
+  next();
+};
+
+// ✅ MIDDLEWARE PARA PROCESAR AVATAR EN CLOUDINARY
+const processAvatarCloudinary = async (req, res, next) => {
+  try {
+    console.log('☁️ Processing avatar upload to Cloudinary...');
+    console.log('☁️ File received by multer:', !!req.file);
+
+    if (!req.file) {
+      console.log('ℹ️ No file to upload to Cloudinary');
+      return next();
+    }
+
+    // Importar servicio de upload
+    const { uploadToCloudinary } = require('../services/uploadService');
+
+    const cloudinaryOptions = {
+      folder: 'telofundi/avatars',
+      type: 'avatar',
+      userId: req.user?.id,
+      generateVariations: true
+    };
+
+    console.log('📤 Uploading avatar to Cloudinary...', {
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      userId: req.user?.id
+    });
+
+    const uploadResult = await uploadToCloudinary(req.file, cloudinaryOptions);
+    
+    req.uploadedFile = uploadResult;
+
+    console.log('✅ Avatar uploaded to Cloudinary successfully:', {
+      url: uploadResult.secure_url,
+      publicId: uploadResult.public_id
+    });
+
+    next();
+
+  } catch (error) {
+    console.error('❌ Avatar Cloudinary upload error:', error);
+    req.uploadError = error.message;
+    next(); // Continuar sin bloquear
+  }
+};
 
 /**
  * @swagger
@@ -110,82 +188,7 @@ const {
  *         client:
  *           type: object
  *           nullable: true
- *     
- *     UpdateProfileRequest:
- *       type: object
- *       properties:
- *         firstName:
- *           type: string
- *           minLength: 2
- *           maxLength: 50
- *           example: "Juan"
- *         lastName:
- *           type: string
- *           minLength: 2
- *           maxLength: 50
- *           example: "Pérez"
- *         bio:
- *           type: string
- *           maxLength: 500
- *           example: "Mi nueva biografía"
- *         phone:
- *           type: string
- *           example: "+1234567890"
- *         website:
- *           type: string
- *           format: uri
- *           example: "https://miwebsite.com"
- *         locationId:
- *           type: string
- *           example: "cm123location456"
- *         age:
- *           type: integer
- *           minimum: 18
- *           maximum: 80
- *           example: 25
- *         services:
- *           type: array
- *           items:
- *             type: string
- *           maxItems: 10
- *           example: ["Masajes", "Compañía"]
- *         rates:
- *           type: object
- *           example: {"1h": 100, "2h": 180}
- *         languages:
- *           type: array
- *           items:
- *             type: string
- *           maxItems: 10
- *           example: ["Español", "Inglés"]
- *
- *     CloudinaryUploadResponse:
- *       type: object
- *       properties:
- *         url:
- *           type: string
- *           example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/avatar.webp"
- *         publicId:
- *           type: string
- *           example: "telofundi/avatars/avatar_user123_1234567890_abc123"
- *         size:
- *           type: integer
- *           example: 245760
- *         format:
- *           type: string
- *           example: "webp"
- *         width:
- *           type: integer
- *           example: 400
- *         height:
- *           type: integer
- *           example: 400
- *         optimized:
- *           type: boolean
- *           example: true
  */
-
-
 
 /**
  * @swagger
@@ -211,7 +214,7 @@ const {
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/profile', getUserProfile);
+router.get('/profile', authenticate, getUserProfile);
 
 /**
  * @swagger
@@ -226,29 +229,49 @@ router.get('/profile', getUserProfile);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UpdateProfileRequest'
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
+ *                 example: "Juan"
+ *               lastName:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
+ *                 example: "Pérez"
+ *               bio:
+ *                 type: string
+ *                 maxLength: 500
+ *                 example: "Mi nueva biografía"
+ *               phone:
+ *                 type: string
+ *                 example: "+1234567890"
+ *               website:
+ *                 type: string
+ *                 format: uri
+ *                 example: "https://miwebsite.com"
+ *               age:
+ *                 type: integer
+ *                 minimum: 18
+ *                 maximum: 80
+ *                 example: 25
+ *               services:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 maxItems: 10
+ *                 example: ["Masajes", "Compañía"]
  *     responses:
  *       200:
  *         description: Perfil actualizado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Perfil actualizado exitosamente"
- *                 data:
- *                   $ref: '#/components/schemas/UserProfile'
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.put('/profile', validateUpdateProfile, updateUserProfile);
+router.put('/profile', authenticate, validateUpdateProfile, updateUserProfile);
 
 /**
  * @swagger
@@ -274,73 +297,8 @@ router.put('/profile', validateUpdateProfile, updateUserProfile);
  *     responses:
  *       200:
  *         description: Foto de perfil subida exitosamente a Cloudinary
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Foto de perfil actualizada"
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         avatar:
- *                           type: string
- *                           example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/avatars/avatar_user123_1234567890_abc123.webp"
- *                         firstName:
- *                           type: string
- *                         lastName:
- *                           type: string
- *                         userType:
- *                           type: string
- *                     avatar:
- *                       type: string
- *                       example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/avatars/avatar_user123_1234567890_abc123.webp"
- *                     cloudinary:
- *                       type: object
- *                       properties:
- *                         public_id:
- *                           type: string
- *                           example: "telofundi/avatars/avatar_user123_1234567890_abc123"
- *                         format:
- *                           type: string
- *                           example: "webp"
- *                         width:
- *                           type: integer
- *                           example: 400
- *                         height:
- *                           type: integer
- *                           example: 400
- *                         bytes:
- *                           type: integer
- *                           example: 245760
- *                 uploadedFile:
- *                   $ref: '#/components/schemas/CloudinaryUploadResponse'
  *       400:
  *         description: Error en el archivo o límites excedidos
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Archivo demasiado grande. Máximo permitido: 3MB"
- *                 errorCode:
- *                   type: string
- *                   example: "FILE_TOO_LARGE"
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       429:
@@ -348,14 +306,13 @@ router.put('/profile', validateUpdateProfile, updateUserProfile);
  *       500:
  *         description: Error subiendo a Cloudinary
  */
+// ✅ RUTA DE UPLOAD DE AVATAR CORREGIDA
 router.post('/profile/picture', 
-  uploadLimiter,
-  uploadAvatar,
-  validateFileTypes(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']),
-  processAndUploadToCloud,
-  cleanFileMetadata,
-  addUploadInfo,
-  uploadProfilePicture
+  debugAvatar,              // Debug
+  authenticate,             // Autenticación
+  uploadAvatar,             // Multer - procesar archivo
+  processAvatarCloudinary,  // Cloudinary - subir archivo
+  uploadProfilePicture      // Controller
 );
 
 /**
@@ -369,21 +326,10 @@ router.post('/profile/picture',
  *     responses:
  *       200:
  *         description: Foto de perfil eliminada de la base de datos y Cloudinary
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Foto de perfil eliminada exitosamente"
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.delete('/profile/picture', deleteProfilePicture);
+router.delete('/profile/picture', authenticate, deleteProfilePicture);
 
 /**
  * @swagger
@@ -438,14 +384,10 @@ router.delete('/profile/picture', deleteProfilePicture);
  *     responses:
  *       200:
  *         description: Resultados de búsqueda
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/search', validatePagination, searchUsers);
+router.get('/search', authenticate, validatePagination, searchUsers);
 
 /**
  * @swagger
@@ -470,14 +412,10 @@ router.get('/search', validatePagination, searchUsers);
  *     responses:
  *       200:
  *         description: Usuarios recomendados
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/discover', validatePagination, getDiscoverUsers);
+router.get('/discover', authenticate, validatePagination, getDiscoverUsers);
 
 /**
  * @swagger
@@ -502,14 +440,10 @@ router.get('/discover', validatePagination, getDiscoverUsers);
  *     responses:
  *       200:
  *         description: Usuarios en tendencia
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/trending', validatePagination, getTrendingUsers);
+router.get('/trending', authenticate, validatePagination, getTrendingUsers);
 
 /**
  * @swagger
@@ -522,36 +456,10 @@ router.get('/trending', validatePagination, getTrendingUsers);
  *     responses:
  *       200:
  *         description: Estadísticas del usuario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     profileViews:
- *                       type: integer
- *                       example: 150
- *                     totalPosts:
- *                       type: integer
- *                       example: 5
- *                     totalLikes:
- *                       type: integer
- *                       example: 25
- *                     totalFavorites:
- *                       type: integer
- *                       example: 10
- *                     totalMessages:
- *                       type: integer
- *                       example: 45
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/stats', getUserStats);
+router.get('/stats', authenticate, getUserStats);
 
 /**
  * @swagger
@@ -576,14 +484,10 @@ router.get('/stats', getUserStats);
  *     responses:
  *       200:
  *         description: Lista de usuarios bloqueados
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/blocked', validatePagination, getBlockedUsers);
+router.get('/blocked', authenticate, validatePagination, getBlockedUsers);
 
 /**
  * @swagger
@@ -596,33 +500,10 @@ router.get('/blocked', validatePagination, getBlockedUsers);
  *     responses:
  *       200:
  *         description: Configuraciones del usuario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     emailNotifications:
- *                       type: boolean
- *                       example: true
- *                     pushNotifications:
- *                       type: boolean
- *                       example: true
- *                     showOnline:
- *                       type: boolean
- *                       example: true
- *                     showInDiscovery:
- *                       type: boolean
- *                       example: true
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/settings', getUserSettings);
+router.get('/settings', authenticate, getUserSettings);
 
 /**
  * @swagger
@@ -645,37 +526,12 @@ router.get('/settings', getUserSettings);
  *               pushNotifications:
  *                 type: boolean
  *                 example: true
- *               messageNotifications:
- *                 type: boolean
- *                 example: true
- *               likeNotifications:
- *                 type: boolean
- *                 example: true
  *               showOnline:
  *                 type: boolean
  *                 example: true
- *               showLastSeen:
- *                 type: boolean
- *                 example: true
- *               allowDirectMessages:
- *                 type: boolean
- *                 example: true
- *               showPhoneNumber:
- *                 type: boolean
- *                 example: false
  *               showInDiscovery:
  *                 type: boolean
  *                 example: true
- *               showInTrending:
- *                 type: boolean
- *                 example: true
- *               showInSearch:
- *                 type: boolean
- *                 example: true
- *               contentFilter:
- *                 type: string
- *                 enum: [NONE, MODERATE, STRICT]
- *                 example: "MODERATE"
  *     responses:
  *       200:
  *         description: Configuraciones actualizadas
@@ -684,7 +540,7 @@ router.get('/settings', getUserSettings);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.put('/settings', updateUserSettings);
+router.put('/settings', authenticate, updateUserSettings);
 
 /**
  * @swagger
@@ -697,41 +553,6 @@ router.put('/settings', updateUserSettings);
  *     responses:
  *       200:
  *         description: Estadísticas de Cloudinary
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     plan:
- *                       type: string
- *                       example: "cloudinary-plus"
- *                     credits:
- *                       type: object
- *                       properties:
- *                         used:
- *                           type: integer
- *                         limit:
- *                           type: integer
- *                     storage:
- *                       type: object
- *                       properties:
- *                         used:
- *                           type: integer
- *                         limit:
- *                           type: integer
- *                     bandwidth:
- *                       type: object
- *                       properties:
- *                         used:
- *                           type: integer
- *                         limit:
- *                           type: integer
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
@@ -757,22 +578,12 @@ router.get('/cloudinary/stats', requireUserType(['ADMIN']), getCloudinaryStats);
  *     responses:
  *       200:
  *         description: Perfil público del usuario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/UserProfile'
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/:userId', checkClientLimits, getUserById);
+router.get('/:userId', authenticate, checkClientLimits, getUserById);
 
 /**
  * @swagger
@@ -809,7 +620,7 @@ router.get('/:userId', checkClientLimits, getUserById);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.post('/:userId/block', blockUser);
+router.post('/:userId/block', authenticate, blockUser);
 
 /**
  * @swagger
@@ -834,7 +645,7 @@ router.post('/:userId/block', blockUser);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.delete('/:userId/unblock', unblockUser);
+router.delete('/:userId/unblock', authenticate, unblockUser);
 
 /**
  * @swagger
@@ -883,7 +694,7 @@ router.delete('/:userId/unblock', unblockUser);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.post('/:userId/report', reportUser);
+router.post('/:userId/report', authenticate, reportUser);
 
 /**
  * @swagger
@@ -917,9 +728,64 @@ router.post('/:userId/report', reportUser);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.delete('/account', deleteUserAccount);
+router.delete('/account', authenticate, deleteUserAccount);
 
-// TEST CLOUDINARY PÚBLICO - REEMPLAZA EL CÓDIGO ANTERIOR
+// ✅ MIDDLEWARE DE MANEJO DE ERRORES DE MULTER PARA AVATARS
+router.use((error, req, res, next) => {
+  console.error('🔥 Users route error:', error);
+
+  if (error instanceof multer.MulterError) {
+    switch (error.code) {
+      case 'LIMIT_FILE_SIZE':
+        return res.status(400).json({
+          success: false,
+          message: 'Archivo muy grande',
+          errorCode: 'FILE_TOO_LARGE',
+          details: 'Máximo 3MB para avatars'
+        });
+
+      case 'LIMIT_FILE_COUNT':
+        return res.status(400).json({
+          success: false,
+          message: 'Demasiados archivos',
+          errorCode: 'TOO_MANY_FILES',
+          details: 'Solo se permite 1 archivo para avatar'
+        });
+
+      case 'LIMIT_UNEXPECTED_FILE':
+        return res.status(400).json({
+          success: false,
+          message: 'Campo de archivo inesperado',
+          errorCode: 'UNEXPECTED_FILE_FIELD',
+          details: `Campo esperado: avatar, recibido: ${error.field}`
+        });
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Error de upload',
+          errorCode: 'UPLOAD_ERROR',
+          details: error.message
+        });
+    }
+  }
+
+  // Error de filtro de archivos
+  if (error.message.includes('Tipo de archivo no permitido')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Tipo de archivo no permitido',
+      errorCode: 'INVALID_FILE_TYPE',
+      details: 'Solo se permiten imágenes (JPG, PNG, GIF, WebP) para avatars',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    });
+  }
+
+  // Otros errores
+  next(error);
+});
+
+// TEST CLOUDINARY PÚBLICO - SIN AUTENTICACIÓN (por eso está al final)
 router.get('/test/cloudinary-public', async (req, res) => {
   try {
     const cloudinary = require('cloudinary').v2;
@@ -942,4 +808,7 @@ router.get('/test/cloudinary-public', async (req, res) => {
     });
   }
 });
+
+console.log('✅ Users routes configured with DIRECT MULTER implementation');
+
 module.exports = router;

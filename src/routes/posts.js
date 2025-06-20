@@ -1,46 +1,169 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 
-// Middleware de autenticación y validación
-const { 
-  requireEscortOrAgency, 
-  requireOwnership,
-  optionalAuth 
-} = require('../middleware/auth');
-const { 
-  validateCreatePost, 
-  validateUpdatePost, 
-  validatePagination 
-} = require('../middleware/validation');
-const { 
-  postLimiter, 
-  uploadLimiter, 
-  searchLimiter 
-} = require('../middleware/rateLimiter');
+// Middlewares
+const { authenticate } = require('../middleware/auth');
+const { validateUser } = require('../middleware/validation');
 
-// MIDDLEWARES DE UPLOAD INTEGRADOS CON CLOUDINARY
-const {
-  uploadPostImages,
-  processAndUploadToCloud,
-  validateFileTypes,
-  cleanFileMetadata,
-  addUploadInfo,
-  handleMulterError
-} = require('../middleware/upload');
-
-// Controllers - NOMBRES CORREGIDOS PARA COINCIDIR CON EL CONTROLADOR
+// Controllers
 const {
   createPost,
-  getFeed,              // Era getAllPosts
+  getFeed,
+  getTrendingPosts,
+  getDiscoveryPosts,
   getPostById,
   updatePost,
   deletePost,
-  likePost,             // Unificado (era likePost y unlikePost)
-  toggleFavorite,       // Era addToFavorites y removeFromFavorites
-  getMyPosts,           // Era getUserFavorites y getUserLikes  
-  getTrendingPosts,
-  getDiscoveryPosts     // Era getDiscoverPosts
+  likePost,
+  toggleFavorite,
+  getMyPosts
 } = require('../controllers/postController');
+
+// ✅ CONFIGURACIÓN DIRECTA DE MULTER - SIN ARCHIVOS EXTERNOS
+const storage = multer.memoryStorage();
+
+const fileFilter = (req, file, cb) => {
+  console.log('🔍 MULTER File filter - Processing file:', {
+    fieldname: file.fieldname,
+    originalname: file.originalname,
+    mimetype: file.mimetype
+  });
+
+  // Tipos de archivo permitidos
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}`), false);
+  }
+};
+
+// ✅ MULTER PARA POSTS (múltiples imágenes)
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 8 * 1024 * 1024, // 8MB por imagen
+    files: 5 // Máximo 5 imágenes
+  }
+});
+
+const uploadPostImages = upload.array('images', 5);
+
+// ✅ MIDDLEWARE DE DEBUG MEJORADO
+const debugMulter = (req, res, next) => {
+  console.log('🔍 === MULTER DEBUG START ===');
+  console.log('🔍 URL:', req.originalUrl);
+  console.log('🔍 Method:', req.method);
+  console.log('🔍 Content-Type:', req.get('content-type'));
+  console.log('🔍 Content-Length:', req.get('content-length'));
+  
+  // Debug del body antes de multer
+  console.log('🔍 Body status:', {
+    hasBody: !!req.body,
+    bodyKeys: Object.keys(req.body || {}),
+    bodyType: typeof req.body,
+    isEmpty: Object.keys(req.body || {}).length === 0,
+    bodyContent: req.body
+  });
+
+  // Debug de headers importantes
+  console.log('🔍 Headers:', {
+    authorization: req.get('authorization') ? 'Present' : 'Missing',
+    contentType: req.get('content-type'),
+    contentLength: req.get('content-length'),
+    userAgent: req.get('user-agent'),
+    host: req.get('host')
+  });
+
+  // Debug de query parameters
+  console.log('🔍 Query params:', req.query);
+
+  // Debug de parámetros de ruta
+  console.log('🔍 Route params:', req.params);
+
+  // Debug del usuario autenticado (si existe)
+  console.log('🔍 User info:', {
+    hasUser: !!req.user,
+    userId: req.user?.id,
+    username: req.user?.username,
+    isValidated: req.user?.isValidated
+  });
+
+  // Debug de archivos antes de multer (normalmente vacío)
+  console.log('🔍 Files before multer:', {
+    hasFiles: !!req.files,
+    filesCount: req.files?.length || 0,
+    hasFile: !!req.file
+  });
+
+  // Debug de la IP y otros datos de la request
+  console.log('🔍 Request info:', {
+    ip: req.ip,
+    ips: req.ips,
+    protocol: req.protocol,
+    secure: req.secure,
+    xhr: req.xhr
+  });
+
+  console.log('🔍 === MULTER DEBUG END ===');
+  next();
+};
+
+// ✅ MIDDLEWARE PARA PROCESAR CLOUDINARY DESPUÉS DE MULTER - FIXED
+const processCloudinary = async (req, res, next) => {
+  try {
+    console.log('☁️ Processing Cloudinary upload...');
+    console.log('☁️ Files received by multer:', req.files?.length || 0);
+
+    if (!req.files || req.files.length === 0) {
+      console.log('ℹ️ No files to upload to Cloudinary');
+      return next();
+    }
+
+    const { uploadMultipleToCloudinary } = require('../services/uploadService');
+
+    // ✅ OPCIONES CORREGIDAS SIN 'type'
+    const cloudinaryOptions = {
+      folder: 'telofundi/posts',
+      userId: req.user?.id,
+      generateVariations: true,
+      // ✅ REMOVIDO: type: 'post' (esto causaba el error)
+      // ✅ OPCIONALES: Agregar solo opciones válidas de Cloudinary
+      tags: ['post', 'telofundi'],
+      context: { userId: req.user?.id }
+    };
+
+    console.log('📤 Uploading to Cloudinary...', {
+      filesCount: req.files.length,
+      userId: req.user?.id,
+      folder: cloudinaryOptions.folder
+    });
+
+    const uploadResult = await uploadMultipleToCloudinary(req.files, cloudinaryOptions);
+    
+    if (uploadResult.totalUploaded === 0) {
+      throw new Error('No se pudo subir ningún archivo a Cloudinary');
+    }
+
+    req.uploadedFiles = uploadResult.successful;
+    req.failedUploads = uploadResult.failed;
+
+    console.log('✅ Cloudinary upload completed:', {
+      successful: uploadResult.totalUploaded,
+      failed: uploadResult.totalFailed
+    });
+
+    next();
+
+  } catch (error) {
+    console.error('❌ Cloudinary upload error:', error);
+    req.uploadError = error.message;
+    next(); // Continuar sin bloquear
+  }
+};
 
 /**
  * @swagger
@@ -51,229 +174,69 @@ const {
  *       properties:
  *         id:
  *           type: string
- *           example: "cm123post456"
+ *           example: "cm123abc456"
  *         title:
  *           type: string
- *           example: "Anuncio de ejemplo"
+ *           example: "Servicios de acompañamiento VIP"
  *         description:
  *           type: string
- *           example: "Descripción detallada del anuncio"
+ *           example: "Ofrezco servicios de alta calidad..."
  *         images:
  *           type: array
  *           items:
  *             type: string
- *           example: ["https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/posts/post_user123_1234567890_abc123.webp"]
- *         phone:
- *           type: string
- *           example: "+1234567890"
- *         services:
- *           type: array
- *           items:
- *             type: string
- *           example: ["Masajes", "Compañía"]
- *         rates:
+ *           example: ["https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/posts/post_1.webp"]
+ *         author:
  *           type: object
- *           example: {"1h": 100, "2h": 180}
- *         views:
- *           type: integer
- *           example: 150
+ *           properties:
+ *             id:
+ *               type: string
+ *             username:
+ *               type: string
+ *             avatar:
+ *               type: string
  *         likes:
  *           type: integer
- *           example: 25
- *         isActive:
- *           type: boolean
- *           example: true
- *         isTrending:
- *           type: boolean
- *           example: false
- *         isFeatured:
+ *           example: 15
+ *         views:
+ *           type: integer
+ *           example: 120
+ *         isLiked:
  *           type: boolean
  *           example: false
- *         premiumOnly:
+ *         isFavorited:
  *           type: boolean
  *           example: false
- *         score:
- *           type: number
- *           format: float
- *           example: 85.5
- *         authorId:
- *           type: string
- *           example: "cm123user456"
- *         author:
- *           $ref: '#/components/schemas/User'
- *         location:
- *           type: object
- *           nullable: true
  *         createdAt:
  *           type: string
  *           format: date-time
  *         updatedAt:
  *           type: string
  *           format: date-time
- *         lastBoosted:
- *           type: string
- *           format: date-time
- *           nullable: true
- *         isLiked:
- *           type: boolean
- *           example: false
- *           description: Si el usuario actual ha dado like
- *         isFavorited:
- *           type: boolean
- *           example: false
- *           description: Si está en favoritos del usuario actual
- *     
- *     CreatePostRequest:
- *       type: object
- *       required:
- *         - title
- *         - description
- *         - phone
- *       properties:
- *         title:
- *           type: string
- *           minLength: 5
- *           maxLength: 100
- *           example: "Servicios de masajes relajantes"
- *         description:
- *           type: string
- *           minLength: 10
- *           maxLength: 2000
- *           example: "Ofrezco servicios de masajes relajantes y terapéuticos..."
- *         phone:
- *           type: string
- *           example: "+1234567890"
- *         services:
- *           type: array
- *           items:
- *             type: string
- *           maxItems: 15
- *           example: ["Masajes", "Relajación", "Terapéutico"]
- *         rates:
- *           type: object
- *           example: {"1h": 100, "2h": 180, "overnight": 500}
- *         availability:
- *           type: object
- *           example: {"mon": ["9-17"], "tue": ["10-18"]}
- *         locationId:
- *           type: string
- *           example: "cm123location456"
- *         premiumOnly:
- *           type: boolean
- *           default: false
- *           example: false
- *         tags:
- *           type: array
- *           items:
- *             type: string
- *           maxItems: 10
- *           example: ["masajes", "relajante", "terapeutico"]
- *         removeImages:
- *           type: array
- *           items:
- *             type: string
- *           description: URLs de imágenes a eliminar (solo para actualización)
- *           example: ["https://res.cloudinary.com/old-image.jpg"]
- *
- *     CloudinaryImageResponse:
- *       type: object
- *       properties:
- *         url:
- *           type: string
- *           example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/posts/post_user123_1234567890_abc123.webp"
- *         publicId:
- *           type: string
- *           example: "telofundi/posts/post_user123_1234567890_abc123"
- *         size:
- *           type: integer
- *           example: 456789
- *         format:
- *           type: string
- *           example: "webp"
- *         width:
- *           type: integer
- *           example: 1200
- *         height:
- *           type: integer
- *           example: 900
- *         optimized:
- *           type: boolean
- *           example: true
- *         variations:
- *           type: object
- *           properties:
- *             thumbnail:
- *               type: string
- *             small:
- *               type: string
- *             medium:
- *               type: string
  */
+
+// ✅ RUTAS PÚBLICAS (sin autenticación)
 
 /**
  * @swagger
- * /api/posts:
- *   post:
- *     summary: Crear nuevo post/anuncio con imágenes (Cloudinary)
+ * /api/posts/feed:
+ *   get:
+ *     summary: Obtener feed de posts públicos
  *     tags: [Posts]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - title
- *               - description
- *               - phone
- *             properties:
- *               title:
- *                 type: string
- *                 minLength: 5
- *                 maxLength: 100
- *                 example: "Servicios de masajes relajantes"
- *               description:
- *                 type: string
- *                 minLength: 10
- *                 maxLength: 2000
- *                 example: "Ofrezco servicios de masajes relajantes y terapéuticos..."
- *               phone:
- *                 type: string
- *                 example: "+1234567890"
- *               images:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 maxItems: 5
- *                 description: Hasta 5 imágenes (JPG, PNG, WebP) - Máximo 8MB cada una
- *               services:
- *                 type: string
- *                 description: JSON string array
- *                 example: '["Masajes", "Relajación"]'
- *               rates:
- *                 type: string
- *                 description: JSON string object
- *                 example: '{"1h": 100, "2h": 180}'
- *               availability:
- *                 type: string
- *                 description: JSON string object
- *                 example: '{"mon": ["9-17"], "tue": ["10-18"]}'
- *               locationId:
- *                 type: string
- *                 example: "cm123location456"
- *               premiumOnly:
- *                 type: boolean
- *                 default: false
- *               tags:
- *                 type: string
- *                 description: JSON string array
- *                 example: '["masajes", "relajante"]'
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
  *     responses:
- *       201:
- *         description: Post creado exitosamente con imágenes subidas a Cloudinary
+ *       200:
+ *         description: Feed de posts
  *         content:
  *           application/json:
  *             schema:
@@ -282,75 +245,66 @@ const {
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Anuncio creado exitosamente"
  *                 data:
- *                   $ref: '#/components/schemas/Post'
- *                 uploadedFiles:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/CloudinaryImageResponse'
- *                 uploadStats:
- *                   type: object
- *                   properties:
- *                     totalFiles:
- *                       type: integer
- *                       example: 3
- *                     totalSize:
- *                       type: integer
- *                       example: 1234567
- *                     formats:
- *                       type: array
- *                       items:
- *                         type: string
- *                       example: ["webp", "jpg"]
- *                     hasVariations:
- *                       type: boolean
- *                       example: true
- *       400:
- *         description: Error de validación o archivo
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Has alcanzado el límite de 5 anuncios activos"
- *                 errorCode:
- *                   type: string
- *                   example: "POST_LIMIT_REACHED"
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- *       403:
- *         description: Límite de posts alcanzado o permisos insuficientes
- *       429:
- *         description: Límite de uploads excedido
- *       500:
- *         description: Error subiendo imágenes a Cloudinary
+ *                     $ref: '#/components/schemas/Post'
  */
-router.post('/', 
-  requireEscortOrAgency, 
-  postLimiter,
-  uploadLimiter,
-  uploadPostImages,
-  validateFileTypes(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']),
-  processAndUploadToCloud,
-  cleanFileMetadata,
-  addUploadInfo,
-  validateCreatePost,
-  createPost
-);
+router.get('/feed', getFeed);
 
 /**
  * @swagger
- * /api/posts/feed:
+ * /api/posts/trending:
  *   get:
- *     summary: Obtener feed principal de posts
+ *     summary: Obtener posts en tendencia
+ *     tags: [Posts]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Posts en tendencia
+ */
+router.get('/trending', getTrendingPosts);
+
+/**
+ * @swagger
+ * /api/posts/discover:
+ *   get:
+ *     summary: Obtener posts para descubrir
+ *     tags: [Posts]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Posts para descubrir
+ */
+router.get('/discover', getDiscoveryPosts);
+
+// ✅ RUTAS PROTEGIDAS CON PATHS ESPECÍFICOS (DEBEN IR ANTES DE /:postId)
+
+/**
+ * @swagger
+ * /api/posts/my:
+ *   get:
+ *     summary: Obtener mis posts
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
@@ -365,49 +319,21 @@ router.post('/',
  *         schema:
  *           type: integer
  *           default: 20
- *           maximum: 50
  *       - in: query
- *         name: location
+ *         name: status
  *         schema:
  *           type: string
- *         description: Filtrar por ubicación
- *       - in: query
- *         name: userType
- *         schema:
- *           type: string
- *           enum: [ESCORT, AGENCY]
- *         description: Filtrar por tipo de autor
- *       - in: query
- *         name: services
- *         schema:
- *           type: string
- *         description: Filtrar por servicios
+ *           enum: [active, deleted, all]
+ *           default: active
  *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: [recent, trending, popular, boosted]
+ *           enum: [recent, oldest, popular, likes]
  *           default: recent
- *       - in: query
- *         name: minAge
- *         schema:
- *           type: integer
- *           minimum: 18
- *         description: Edad mínima del autor (escorts)
- *       - in: query
- *         name: maxAge
- *         schema:
- *           type: integer
- *           maximum: 80
- *         description: Edad máxima del autor (escorts)
- *       - in: query
- *         name: verified
- *         schema:
- *           type: boolean
- *         description: Solo autores verificados
  *     responses:
  *       200:
- *         description: Feed de posts con imágenes optimizadas de Cloudinary
+ *         description: Mis posts
  *         content:
  *           application/json:
  *             schema:
@@ -424,155 +350,78 @@ router.post('/',
  *                       items:
  *                         $ref: '#/components/schemas/Post'
  *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *                     filters:
  *                       type: object
- *                       properties:
- *                         location:
- *                           type: string
- *                         userType:
- *                           type: string
- *                         services:
- *                           type: string
- *                         sortBy:
- *                           type: string
+ *                     stats:
+ *                       type: object
  *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *         description: No autorizado
  */
-router.get('/feed', validatePagination, getFeed);
+router.get('/my', authenticate, validateUser, getMyPosts);
 
 /**
  * @swagger
- * /api/posts/discover:
- *   get:
- *     summary: Obtener posts recomendados
+ * /api/posts:
+ *   post:
+ *     summary: Crear nuevo post con imágenes
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *           maximum: 50
- *       - in: query
- *         name: algorithm
- *         schema:
- *           type: string
- *           enum: [mixed, quality, new, popular, personalized]
- *           default: mixed
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 5
+ *                 maxLength: 100
+ *                 example: "Servicios de acompañamiento VIP"
+ *               description:
+ *                 type: string
+ *                 minLength: 10
+ *                 maxLength: 2000
+ *                 example: "Ofrezco servicios de alta calidad para caballeros distinguidos..."
+ *               phone:
+ *                 type: string
+ *                 example: "+1234567890"
+ *               services:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["Masajes", "Compañía", "Cenas"]
+ *               locationId:
+ *                 type: string
+ *                 example: "cm123location"
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Hasta 5 imágenes, máximo 8MB cada una
+ *             required:
+ *               - title
+ *               - description
+ *               - phone
  *     responses:
- *       200:
- *         description: Posts recomendados
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
+ *       201:
+ *         description: Post creado exitosamente
+ *       400:
+ *         description: Error de validación o archivos
  *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *         description: No autorizado
  */
-router.get('/discover', getDiscoveryPosts);
+router.post('/', 
+  debugMulter,           // Debug mejorado
+  authenticate,          // Autenticación
+  validateUser,          // Validación de usuario
+  uploadPostImages,      // Multer - procesar FormData
+  processCloudinary,     // Cloudinary - subir archivos
+  createPost             // Controller
+);
 
-/**
- * @swagger
- * /api/posts/trending:
- *   get:
- *     summary: Obtener posts en tendencia
- *     tags: [Posts]
- *     parameters:
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *           maximum: 50
- *       - in: query
- *         name: timeframe
- *         schema:
- *           type: string
- *           enum: [1h, 6h, 24h, 7d]
- *           default: 24h
- *         description: Marco temporal para trending
- *     responses:
- *       200:
- *         description: Posts en tendencia
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PaginatedResponse'
- */
-router.get('/trending', getTrendingPosts);
-
-/**
- * @swagger
- * /api/posts/my:
- *   get:
- *     summary: Obtener posts del usuario autenticado
- *     tags: [Posts]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *           maximum: 100
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, deleted, all]
- *           default: active
- *     responses:
- *       200:
- *         description: Posts del usuario con información de boost y Cloudinary
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     posts:
- *                       type: array
- *                       items:
- *                         allOf:
- *                           - $ref: '#/components/schemas/Post'
- *                           - type: object
- *                             properties:
- *                               isBoosted:
- *                                 type: boolean
- *                                 example: true
- *                               activeBoost:
- *                                 type: object
- *                                 nullable: true
- *                                 properties:
- *                                   id:
- *                                     type: string
- *                                   expiresAt:
- *                                     type: string
- *                                     format: date-time
- *                                   pricing:
- *                                     type: object
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *                     status:
- *                       type: string
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- */
-router.get('/my', validatePagination, getMyPosts);
+// ✅ RUTAS CON PARÁMETROS (DEBEN IR AL FINAL)
 
 /**
  * @swagger
@@ -589,47 +438,17 @@ router.get('/my', validatePagination, getMyPosts);
  *         description: ID del post
  *     responses:
  *       200:
- *         description: Detalles del post con imágenes de Cloudinary
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/Post'
- *                     - type: object
- *                       properties:
- *                         tags:
- *                           type: array
- *                           items:
- *                             type: object
- *                             properties:
- *                               name:
- *                                 type: string
- *                               color:
- *                                 type: string
- *                         likesCount:
- *                           type: integer
- *                         favoritesCount:
- *                           type: integer
- *                         viewsCount:
- *                           type: integer
- *       403:
- *         description: Contenido premium - actualiza tu cuenta
+ *         description: Detalles del post
  *       404:
- *         $ref: '#/components/responses/NotFoundError'
+ *         description: Post no encontrado
  */
-router.get('/:postId', optionalAuth, getPostById);
+router.get('/:postId', getPostById);
 
 /**
  * @swagger
  * /api/posts/{postId}:
  *   put:
- *     summary: Actualizar post con gestión de imágenes en Cloudinary
+ *     summary: Actualizar post existente
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
@@ -639,7 +458,7 @@ router.get('/:postId', optionalAuth, getPostById);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID del post
+ *         description: ID del post a actualizar
  *     requestBody:
  *       required: true
  *       content:
@@ -657,94 +476,42 @@ router.get('/:postId', optionalAuth, getPostById);
  *                 maxLength: 2000
  *               phone:
  *                 type: string
+ *               services:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *               images:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *                 maxItems: 5
- *                 description: Nuevas imágenes a agregar
- *               removeImages:
- *                 type: string
- *                 description: JSON array de URLs de imágenes a eliminar
- *                 example: '["https://res.cloudinary.com/old-image.jpg"]'
- *               services:
- *                 type: string
- *                 description: JSON string array
- *               rates:
- *                 type: string
- *                 description: JSON string object
- *               availability:
- *                 type: string
- *                 description: JSON string object
- *               locationId:
- *                 type: string
- *               premiumOnly:
- *                 type: boolean
- *               tags:
- *                 type: string
- *                 description: JSON string array
+ *                 description: Nuevas imágenes (opcional)
  *     responses:
  *       200:
- *         description: Post actualizado exitosamente con gestión de imágenes
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Anuncio actualizado exitosamente"
- *                 data:
- *                   $ref: '#/components/schemas/Post'
- *                 uploadedFiles:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/CloudinaryImageResponse'
- *                   description: Nuevas imágenes subidas
+ *         description: Post actualizado exitosamente
  *       400:
- *         description: Error de validación o demasiadas imágenes
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Máximo 5 imágenes permitidas en total"
- *                 errorCode:
- *                   type: string
- *                   example: "TOO_MANY_IMAGES"
+ *         description: Error de validación
  *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *         description: No autorizado
  *       403:
- *         $ref: '#/components/responses/ForbiddenError'
+ *         description: No eres el propietario del post
  *       404:
- *         $ref: '#/components/responses/NotFoundError'
+ *         description: Post no encontrado
  */
 router.put('/:postId', 
-  requireOwnership('postId', 'post'),
-  uploadLimiter,
-  uploadPostImages,
-  validateFileTypes(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']),
-  processAndUploadToCloud,
-  cleanFileMetadata,
-  addUploadInfo,
-  validateUpdatePost,
-  updatePost
+  debugMulter,           // Debug mejorado
+  authenticate,          // Autenticación
+  validateUser,          // Validación de usuario
+  uploadPostImages,      // Multer - procesar FormData
+  processCloudinary,     // Cloudinary - subir archivos
+  updatePost             // Controller
 );
 
 /**
  * @swagger
  * /api/posts/{postId}:
  *   delete:
- *     summary: Eliminar post (también elimina imágenes de Cloudinary)
+ *     summary: Eliminar post
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
@@ -754,35 +521,24 @@ router.put('/:postId',
  *         required: true
  *         schema:
  *           type: string
- *         description: ID del post
+ *         description: ID del post a eliminar
  *     responses:
  *       200:
- *         description: Post eliminado exitosamente (soft delete + limpieza Cloudinary)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Anuncio eliminado exitosamente"
+ *         description: Post eliminado exitosamente
  *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *         description: No autorizado
  *       403:
- *         $ref: '#/components/responses/ForbiddenError'
+ *         description: No eres el propietario del post
  *       404:
- *         $ref: '#/components/responses/NotFoundError'
+ *         description: Post no encontrado
  */
-router.delete('/:postId', requireOwnership('postId', 'post'), deletePost);
+router.delete('/:postId', authenticate, validateUser, deletePost);
 
 /**
  * @swagger
  * /api/posts/{postId}/like:
  *   post:
- *     summary: Dar/quitar like a un post (toggle)
+ *     summary: Dar/quitar like a un post
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
@@ -795,7 +551,7 @@ router.delete('/:postId', requireOwnership('postId', 'post'), deletePost);
  *         description: ID del post
  *     responses:
  *       200:
- *         description: Like agregado/removido exitosamente
+ *         description: Like actualizado exitosamente
  *         content:
  *           application/json:
  *             schema:
@@ -813,20 +569,21 @@ router.delete('/:postId', requireOwnership('postId', 'post'), deletePost);
  *                     isLiked:
  *                       type: boolean
  *                       example: true
- *       400:
- *         description: No puedes dar like a tu propio anuncio
+ *                     totalLikes:
+ *                       type: integer
+ *                       example: 16
  *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *         description: No autorizado
  *       404:
- *         $ref: '#/components/responses/NotFoundError'
+ *         description: Post no encontrado
  */
-router.post('/:postId/like', likePost);
+router.post('/:postId/like', authenticate, validateUser, likePost);
 
 /**
  * @swagger
  * /api/posts/{postId}/favorite:
  *   post:
- *     summary: Agregar/quitar de favoritos (toggle)
+ *     summary: Agregar/quitar de favoritos
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
@@ -839,7 +596,7 @@ router.post('/:postId/like', likePost);
  *         description: ID del post
  *     responses:
  *       200:
- *         description: Post agregado/removido de favoritos
+ *         description: Favorito actualizado exitosamente
  *         content:
  *           application/json:
  *             schema:
@@ -858,10 +615,67 @@ router.post('/:postId/like', likePost);
  *                       type: boolean
  *                       example: true
  *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *         description: No autorizado
  *       404:
- *         $ref: '#/components/responses/NotFoundError'
+ *         description: Post no encontrado
  */
-router.post('/:postId/favorite', toggleFavorite);
+router.post('/:postId/favorite', authenticate, validateUser, toggleFavorite);
+
+// ✅ MIDDLEWARE DE MANEJO DE ERRORES DE MULTER
+router.use((error, req, res, next) => {
+  console.error('🔥 Posts route error:', error);
+
+  if (error instanceof multer.MulterError) {
+    switch (error.code) {
+      case 'LIMIT_FILE_SIZE':
+        return res.status(400).json({
+          success: false,
+          message: 'Archivo muy grande',
+          errorCode: 'FILE_TOO_LARGE',
+          details: 'Máximo 8MB por imagen'
+        });
+
+      case 'LIMIT_FILE_COUNT':
+        return res.status(400).json({
+          success: false,
+          message: 'Demasiados archivos',
+          errorCode: 'TOO_MANY_FILES',
+          details: 'Máximo 5 imágenes por post'
+        });
+
+      case 'LIMIT_UNEXPECTED_FILE':
+        return res.status(400).json({
+          success: false,
+          message: 'Campo de archivo inesperado',
+          errorCode: 'UNEXPECTED_FILE_FIELD',
+          details: `Campo recibido: ${error.field}. Campo esperado: "images"`
+        });
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Error de upload',
+          errorCode: 'UPLOAD_ERROR',
+          details: error.message
+        });
+    }
+  }
+
+  // Error de filtro de archivos
+  if (error.message.includes('Tipo de archivo no permitido')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Tipo de archivo no permitido',
+      errorCode: 'INVALID_FILE_TYPE',
+      details: 'Solo se permiten imágenes (JPG, PNG, GIF, WebP)',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    });
+  }
+
+  // Otros errores
+  next(error);
+});
+
+console.log('✅ Posts routes configured with FIXED CLOUDINARY and ENHANCED DEBUG');
 
 module.exports = router;

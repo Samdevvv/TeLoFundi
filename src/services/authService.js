@@ -4,28 +4,321 @@ const nodemailer = require('nodemailer');
 const { prisma } = require('../config/database');
 const logger = require('../utils/logger');
 
-// Configurar transportador de email
+// ✅ CONFIGURAR TRANSPORTADOR DE EMAIL CORREGIDO COMPLETAMENTE
 const createEmailTransporter = () => {
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    logger.warn('Email configuration missing - email features disabled');
+    logger.warn('❌ Configuración de email faltante:', {
+      EMAIL_HOST: !!process.env.EMAIL_HOST,
+      EMAIL_USER: !!process.env.EMAIL_USER,
+      EMAIL_PASS: !!process.env.EMAIL_PASS,
+      EMAIL_FROM: !!process.env.EMAIL_FROM,
+      EMAIL_FROM_NAME: !!process.env.EMAIL_FROM_NAME
+    });
     return null;
   }
 
-  return nodemailer.createTransporter({
-    host: process.env.EMAIL_HOST,
+  // ✅ CONFIGURACIÓN CORREGIDA PARA GMAIL CON CONTRASEÑA DE APLICACIÓN
+  const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST, // smtp.gmail.com
     port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false, // true para 465, false para otros puertos
+    secure: process.env.EMAIL_SECURE === 'true' || false, // false para puerto 587
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      pass: process.env.EMAIL_PASS // Contraseña de aplicación de 16 dígitos
     },
+    // ✅ Configuraciones adicionales para mejorar confiabilidad
     tls: {
-      rejectUnauthorized: false
+      rejectUnauthorized: false // Permite certificados auto-firmados
+    },
+    connectionTimeout: 60000, // 60 segundos
+    greetingTimeout: 30000, // 30 segundos
+    socketTimeout: 60000, // 60 segundos
+    debug: process.env.NODE_ENV === 'development', // Debug en desarrollo
+    logger: process.env.NODE_ENV === 'development' // Logger en desarrollo
+  });
+
+  // ✅ VERIFICAR CONFIGURACIÓN AL CREAR EL TRANSPORTER
+  transporter.verify((error, success) => {
+    if (error) {
+      logger.error('❌ Error configurando nodemailer:', {
+        error: error.message,
+        code: error.code,
+        command: error.command,
+        response: error.response,
+        stack: error.stack
+      });
+      
+      // ✅ Mensajes de ayuda específicos para errores comunes
+      if (error.code === 'EAUTH') {
+        logger.error('🔑 ERROR DE AUTENTICACIÓN - Revisa:');
+        logger.error('   1. ¿Tienes verificación en 2 pasos activada?');
+        logger.error('   2. ¿Estás usando contraseña de aplicación (16 dígitos)?');
+        logger.error('   3. ¿La contraseña de aplicación es correcta?');
+        logger.error('   📝 Crear contraseña: https://myaccount.google.com/apppasswords');
+      }
+      
+      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNECTION') {
+        logger.error('🌐 ERROR DE CONEXIÓN - Revisa tu conexión a internet');
+      }
+
+      if (error.code === 'ENOTFOUND') {
+        logger.error('🌐 ERROR DNS - No se puede resolver smtp.gmail.com');
+      }
+    } else {
+      logger.info('✅ Nodemailer configurado correctamente para Gmail');
+      logger.info('📧 Listo para enviar emails desde:', process.env.EMAIL_USER);
+      logger.info('🔧 Configuración:', {
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT,
+        secure: process.env.EMAIL_SECURE,
+        user: process.env.EMAIL_USER
+      });
     }
   });
+
+  return transporter;
 };
 
-// Enviar email de verificación
+// ✅ ENVIAR EMAIL DE RESTABLECIMIENTO DE CONTRASEÑA - COMPLETAMENTE CORREGIDO
+const sendPasswordResetEmail = async (user, resetToken) => {
+  const transporter = createEmailTransporter();
+  if (!transporter) {
+    logger.warn('❌ No se puede enviar email - transporter no configurado');
+    return false;
+  }
+
+  // ✅ URL CORREGIDA PARA EL FRONTEND
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+  const mailOptions = {
+    from: {
+      name: process.env.EMAIL_FROM_NAME || 'TeloFundi',
+      address: process.env.EMAIL_USER
+    },
+    to: user.email,
+    subject: '🔐 Restablecer contraseña - TeloFundi',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Restablecer Contraseña - TeloFundi</title>
+        <style>
+          body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f5f5f5; 
+            color: #333;
+          }
+          .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            padding: 30px; 
+            text-align: center; 
+            color: white;
+          }
+          .header h1 { 
+            margin: 0; 
+            font-size: 24px; 
+            font-weight: 600;
+          }
+          .content { 
+            padding: 40px 30px; 
+          }
+          .content h2 { 
+            color: #333; 
+            margin-bottom: 20px; 
+            font-size: 20px;
+          }
+          .content p { 
+            line-height: 1.6; 
+            margin-bottom: 20px; 
+            color: #666;
+          }
+          .button { 
+            display: inline-block; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 15px 30px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: 600;
+            margin: 20px 0;
+            transition: transform 0.2s;
+          }
+          .button:hover { 
+            transform: translateY(-2px); 
+          }
+          .warning { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 20px 0;
+          }
+          .footer { 
+            background: #f8f9fa; 
+            padding: 20px 30px; 
+            text-align: center; 
+            font-size: 14px; 
+            color: #666;
+          }
+          .token-code {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            color: #495057;
+            word-break: break-all;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 TeloFundi</h1>
+          </div>
+          <div class="content">
+            <h2>Hola ${user.firstName},</h2>
+            <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta de TeloFundi.</p>
+            
+            <p>Haz clic en el siguiente botón para crear una nueva contraseña:</p>
+            <div style="text-align: center;">
+              <a href="${resetUrl}" class="button">Restablecer Contraseña</a>
+            </div>
+            
+            <p>O copia y pega este enlace en tu navegador:</p>
+            <div class="token-code">${resetUrl}</div>
+            
+            <div class="warning">
+              <p><strong>⚠️ Importante:</strong></p>
+              <ul>
+                <li>Este enlace expira en <strong>15 minutos</strong></li>
+                <li>Si no solicitaste este cambio, ignora este email</li>
+                <li>Tu contraseña actual seguirá siendo válida hasta que la cambies</li>
+              </ul>
+            </div>
+            
+            <p>Si tienes problemas con el enlace, contacta nuestro soporte.</p>
+          </div>
+          <div class="footer">
+            <p>Este es un email automático, no respondas a este mensaje.</p>
+            <p>&copy; 2025 TeloFundi - Plataforma Premium de República Dominicana</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    // ✅ Agregar versión de texto plano como fallback
+    text: `
+      Hola ${user.firstName},
+      
+      Recibimos una solicitud para restablecer la contraseña de tu cuenta de TeloFundi.
+      
+      Copia y pega este enlace en tu navegador para restablecer tu contraseña:
+      ${resetUrl}
+      
+      IMPORTANTE:
+      - Este enlace expira en 15 minutos
+      - Si no solicitaste este cambio, ignora este email
+      - Tu contraseña actual seguirá siendo válida hasta que la cambies
+      
+      TeloFundi - Plataforma Premium de República Dominicana
+    `,
+    // ✅ Configuraciones adicionales para mejorar entrega
+    priority: 'high',
+    headers: {
+      'X-Priority': '1',
+      'X-MSMail-Priority': 'High',
+      'Importance': 'high'
+    }
+  };
+
+  try {
+    // ✅ LOG ANTES DE ENVIAR CON MÁS DETALLES
+    logger.info('📧 Intentando enviar email de reset...', {
+      to: user.email,
+      from: mailOptions.from,
+      subject: mailOptions.subject,
+      resetUrl,
+      userAgent: 'TeloFundi-Backend',
+      timestamp: new Date().toISOString(),
+      config: {
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT,
+        user: process.env.EMAIL_USER
+      }
+    });
+
+    // ✅ USAR ASYNC/AWAIT EN LUGAR DE CALLBACK
+    const info = await transporter.sendMail(mailOptions);
+    
+    // ✅ LOG DETALLADO DEL ÉXITO
+    logger.info('✅ Email de reset enviado exitosamente:', { 
+      messageId: info.messageId,
+      response: info.response,
+      envelope: info.envelope,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      userId: user.id, 
+      email: user.email,
+      resetUrl,
+      timestamp: new Date().toISOString()
+    });
+    
+    return true;
+  } catch (error) {
+    // ✅ LOG DETALLADO DEL ERROR CON AYUDA ESPECÍFICA
+    logger.error('❌ Error enviando email de reset:', {
+      error: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      userId: user.id,
+      email: user.email,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ Ayuda específica según el tipo de error
+    if (error.code === 'EAUTH') {
+      logger.error('🔑 PROBLEMA DE AUTENTICACIÓN:');
+      logger.error('   1. Verifica que tienes 2FA activado en Gmail');
+      logger.error('   2. Crea una contraseña de aplicación: https://myaccount.google.com/apppasswords');
+      logger.error('   3. Usa la contraseña de aplicación (16 dígitos) en EMAIL_PASS');
+      logger.error('   4. NO uses tu contraseña regular de Gmail');
+    } else if (error.code === 'ETIMEDOUT') {
+      logger.error('⏰ TIMEOUT - El servidor tardó mucho en responder');
+    } else if (error.code === 'ECONNECTION') {
+      logger.error('🌐 ERROR DE CONEXIÓN - Problema de red o firewall');
+    } else if (error.code === 'ENOTFOUND') {
+      logger.error('🔍 DNS ERROR - No se puede resolver smtp.gmail.com');
+    } else if (error.responseCode === 535) {
+      logger.error('🔒 CREDENCIALES INCORRECTAS - Usuario o contraseña inválidos');
+    } else if (error.responseCode === 550) {
+      logger.error('📧 EMAIL RECHAZADO - Dirección de destino inválida');
+    }
+    
+    return false;
+  }
+};
+
+// ✅ ENVIAR EMAIL DE VERIFICACIÓN - COMPLETO
 const sendVerificationEmail = async (user, verificationToken) => {
   const transporter = createEmailTransporter();
   if (!transporter) {
@@ -36,16 +329,19 @@ const sendVerificationEmail = async (user, verificationToken) => {
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
 
   const mailOptions = {
-    from: `"TeLoFundi" <${process.env.EMAIL_USER}>`,
+    from: {
+      name: process.env.EMAIL_FROM_NAME || 'TeloFundi',
+      address: process.env.EMAIL_USER
+    },
     to: user.email,
-    subject: 'Verifica tu cuenta en TeLoFundi',
+    subject: 'Verifica tu cuenta en TeloFundi',
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Verificación de Email - TeLoFundi</title>
+        <title>Verificación de Email - TeloFundi</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -58,11 +354,11 @@ const sendVerificationEmail = async (user, verificationToken) => {
       <body>
         <div class="container">
           <div class="header">
-            <h1>¡Bienvenido a TeLoFundi!</h1>
+            <h1>¡Bienvenido a TeloFundi!</h1>
           </div>
           <div class="content">
             <h2>Hola ${user.firstName},</h2>
-            <p>Gracias por registrarte en TeLoFundi. Para completar tu registro, por favor verifica tu dirección de email haciendo clic en el botón de abajo:</p>
+            <p>Gracias por registrarte en TeloFundi. Para completar tu registro, por favor verifica tu dirección de email haciendo clic en el botón de abajo:</p>
             
             <div style="text-align: center;">
               <a href="${verificationUrl}" class="button">Verificar Email</a>
@@ -76,99 +372,46 @@ const sendVerificationEmail = async (user, verificationToken) => {
             <p>Si no creaste esta cuenta, puedes ignorar este email.</p>
           </div>
           <div class="footer">
-            <p>&copy; 2024 TeLoFundi. Todos los derechos reservados.</p>
+            <p>&copy; 2024 TeloFundi. Todos los derechos reservados.</p>
           </div>
         </div>
       </body>
       </html>
+    `,
+    text: `
+      Hola ${user.firstName},
+      
+      Gracias por registrarte en TeloFundi. Para completar tu registro, visita este enlace:
+      ${verificationUrl}
+      
+      Este enlace expirará en 24 horas.
+      
+      Si no creaste esta cuenta, puedes ignorar este email.
+      
+      TeloFundi
     `
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    logger.info('Verification email sent', { userId: user.id, email: user.email });
+    const info = await transporter.sendMail(mailOptions);
+    logger.info('Verification email sent', { 
+      messageId: info.messageId,
+      userId: user.id, 
+      email: user.email 
+    });
     return true;
   } catch (error) {
-    logger.error('Error sending verification email:', error);
+    logger.error('Error sending verification email:', {
+      error: error.message,
+      code: error.code,
+      userId: user.id,
+      email: user.email
+    });
     return false;
   }
 };
 
-// Enviar email de restablecimiento de contraseña
-const sendPasswordResetEmail = async (user, resetToken) => {
-  const transporter = createEmailTransporter();
-  if (!transporter) {
-    logger.warn('Cannot send password reset email - transporter not configured');
-    return false;
-  }
-
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
-  const mailOptions = {
-    from: `"TeLoFundi" <${process.env.EMAIL_USER}>`,
-    to: user.email,
-    subject: 'Restablece tu contraseña - TeLoFundi',
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Restablecer Contraseña - TeLoFundi</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; background: #e74c3c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Restablece tu contraseña</h1>
-          </div>
-          <div class="content">
-            <h2>Hola ${user.firstName},</h2>
-            <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en TeLoFundi.</p>
-            
-            <div class="warning">
-              <strong>⚠️ Importante:</strong> Si no solicitaste este cambio, ignora este email. Tu contraseña no será cambiada.
-            </div>
-            
-            <p>Para crear una nueva contraseña, haz clic en el botón de abajo:</p>
-            
-            <div style="text-align: center;">
-              <a href="${resetUrl}" class="button">Restablecer Contraseña</a>
-            </div>
-            
-            <p>Si el botón no funciona, puedes copiar y pegar este enlace en tu navegador:</p>
-            <p style="word-break: break-all; color: #667eea;">${resetUrl}</p>
-            
-            <p><strong>Este enlace expirará en 15 minutos por seguridad.</strong></p>
-          </div>
-          <div class="footer">
-            <p>&copy; 2024 TeLoFundi. Todos los derechos reservados.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    logger.info('Password reset email sent', { userId: user.id, email: user.email });
-    return true;
-  } catch (error) {
-    logger.error('Error sending password reset email:', error);
-    return false;
-  }
-};
-
-// Enviar email de bienvenida
+// ✅ ENVIAR EMAIL DE BIENVENIDA - COMPLETO
 const sendWelcomeEmail = async (user) => {
   const transporter = createEmailTransporter();
   if (!transporter) {
@@ -191,16 +434,19 @@ const sendWelcomeEmail = async (user) => {
   }
 
   const mailOptions = {
-    from: `"TeLoFundi" <${process.env.EMAIL_USER}>`,
+    from: {
+      name: process.env.EMAIL_FROM_NAME || 'TeloFundi',
+      address: process.env.EMAIL_USER
+    },
     to: user.email,
-    subject: '¡Bienvenido a TeLoFundi! Tu cuenta está lista',
+    subject: '¡Bienvenido a TeloFundi! Tu cuenta está lista',
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Bienvenido a TeLoFundi</title>
+        <title>Bienvenido a TeloFundi</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -214,12 +460,12 @@ const sendWelcomeEmail = async (user) => {
       <body>
         <div class="container">
           <div class="header">
-            <h1>¡Bienvenido a TeLoFundi!</h1>
+            <h1>¡Bienvenido a TeloFundi!</h1>
             <p>Tu cuenta está lista para usar</p>
           </div>
           <div class="content">
             <h2>¡Hola ${user.firstName}! 🎉</h2>
-            <p>Tu cuenta en TeLoFundi ha sido creada exitosamente. ${userTypeMessage}</p>
+            <p>Tu cuenta en TeloFundi ha sido creada exitosamente. ${userTypeMessage}</p>
             
             <div style="text-align: center;">
               <a href="${dashboardUrl}" class="button">Ir a mi Dashboard</a>
@@ -256,20 +502,45 @@ const sendWelcomeEmail = async (user) => {
             <p>Si tienes preguntas, no dudes en contactarnos. ¡Estamos aquí para ayudarte!</p>
           </div>
           <div class="footer">
-            <p>&copy; 2024 TeLoFundi. Todos los derechos reservados.</p>
+            <p>&copy; 2024 TeloFundi. Todos los derechos reservados.</p>
           </div>
         </div>
       </body>
       </html>
+    `,
+    text: `
+      ¡Hola ${user.firstName}!
+      
+      Tu cuenta en TeloFundi ha sido creada exitosamente. ${userTypeMessage}
+      
+      Visita tu dashboard: ${dashboardUrl}
+      
+      ¿Qué puedes hacer ahora?
+      - Completa tu perfil
+      - ${user.userType !== 'CLIENT' ? 'Crea tu primer anuncio' : 'Explora perfiles'}
+      - Inicia conversaciones
+      
+      ${user.userType === 'CLIENT' ? '¡Regalo de bienvenida! Tu cuenta incluye 10 puntos gratis para empezar.' : ''}
+      
+      TeloFundi
     `
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    logger.info('Welcome email sent', { userId: user.id, email: user.email });
+    const info = await transporter.sendMail(mailOptions);
+    logger.info('Welcome email sent', { 
+      messageId: info.messageId,
+      userId: user.id, 
+      email: user.email 
+    });
     return true;
   } catch (error) {
-    logger.error('Error sending welcome email:', error);
+    logger.error('Error sending welcome email:', {
+      error: error.message,
+      code: error.code,
+      userId: user.id,
+      email: user.email
+    });
     return false;
   }
 };

@@ -2,11 +2,13 @@ const cors = require('cors');
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Lista de dominios permitidos
+    // Lista de dominios permitidos - AGREGADO 5173
     const allowedOrigins = [
-      process.env.FRONTEND_URL || 'http://localhost:3001',
+      process.env.FRONTEND_URL || 'http://localhost:5173', // ← CAMBIADO DE 3001 A 5173
       'http://localhost:3000',
-      'http://localhost:3001',
+      'http://localhost:5173', // ← AGREGADO ESPECÍFICAMENTE
+      'http://127.0.0.1:5173',  // ← AGREGADO ESPECÍFICAMENTE
+      'http://localhost:3001',  // Mantenido por compatibilidad
       'http://127.0.0.1:3001',
       'https://telofundi.com',
       'https://www.telofundi.com',
@@ -44,10 +46,10 @@ const corsOptions = {
     'X-Current-Page',
     'X-Total-Pages'
   ],
-  credentials: true, // Permitir cookies y headers de autenticación
+  credentials: true,
   preflightContinue: false,
-  optionsSuccessStatus: 200, // Para navegadores legacy
-  maxAge: 86400 // 24 horas de cache para preflight
+  optionsSuccessStatus: 200,
+  maxAge: 86400
 };
 
 module.exports = cors(corsOptions);

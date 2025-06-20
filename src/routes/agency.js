@@ -4,7 +4,7 @@ const router = express.Router();
 // Middleware
 const { authenticate } = require('../middleware/auth');
 
-// ✅ CORREGIDO: Controllers - AGREGADA FUNCIÓN FALTANTE
+// ✅ CORREGIDO: Controllers - AGREGADAS FUNCIONES FALTANTES
 const {
   searchAgencies,
   requestToJoinAgency,
@@ -12,9 +12,13 @@ const {
   respondToInvitation,
   manageMembershipRequest,
   getAgencyEscorts,
-  getVerificationPricing, // ✅ NUEVO - Agregado desde agencyController
+  getVerificationPricing,
   verifyEscort,
-  getAgencyStats
+  getAgencyStats,
+  // ✅ NUEVAS FUNCIONES AGREGADAS
+  getEscortInvitations,
+  getEscortMembershipStatus,
+  leaveCurrentAgency
 } = require('../controllers/agencyController');
 
 /**
@@ -63,6 +67,24 @@ const {
  *         expiresAt:
  *           type: string
  *           format: date-time
+ *     
+ *     MembershipStatus:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           enum: [independent, agency, pending]
+ *         hasActiveMembership:
+ *           type: boolean
+ *         hasPendingRequests:
+ *           type: boolean
+ *         currentAgency:
+ *           type: object
+ *           nullable: true
+ *         pendingRequests:
+ *           type: array
+ *           items:
+ *             type: object
  *     
  *     VerificationPricing:
  *       type: object
@@ -516,5 +538,128 @@ router.post('/escorts/:escortId/verify', authenticate, verifyEscort);
  *         description: Solo agencias pueden ver estadísticas
  */
 router.get('/stats', authenticate, getAgencyStats);
+
+// ✅ ===================================================================
+// ✅ NUEVAS RUTAS ESPECÍFICAS PARA ESCORTS
+// ✅ ===================================================================
+
+/**
+ * @swagger
+ * /api/agency/escort/invitations:
+ *   get:
+ *     summary: Obtener invitaciones recibidas (escort)
+ *     tags: [Agency - Escort]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PENDING, ACCEPTED, REJECTED]
+ *           default: PENDING
+ *     responses:
+ *       200:
+ *         description: Lista de invitaciones recibidas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     invitations:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/AgencyInvitation'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/Pagination'
+ *       403:
+ *         description: Solo escorts pueden ver sus invitaciones
+ */
+router.get('/escort/invitations', authenticate, getEscortInvitations);
+
+/**
+ * @swagger
+ * /api/agency/escort/membership/status:
+ *   get:
+ *     summary: Obtener estado de membresía del escort
+ *     tags: [Agency - Escort]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Estado actual de membresía
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/MembershipStatus'
+ *       403:
+ *         description: Solo escorts pueden ver su estado de membresía
+ */
+router.get('/escort/membership/status', authenticate, getEscortMembershipStatus);
+
+/**
+ * @swagger
+ * /api/agency/escort/membership/leave:
+ *   post:
+ *     summary: Salir de agencia actual (escort)
+ *     tags: [Agency - Escort]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Razón opcional para dejar la agencia
+ *                 maxLength: 500
+ *     responses:
+ *       200:
+ *         description: Has dejado la agencia exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     formerAgency:
+ *                       type: string
+ *                     leftAt:
+ *                       type: string
+ *                       format: date-time
+ *       403:
+ *         description: Solo escorts pueden salir de agencias
+ *       404:
+ *         description: No tienes una membresía activa en ninguna agencia
+ */
+router.post('/escort/membership/leave', authenticate, leaveCurrentAgency);
 
 module.exports = router;

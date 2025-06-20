@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
-// Middleware
-const { authenticate } = require('../middleware/auth');
+// ✅ MIDDLEWARE INTEGRADO: Todo desde auth.js
+const { authenticate, requireAdmin, logAdminActivity } = require('../middleware/auth');
 
 // Controllers - TODOS COINCIDEN CON EL CONTROLADOR
 const {
@@ -97,6 +97,10 @@ const {
  *           type: object
  */
 
+// ✅ APLICAR MIDDLEWARES A TODAS LAS RUTAS DE ADMIN
+router.use(authenticate);
+router.use(requireAdmin);
+
 /**
  * @swagger
  * /api/admin/metrics:
@@ -148,7 +152,104 @@ const {
  *       403:
  *         description: Acceso de administrador requerido
  */
-router.get('/metrics', authenticate, getAppMetrics);
+router.get('/metrics', logAdminActivity('view_metrics'), getAppMetrics);
+
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Obtener lista de todos los usuarios
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: userType
+ *         schema:
+ *           type: string
+ *           enum: [ESCORT, AGENCY, CLIENT, ADMIN]
+ *         description: Filtrar por tipo de usuario
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, banned, inactive, all]
+ *           default: all
+ *         description: Filtrar por estado del usuario
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Buscar por nombre, username o email
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [newest, oldest, lastLogin, profileViews, alphabetical]
+ *           default: newest
+ *     responses:
+ *       200:
+ *         description: Lista de usuarios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/User'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/Pagination'
+ */
+router.get('/users', logAdminActivity('view_users'), getAllUsers);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}:
+ *   get:
+ *     summary: Obtener detalles completos de usuario
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Detalles completos del usuario
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   description: Información completa del usuario incluyendo historial
+ *       404:
+ *         description: Usuario no encontrado
+ */
+router.get('/users/:userId', logAdminActivity('view_user_details'), getUserDetails);
 
 /**
  * @swagger
@@ -212,7 +313,7 @@ router.get('/metrics', authenticate, getAppMetrics);
  *       409:
  *         description: Usuario ya está baneado
  */
-router.post('/users/:userId/ban', authenticate, banUser);
+router.post('/users/:userId/ban', logAdminActivity('ban_user'), banUser);
 
 /**
  * @swagger
@@ -245,7 +346,7 @@ router.post('/users/:userId/ban', authenticate, banUser);
  *       404:
  *         description: Usuario no encontrado
  */
-router.post('/users/:userId/unban', authenticate, unbanUser);
+router.post('/users/:userId/unban', logAdminActivity('unban_user'), unbanUser);
 
 /**
  * @swagger
@@ -297,7 +398,7 @@ router.post('/users/:userId/unban', authenticate, unbanUser);
  *                     pagination:
  *                       $ref: '#/components/schemas/Pagination'
  */
-router.get('/banned-users', authenticate, getBannedUsers);
+router.get('/banned-users', logAdminActivity('view_banned_users'), getBannedUsers);
 
 /**
  * @swagger
@@ -350,7 +451,7 @@ router.get('/banned-users', authenticate, getBannedUsers);
  *                     pagination:
  *                       $ref: '#/components/schemas/Pagination'
  */
-router.get('/reports', authenticate, getPendingReports);
+router.get('/reports', logAdminActivity('view_reports'), getPendingReports);
 
 /**
  * @swagger
@@ -416,104 +517,7 @@ router.get('/reports', authenticate, getPendingReports);
  *       404:
  *         description: Reporte no encontrado
  */
-router.put('/reports/:reportId/resolve', authenticate, resolveReport);
-
-/**
- * @swagger
- * /api/admin/users:
- *   get:
- *     summary: Obtener lista de todos los usuarios
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *       - in: query
- *         name: userType
- *         schema:
- *           type: string
- *           enum: [ESCORT, AGENCY, CLIENT, ADMIN]
- *         description: Filtrar por tipo de usuario
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, banned, inactive, all]
- *           default: all
- *         description: Filtrar por estado del usuario
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Buscar por nombre, username o email
- *       - in: query
- *         name: sortBy
- *         schema:
- *           type: string
- *           enum: [newest, oldest, lastLogin, profileViews, alphabetical]
- *           default: newest
- *     responses:
- *       200:
- *         description: Lista de usuarios
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     users:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/User'
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- */
-router.get('/users', authenticate, getAllUsers);
-
-/**
- * @swagger
- * /api/admin/users/{userId}:
- *   get:
- *     summary: Obtener detalles completos de usuario
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Detalles completos del usuario
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   description: Información completa del usuario incluyendo historial
- *       404:
- *         description: Usuario no encontrado
- */
-router.get('/users/:userId', authenticate, getUserDetails);
+router.put('/reports/:reportId/resolve', logAdminActivity('resolve_report'), resolveReport);
 
 /**
  * @swagger
@@ -574,6 +578,6 @@ router.get('/users/:userId', authenticate, getUserDetails);
  *       403:
  *         description: Se requieren permisos de super administrador
  */
-router.put('/settings', authenticate, updateAppSettings);
+router.put('/settings', logAdminActivity('update_settings'), updateAppSettings);
 
 module.exports = router;

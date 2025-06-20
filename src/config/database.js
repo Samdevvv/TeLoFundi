@@ -1,59 +1,75 @@
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
 
-// Configuración de Prisma basada en el entorno
+// ✅ CONFIGURACIÓN OPTIMIZADA DE PRISMA - SIN LOGS GIGANTESCOS
 const prismaConfig = {
+  // 🔥 CAMBIO PRINCIPAL: Solo errores en desarrollo, nada en producción
   log: process.env.NODE_ENV === 'development' 
-    ? ['query', 'info', 'warn', 'error']
-    : ['error'],
-  errorFormat: 'pretty'
+    ? [
+        { emit: 'event', level: 'error' },
+        { emit: 'event', level: 'warn' }
+      ]
+    : [],
+  errorFormat: 'minimal' // ✅ Cambiar de 'pretty' a 'minimal'
 };
 
 // Crear instancia de Prisma
 const prisma = new PrismaClient(prismaConfig);
 
-// Middleware para logging personalizado
+// ✅ MIDDLEWARE OPTIMIZADO - LOGS CONCISOS
 prisma.$use(async (params, next) => {
   const before = Date.now();
   
   try {
     const result = await next(params);
-    const after = Date.now();
+    const duration = Date.now() - before;
     
-    // Log de queries lentas (más de 1 segundo)
-    if (after - before > 1000) {
-      logger.logPerformance('Database Query', after - before, {
+    // Solo log queries lentas (más de 500ms)
+    if (duration > 500) {
+      logger.warn(`🐌 Slow DB Query: ${params.model}.${params.action} - ${duration}ms`, {
         model: params.model,
         action: params.action,
-        query: params.args
+        duration: `${duration}ms`
       });
+    }
+    
+    // Log muy conciso para desarrollo
+    if (process.env.NODE_ENV === 'development' && duration > 100) {
+      logger.debug(`🔍 DB Query: ${params.model}.${params.action} - ${duration}ms`);
     }
     
     return result;
   } catch (error) {
-    const after = Date.now();
+    const duration = Date.now() - before;
     
-    // Log de errores de base de datos
-    logger.logError(error, {
+    // Log de errores de base de datos - CONCISO
+    logger.error(`💥 DB Error: ${params.model}.${params.action}`, {
       model: params.model,
       action: params.action,
-      duration: after - before,
-      query: params.args
+      duration: `${duration}ms`,
+      error: error.message
     });
     
     throw error;
   }
 });
 
-// Middleware para soft deletes
+// ✅ CORREGIDO: Lista actualizada SOLO con modelos que tienen deletedAt en el schema
+const modelsWithDeletedAt = [
+  'User', 'Post', 'Message', 
+  'AgencyMembership', 'AgencyInvitation', 'EscortVerification',
+  'Review', 'Report', 'Notification', 'Payment', 'Boost', 'Ban'
+  // ❌ REMOVIDO: 'Escort', 'Client' - estos NO tienen deletedAt en el schema
+];
+
+// ✅ CORREGIDO: Middleware para soft deletes - SOLO modelos que TIENEN deletedAt
 prisma.$use(async (params, next) => {
-  // Interceptar eliminaciones para hacer soft delete
-  if (params.action === 'delete') {
+  if (params.action === 'delete' && modelsWithDeletedAt.includes(params.model)) {
     params.action = 'update';
     params.args['data'] = { deletedAt: new Date() };
   }
   
-  if (params.action === 'deleteMany') {
+  if (params.action === 'deleteMany' && modelsWithDeletedAt.includes(params.model)) {
     params.action = 'updateMany';
     if (params.args.data != undefined) {
       params.args.data['deletedAt'] = new Date();
@@ -65,20 +81,25 @@ prisma.$use(async (params, next) => {
   return next(params);
 });
 
-// Middleware para filtrar registros eliminados (soft delete)
+// ✅ CORREGIDO: Middleware para filtrar registros eliminados - SOLO modelos con deletedAt
 prisma.$use(async (params, next) => {
-  const modelsWithSoftDelete = [
-    'User', 'Post', 'Message', 'Agency', 'Escort', 'Client', 
-    'AgencyMembership', 'AgencyInvitation', 'EscortVerification',
-    'Review', 'Report', 'Notification', 'Payment', 'Boost', 'Ban'
-  ];
-  
-  if (modelsWithSoftDelete.includes(params.model)) {
+  // ✅ VERIFICAR que el modelo esté en la lista de modelos con deletedAt
+  if (modelsWithDeletedAt.includes(params.model)) {
     if (params.action === 'findUnique' || params.action === 'findFirst') {
+      // ✅ VERIFICAR que args.where existe antes de agregar deletedAt
+      if (!params.args) {
+        params.args = {};
+      }
+      if (!params.args.where) {
+        params.args.where = {};
+      }
       params.args.where['deletedAt'] = null;
     }
     
     if (params.action === 'findMany') {
+      if (!params.args) {
+        params.args = {};
+      }
       if (params.args.where) {
         if (params.args.where.deletedAt == undefined) {
           params.args.where['deletedAt'] = null;
@@ -89,6 +110,9 @@ prisma.$use(async (params, next) => {
     }
     
     if (params.action === 'count') {
+      if (!params.args) {
+        params.args = {};
+      }
       if (params.args.where) {
         if (params.args.where.deletedAt == undefined) {
           params.args.where['deletedAt'] = null;
@@ -102,35 +126,38 @@ prisma.$use(async (params, next) => {
   return next(params);
 });
 
-// Conexión y manejo de eventos
-prisma.$connect()
-  .then(() => {
-    logger.info('🗄️  Conexión a la base de datos establecida correctamente');
-  })
-  .catch((error) => {
-    logger.error('❌ Error al conectar con la base de datos:', error);
-    process.exit(1);
-  });
-
-// Manejo de eventos de Prisma
+// ✅ EVENTOS DE PRISMA OPTIMIZADOS - LOGS CONCISOS
 prisma.$on('error', (e) => {
-  logger.error('Error de Prisma:', e);
+  logger.error('💥 Prisma Error:', {
+    message: e.message,
+    timestamp: new Date().toISOString()
+  });
 });
 
 prisma.$on('warn', (e) => {
-  logger.warn('Advertencia de Prisma:', e);
+  logger.warn('⚠️  Prisma Warning:', {
+    message: e.message,
+    timestamp: new Date().toISOString()
+  });
 });
 
-if (process.env.NODE_ENV === 'development') {
-  prisma.$on('query', (e) => {
-    logger.debug(`Query: ${e.query} - Params: ${e.params} - Duration: ${e.duration}ms`);
+// ✅ ELIMINADO: El evento 'query' que causaba logs gigantescos
+// Ya no hay prisma.$on('query') que imprimía las consultas completas
+
+// Conexión optimizada
+prisma.$connect()
+  .then(() => {
+    logger.info('🗄️  Database connected successfully');
+  })
+  .catch((error) => {
+    logger.error('❌ Database connection failed:', { error: error.message });
+    process.exit(1);
   });
-}
 
 // Función para cerrar conexión gracefully
 const closePrisma = async () => {
   await prisma.$disconnect();
-  logger.info('🗄️  Conexión a la base de datos cerrada');
+  logger.info('🗄️  Database connection closed');
 };
 
 // Función para verificar la salud de la base de datos
@@ -139,7 +166,7 @@ const checkDatabaseHealth = async () => {
     await prisma.$queryRaw`SELECT 1`;
     return { status: 'healthy', timestamp: new Date().toISOString() };
   } catch (error) {
-    logger.error('Database health check failed:', error);
+    logger.error('Database health check failed:', { error: error.message });
     return { 
       status: 'unhealthy', 
       error: error.message,
@@ -155,8 +182,7 @@ const cleanupTestData = async () => {
   }
   
   try {
-    // Eliminar datos de prueba con email de ejemplo
-    await prisma.user.deleteMany({
+    const deleted = await prisma.user.deleteMany({
       where: {
         email: {
           contains: 'test'
@@ -164,9 +190,10 @@ const cleanupTestData = async () => {
       }
     });
     
-    logger.info('Datos de prueba eliminados correctamente');
+    logger.info(`🧹 Test data cleanup: ${deleted.count} records deleted`);
+    return deleted.count;
   } catch (error) {
-    logger.error('Error al limpiar datos de prueba:', error);
+    logger.error('Error cleaning test data:', { error: error.message });
     throw error;
   }
 };
@@ -174,7 +201,7 @@ const cleanupTestData = async () => {
 // Función para estadísticas de la base de datos
 const getDatabaseStats = async () => {
   try {
-    const stats = await Promise.all([
+    const [users, posts, messages, favorites, likes] = await Promise.all([
       prisma.user.count(),
       prisma.post.count(),
       prisma.message.count(),
@@ -182,16 +209,19 @@ const getDatabaseStats = async () => {
       prisma.like.count()
     ]);
 
-    return {
-      users: stats[0],
-      posts: stats[1],
-      messages: stats[2],
-      favorites: stats[3],
-      likes: stats[4],
+    const stats = {
+      users,
+      posts,
+      messages,
+      favorites,
+      likes,
       timestamp: new Date().toISOString()
     };
+
+    logger.info('📊 Database stats retrieved', stats);
+    return stats;
   } catch (error) {
-    logger.error('Error obteniendo estadísticas de BD:', error);
+    logger.error('Error getting database stats:', { error: error.message });
     throw error;
   }
 };

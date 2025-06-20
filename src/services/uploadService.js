@@ -27,13 +27,13 @@ const verifyCloudinaryConfig = () => {
 
 const isCloudinaryConfigured = verifyCloudinaryConfig();
 
-// Configuraciones de transformación por tipo de imagen
+// ✅ CONFIGURACIONES DE TRANSFORMACIÓN CORREGIDAS
 const transformations = {
   avatar: {
     width: 400,
     height: 400,
     crop: 'fill',
-    gravity: 'face',
+    gravity: 'face', // Para Cloudinary
     quality: 'auto:good',
     format: 'webp',
     fetch_format: 'auto',
@@ -70,7 +70,26 @@ const transformations = {
   }
 };
 
-// Función para optimizar imagen con Sharp (antes de subir a Cloudinary)
+// ✅ MAPEO DE GRAVITY PARA SHARP
+const mapGravityForSharp = (gravity) => {
+  const gravityMap = {
+    'face': 'centre', // Sharp no tiene 'face', usar 'centre'
+    'center': 'centre',
+    'centre': 'centre',
+    'north': 'top',
+    'south': 'bottom',
+    'east': 'right',
+    'west': 'left',
+    'northeast': 'top right',
+    'northwest': 'top left',
+    'southeast': 'bottom right',
+    'southwest': 'bottom left'
+  };
+  
+  return gravityMap[gravity] || 'centre';
+};
+
+// ✅ FUNCIÓN CORREGIDA PARA OPTIMIZAR IMAGEN CON SHARP
 const optimizeImage = async (buffer, type = 'post') => {
   try {
     const config = transformations[type];
@@ -92,11 +111,13 @@ const optimizeImage = async (buffer, type = 'post') => {
     // Auto-rotar basado en EXIF
     sharpInstance = sharpInstance.rotate();
 
-    // Redimensionar según configuración
+    // ✅ REDIMENSIONAR CON GRAVITY CORREGIDO
     if (config.width && config.height) {
+      const sharpGravity = mapGravityForSharp(config.gravity || 'center');
+      
       sharpInstance = sharpInstance.resize(config.width, config.height, {
         fit: config.crop === 'fill' ? 'cover' : 'inside',
-        position: config.gravity || 'center',
+        position: sharpGravity, // ✅ Usar gravity mapeado
         withoutEnlargement: true
       });
     }
@@ -123,7 +144,7 @@ const optimizeImage = async (buffer, type = 'post') => {
         outputBuffer = await sharpInstance.toBuffer();
     }
 
-    logger.debug('Image optimized', {
+    logger.debug('Image optimized successfully', {
       originalSize: buffer.length,
       optimizedSize: outputBuffer.length,
       compressionRatio: ((buffer.length - outputBuffer.length) / buffer.length * 100).toFixed(2) + '%'
@@ -132,11 +153,12 @@ const optimizeImage = async (buffer, type = 'post') => {
     return outputBuffer;
   } catch (error) {
     logger.error('Error optimizing image:', error);
-    return buffer; // Retornar buffer original si falla la optimización
+    // ✅ IMPORTANTE: Retornar buffer original si falla la optimización
+    return buffer;
   }
 };
 
-// Función principal para subir a Cloudinary
+// ✅ FUNCIÓN PRINCIPAL CORREGIDA PARA SUBIR A CLOUDINARY
 const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
   try {
     if (!isCloudinaryConfigured) {
@@ -160,20 +182,24 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       throw new Error('Invalid file format');
     }
     
-    // Determinar tipo de archivo y optimizar si es imagen
+    // Determinar tipo de archivo
     const isImage = mimetype.startsWith('image/');
 
-    if (isImage && !options.skipOptimization) {
+    // ✅ OPTIMIZAR IMAGEN SOLO SI NO ES AVATAR (para evitar errores con face detection)
+    if (isImage && !options.skipOptimization && fileType !== 'avatar') {
+      logger.debug('Optimizing image with Sharp');
       uploadBuffer = await optimizeImage(uploadBuffer, fileType);
+    } else if (fileType === 'avatar') {
+      logger.debug('Skipping Sharp optimization for avatar - using Cloudinary transformations');
     }
 
     // Generar ID único
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
-    const userId = options.userId || options.public_id?.includes('_') ? options.public_id.split('_')[1] : 'user';
+    const userId = options.userId || (options.public_id?.includes('_') ? options.public_id.split('_')[1] : 'user');
     const publicId = options.public_id || `${fileType}_${userId}_${timestamp}_${random}`;
 
-    // Configurar opciones de subida
+    // ✅ CONFIGURAR OPCIONES DE SUBIDA CORREGIDAS - FILTRAR CAMPOS INVÁLIDOS
     const uploadOptions = {
       folder,
       resource_type: isImage ? 'image' : 'raw',
@@ -181,32 +207,60 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       overwrite: false,
       unique_filename: true,
       use_filename: false,
-      ...options
+      // ✅ CRÍTICO: Solo incluir campos válidos de Cloudinary, NO incluir 'type' personalizado
+      ...(options.transformation && { transformation: options.transformation }),
+      ...(options.tags && { tags: options.tags }),
+      ...(options.context && { context: options.context }),
+      ...(options.notification_url && { notification_url: options.notification_url }),
+      ...(options.eager && { eager: options.eager }),
+      ...(options.backup && { backup: options.backup }),
+      ...(options.return_delete_token && { return_delete_token: options.return_delete_token })
     };
 
-    // Aplicar transformaciones específicas para imágenes
+    // ✅ APLICAR TRANSFORMACIONES ESPECÍFICAS PARA IMÁGENES (ESPECIALMENTE AVATARES)
     if (isImage && transformations[fileType]) {
       const transform = transformations[fileType];
-      uploadOptions.transformation = {
-        width: transform.width,
-        height: transform.height,
-        crop: transform.crop,
-        gravity: transform.gravity,
-        quality: transform.quality,
-        format: transform.format,
-        fetch_format: transform.fetch_format,
-        dpr: transform.dpr
-      };
+      
+      // ✅ Para avatares, usar transformaciones simples y seguras
+      if (fileType === 'avatar') {
+        uploadOptions.transformation = [
+          {
+            width: transform.width,
+            height: transform.height,
+            crop: transform.crop,
+            gravity: transform.gravity, // Cloudinary sí entiende 'face'
+            quality: transform.quality,
+            fetch_format: 'auto'
+          }
+        ];
+      } else {
+        uploadOptions.transformation = [
+          {
+            width: transform.width,
+            height: transform.height,
+            crop: transform.crop,
+            gravity: transform.gravity || 'center',
+            quality: transform.quality,
+            format: transform.format,
+            fetch_format: transform.fetch_format,
+            dpr: transform.dpr
+          }
+        ];
+      }
     }
 
-    // Subir archivo
+    logger.info('Files processed by multer');
+
+    // ✅ SUBIR ARCHIVO CON MEJOR MANEJO DE ERRORES
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         uploadOptions,
         (error, result) => {
           if (error) {
+            logger.error('Cloudinary upload error:', error);
             reject(error);
           } else {
+            logger.info('File uploaded successfully');
             resolve(result);
           }
         }
@@ -215,10 +269,15 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       uploadStream.end(uploadBuffer);
     });
 
-    // Generar variaciones de la imagen si es necesario
+    // ✅ GENERAR VARIACIONES DE LA IMAGEN SI ES NECESARIO (SOLO PARA POSTS)
     let variations = {};
     if (isImage && fileType === 'post' && !options.skipVariations) {
-      variations = await generateImageVariations(result.public_id);
+      try {
+        variations = await generateImageVariations(result.public_id);
+      } catch (error) {
+        logger.warn('Error generating image variations:', error);
+        // No es crítico, continuar sin variaciones
+      }
     }
 
     const uploadResult = {
@@ -232,7 +291,7 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       created_at: result.created_at,
       folder,
       variations,
-      optimized: isImage && !options.skipOptimization
+      optimized: isImage && !options.skipOptimization && fileType !== 'avatar'
     };
 
     logger.info('File uploaded to Cloudinary successfully', {
@@ -241,6 +300,7 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       size: result.bytes,
       format: result.format,
       folder,
+      fileType,
       hasVariations: Object.keys(variations).length > 0
     });
 
@@ -248,6 +308,15 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
 
   } catch (error) {
     logger.error('Error uploading to Cloudinary:', error);
+    
+    // ✅ MEJOR MANEJO DE ERRORES ESPECÍFICOS
+    if (error.message && error.message.includes('Invalid image file')) {
+      throw new Error('Archivo de imagen inválido o corrupto');
+    } else if (error.message && error.message.includes('File size too large')) {
+      throw new Error('Archivo demasiado grande');
+    } else if (error.message && error.message.includes('Invalid')) {
+      throw new Error('Archivo no válido para subir');
+    }
     
     // Fallback a almacenamiento local si Cloudinary falla
     if (process.env.NODE_ENV !== 'production') {
@@ -259,14 +328,21 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
   }
 };
 
-// Función para upload múltiple optimizada
+// ✅ FUNCIÓN PARA UPLOAD MÚLTIPLE CORREGIDA
 const uploadMultipleToCloudinary = async (files, options = {}) => {
   try {
     const uploadPromises = files.map((file, index) => {
       const fileOptions = {
-        ...options,
-        public_id: `${options.type || 'post'}_${options.userId || 'user'}_${Date.now()}_${index}`,
-        skipVariations: index > 0 // Solo generar variaciones para la primera imagen
+        // ✅ CRÍTICO: Solo incluir opciones válidas de Cloudinary, NO 'type' personalizado
+        public_id: `post_${options.userId || 'user'}_${Date.now()}_${index}`,
+        skipVariations: index > 0, // Solo generar variaciones para la primera imagen
+        // ✅ Solo incluir opciones válidas de Cloudinary
+        ...(options.transformation && { transformation: options.transformation }),
+        ...(options.tags && { tags: options.tags }),
+        ...(options.context && { context: options.context }),
+        ...(options.notification_url && { notification_url: options.notification_url }),
+        ...(options.eager && { eager: options.eager }),
+        ...(options.backup && { backup: options.backup })
       };
       
       return uploadToCloudinary(file, options.folder || 'telofundi/posts', fileOptions);

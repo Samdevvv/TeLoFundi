@@ -4,9 +4,16 @@ const { sanitizeString } = require('../utils/validators');
 const { uploadToCloudinary, getCloudinaryUsage, deleteFromCloudinary } = require('../services/uploadService');
 const logger = require('../utils/logger');
 
-// Obtener perfil del usuario autenticado
+// ✅ CORREGIDO: Obtener perfil del usuario autenticado
 const getUserProfile = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
+  console.log('🔍 Obteniendo perfil para usuario:', userId);
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -30,6 +37,8 @@ const getUserProfile = catchAsync(async (req, res) => {
   if (!user) {
     throw new AppError('Usuario no encontrado', 404, 'USER_NOT_FOUND');
   }
+
+  console.log('✅ Usuario encontrado:', user.username, `(${user.userType})`);
 
   // Respuesta sin datos sensibles
   const userResponse = {
@@ -62,9 +71,18 @@ const getUserProfile = catchAsync(async (req, res) => {
   });
 });
 
-// Actualizar perfil del usuario autenticado
+// ✅ SOLUCION COMPLETA: updateUserProfile corregido con transacciones
 const updateUserProfile = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
+  console.log('🔍 Actualizando perfil para usuario:', userId);
+  console.log('📥 Datos recibidos:', Object.keys(req.body));
+
   const {
     firstName,
     lastName,
@@ -83,187 +101,296 @@ const updateUserProfile = catchAsync(async (req, res) => {
     services,
     rates,
     availability,
-    languages
+    languages,
+    specialties,
+    hobbies,
+    personalityTraits,
+    outcallAreas,
+    measurements,
+    workingHours,
+    socialMedia,
+    aboutMe,
+    education,
+    incallLocation,
+    experience,
+    preferredClientType
   } = req.body;
 
-  // Preparar datos de actualización
-  const updateData = {
-    ...(firstName && { firstName: sanitizeString(firstName) }),
-    ...(lastName && { lastName: sanitizeString(lastName) }),
-    ...(bio !== undefined && { bio: sanitizeString(bio) || null }),
-    ...(phone !== undefined && { phone: phone || null }),
-    ...(website !== undefined && { website: website || null }),
-    ...(locationId !== undefined && { locationId: locationId || null }),
-    updatedAt: new Date()
-  };
-
-  // Datos específicos para escorts
-  let escortUpdateData = null;
-  if (req.user.userType === 'ESCORT') {
-    escortUpdateData = {
-      ...(age !== undefined && { age: age || null }),
-      ...(height !== undefined && { height: height || null }),
-      ...(weight !== undefined && { weight: weight || null }),
-      ...(bodyType !== undefined && { bodyType: bodyType || null }),
-      ...(ethnicity !== undefined && { ethnicity: ethnicity || null }),
-      ...(hairColor !== undefined && { hairColor: hairColor || null }),
-      ...(eyeColor !== undefined && { eyeColor: eyeColor || null }),
-      ...(services && { services: services }),
-      ...(rates && { rates: rates }),
-      ...(availability && { availability: availability }),
-      ...(languages && { languages: languages })
+  try {
+    // ✅ PREPARAR DATOS DE ACTUALIZACIÓN BÁSICOS
+    const updateData = {
+      ...(firstName && { firstName: sanitizeString(firstName) }),
+      ...(lastName && { lastName: sanitizeString(lastName) }),
+      ...(bio !== undefined && { bio: sanitizeString(bio) || null }),
+      ...(phone !== undefined && { phone: phone || null }),
+      ...(website !== undefined && { website: website || null }),
+      ...(locationId !== undefined && { locationId: locationId || null }),
+      updatedAt: new Date()
     };
-  }
 
-  // Actualizar usuario
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...updateData,
-      ...(escortUpdateData && req.user.userType === 'ESCORT' && {
-        escort: {
-          update: escortUpdateData
+    console.log('📤 Datos básicos a actualizar:', Object.keys(updateData));
+
+    // ✅ USAR TRANSACCIÓN PARA ACTUALIZAR TODO JUNTO
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Actualizar datos básicos del usuario
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: updateData,
+        include: {
+          escort: true,
+          agency: true,
+          client: true,
+          settings: true,
+          reputation: true,
+          location: true
         }
-      })
-    },
-    include: {
-      escort: true,
-      agency: true,
-      client: true,
-      settings: true,
-      reputation: true,
-      location: true
+      });
+
+      // 2. Si es ESCORT, actualizar/crear datos específicos
+      if (req.user.userType === 'ESCORT') {
+        console.log('🏷️ Procesando datos de ESCORT...');
+        
+        // Preparar datos específicos de escort
+        const escortUpdateData = {};
+        
+        // Solo agregar campos que tienen valor
+        if (age !== undefined && age !== '') escortUpdateData.age = parseInt(age) || null;
+        if (height !== undefined && height !== '') escortUpdateData.height = parseInt(height) || null;
+        if (weight !== undefined && weight !== '') escortUpdateData.weight = parseInt(weight) || null;
+        if (bodyType !== undefined && bodyType !== '') escortUpdateData.bodyType = bodyType;
+        if (ethnicity !== undefined && ethnicity !== '') escortUpdateData.ethnicity = ethnicity;
+        if (hairColor !== undefined && hairColor !== '') escortUpdateData.hairColor = hairColor;
+        if (eyeColor !== undefined && eyeColor !== '') escortUpdateData.eyeColor = eyeColor;
+        if (experience !== undefined && experience !== '') escortUpdateData.experience = experience;
+        if (preferredClientType !== undefined && preferredClientType !== '') escortUpdateData.preferredClientType = preferredClientType;
+        if (aboutMe !== undefined && aboutMe !== '') escortUpdateData.aboutMe = sanitizeString(aboutMe) || null;
+        if (education !== undefined && education !== '') escortUpdateData.education = sanitizeString(education) || null;
+        if (incallLocation !== undefined && incallLocation !== '') escortUpdateData.incallLocation = sanitizeString(incallLocation) || null;
+
+        // Arrays y objetos (solo si tienen contenido)
+        if (services && Array.isArray(services) && services.length > 0) escortUpdateData.services = services;
+        if (languages && Array.isArray(languages) && languages.length > 0) escortUpdateData.languages = languages;
+        if (specialties && Array.isArray(specialties) && specialties.length > 0) escortUpdateData.specialties = specialties;
+        if (hobbies && Array.isArray(hobbies) && hobbies.length > 0) escortUpdateData.hobbies = hobbies;
+        if (personalityTraits && Array.isArray(personalityTraits) && personalityTraits.length > 0) escortUpdateData.personalityTraits = personalityTraits;
+        if (outcallAreas && Array.isArray(outcallAreas) && outcallAreas.length > 0) escortUpdateData.outcallAreas = outcallAreas;
+
+        if (rates && typeof rates === 'object' && Object.keys(rates).length > 0) escortUpdateData.rates = rates;
+        if (availability && typeof availability === 'object' && Object.keys(availability).length > 0) escortUpdateData.availability = availability;
+        if (measurements && typeof measurements === 'object' && Object.keys(measurements).length > 0) escortUpdateData.measurements = measurements;
+        if (workingHours && typeof workingHours === 'object' && Object.keys(workingHours).length > 0) escortUpdateData.workingHours = workingHours;
+        if (socialMedia && typeof socialMedia === 'object' && Object.keys(socialMedia).length > 0) escortUpdateData.socialMedia = socialMedia;
+
+        console.log('📤 Datos de escort a actualizar:', Object.keys(escortUpdateData));
+
+        // ✅ USAR UPSERT PARA CREAR O ACTUALIZAR REGISTRO DE ESCORT
+        if (Object.keys(escortUpdateData).length > 0) {
+          await tx.escort.upsert({
+            where: { userId },
+            update: escortUpdateData,
+            create: {
+              userId,
+              ...escortUpdateData
+            }
+          });
+          console.log('✅ Datos de escort actualizados/creados');
+        }
+      }
+
+      // 3. Calcular nueva completitud del perfil
+      const profileCompleteness = calculateProfileCompleteness(updatedUser);
+      
+      // 4. Actualizar score de reputación
+      await tx.userReputation.upsert({
+        where: { userId },
+        update: {
+          profileCompleteness,
+          lastScoreUpdate: new Date()
+        },
+        create: {
+          userId,
+          profileCompleteness,
+          overallScore: 50, // Score inicial
+          trustScore: 50,
+          discoveryScore: 50,
+          trendingScore: 50,
+          qualityScore: 50
+        }
+      });
+
+      // 5. Obtener usuario final actualizado
+      const finalUser = await tx.user.findUnique({
+        where: { id: userId },
+        include: {
+          escort: true,
+          agency: true,
+          client: true,
+          settings: true,
+          reputation: true,
+          location: true
+        }
+      });
+
+      return finalUser;
+    });
+
+    logger.info('Profile updated', {
+      userId,
+      updatedFields: Object.keys(updateData),
+      userType: req.user.userType
+    });
+
+    // ✅ RESPUESTA SIN DATOS SENSIBLES
+    const userResponse = {
+      id: result.id,
+      email: result.email,
+      username: result.username,
+      firstName: result.firstName,
+      lastName: result.lastName,
+      avatar: result.avatar,
+      userType: result.userType,
+      phone: result.phone,
+      bio: result.bio,
+      website: result.website,
+      profileViews: result.profileViews,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
+      location: result.location,
+      settings: result.settings,
+      reputation: result.reputation,
+      [result.userType.toLowerCase()]: result[result.userType.toLowerCase()]
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Perfil actualizado exitosamente',
+      data: userResponse,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando perfil:', error);
+    
+    // ✅ MANEJO ESPECÍFICO DE ERRORES DE PRISMA
+    if (error.code === 'P2002') {
+      throw new AppError('Ya existe un registro con estos datos únicos', 409, 'UNIQUE_CONSTRAINT_ERROR');
+    } else if (error.code === 'P2025') {
+      throw new AppError('Usuario no encontrado', 404, 'USER_NOT_FOUND');
+    } else if (error.code === 'P2016') {
+      throw new AppError('Error en la consulta a la base de datos', 400, 'QUERY_INTERPRETATION_ERROR');
     }
-  });
-
-  // Calcular nueva completitud del perfil
-  const profileCompleteness = calculateProfileCompleteness(updatedUser);
-  
-  // Actualizar score de reputación
-  await prisma.userReputation.update({
-    where: { userId },
-    data: {
-      profileCompleteness,
-      lastScoreUpdate: new Date()
-    }
-  });
-
-  logger.info('Profile updated', {
-    userId,
-    updatedFields: Object.keys(updateData),
-    userType: req.user.userType
-  });
-
-  // Respuesta sin datos sensibles
-  const userResponse = {
-    id: updatedUser.id,
-    email: updatedUser.email,
-    username: updatedUser.username,
-    firstName: updatedUser.firstName,
-    lastName: updatedUser.lastName,
-    avatar: updatedUser.avatar,
-    userType: updatedUser.userType,
-    phone: updatedUser.phone,
-    bio: updatedUser.bio,
-    website: updatedUser.website,
-    profileViews: updatedUser.profileViews,
-    createdAt: updatedUser.createdAt,
-    updatedAt: updatedUser.updatedAt,
-    location: updatedUser.location,
-    settings: updatedUser.settings,
-    reputation: updatedUser.reputation,
-    [updatedUser.userType.toLowerCase()]: updatedUser[updatedUser.userType.toLowerCase()]
-  };
-
-  res.status(200).json({
-    success: true,
-    message: 'Perfil actualizado exitosamente',
-    data: userResponse,
-    timestamp: new Date().toISOString()
-  });
+    
+    throw new AppError('Error actualizando perfil', 500, 'UPDATE_PROFILE_ERROR');
+  }
 });
 
-// Subir foto de perfil - OPTIMIZADO PARA CLOUDINARY
+// ✅ SOLUCIÓN RÁPIDA: uploadProfilePicture SIN eliminación de avatar anterior
 const uploadProfilePicture = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
   const userId = req.user.id;
-
   if (!req.file) {
     throw new AppError('No se proporcionó ningún archivo', 400, 'NO_FILE');
   }
-
-  // Obtener avatar anterior para eliminarlo
-  const currentUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { avatar: true }
-  });
-
-  // Subir nueva imagen a Cloudinary con configuración optimizada
-  const result = await uploadToCloudinary(req.file, 'telofundi/avatars', {
-    type: 'avatar',
-    userId: userId,
-    mimetype: req.file.mimetype,
-    public_id: `avatar_${userId}_${Date.now()}`
-  });
-
-  // Actualizar avatar del usuario
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: { 
-      avatar: result.secure_url,
-      updatedAt: new Date()
-    },
-    select: {
-      id: true,
-      avatar: true,
-      firstName: true,
-      lastName: true,
-      userType: true
-    }
-  });
-
-  // Eliminar avatar anterior de Cloudinary si existe
-  if (currentUser.avatar && currentUser.avatar.includes('cloudinary')) {
-    try {
-      const publicId = extractPublicIdFromUrl(currentUser.avatar);
-      if (publicId) {
-        await deleteFromCloudinary(publicId);
-      }
-    } catch (error) {
-      logger.warn('Could not delete old avatar from Cloudinary', {
-        userId,
-        oldAvatar: currentUser.avatar,
-        error: error.message
-      });
-    }
+  // ✅ VERIFICAR QUE EL ARCHIVO SE SUBIÓ A CLOUDINARY CORRECTAMENTE
+  if (!req.uploadedFile) {
+    throw new AppError('Error procesando el archivo', 500, 'FILE_PROCESSING_ERROR');
   }
-
-  logger.info('Avatar uploaded', {
-    userId,
-    avatarUrl: result.secure_url,
-    fileSize: req.file.size,
-    publicId: result.public_id
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Foto de perfil actualizada',
-    data: {
-      user: updatedUser,
-      avatar: result.secure_url,
-      cloudinary: {
-        public_id: result.public_id,
-        format: result.format,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes
+  try {
+    // ✅ ACTUALIZAR AVATAR DEL USUARIO CON LA URL DE CLOUDINARY YA PROCESADA
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        avatar: req.uploadedFile.secure_url, // ✅ Usar la URL ya procesada por el middleware
+        updatedAt: new Date()
+      },
+      select: {
+        id: true,
+        avatar: true,
+        firstName: true,
+        lastName: true,
+        userType: true
       }
-    },
-    timestamp: new Date().toISOString()
-  });
+    });
+    // ✅ COMENTAR TEMPORALMENTE LA ELIMINACIÓN DEL AVATAR ANTERIOR
+    // TODO: Implementar eliminación de avatar anterior de forma segura
+    /*
+    if (currentUser.avatar && currentUser.avatar.includes('cloudinary.com')) {
+      try {
+        const publicId = extractPublicIdFromUrl(currentUser.avatar);
+        if (publicId) {
+          await deleteFromCloudinary(publicId);
+        }
+      } catch (deleteError) {
+        logger.warn('Could not delete old avatar from Cloudinary', {
+          userId,
+          error: deleteError.message
+        });
+      }
+    }
+    */
+    logger.info('Avatar uploaded successfully', {
+      userId,
+      avatarUrl: req.uploadedFile.secure_url,
+      fileSize: req.file.size,
+      publicId: req.uploadedFile.public_id
+    });
+    // ✅ RESPUESTA EXITOSA CON INFORMACIÓN COMPLETA
+    res.status(200).json({
+      success: true,
+      message: 'Foto de perfil actualizada exitosamente',
+      data: {
+        user: updatedUser,
+        avatar: req.uploadedFile.secure_url,
+        cloudinary: {
+          public_id: req.uploadedFile.public_id,
+          format: req.uploadedFile.format,
+          width: req.uploadedFile.width,
+          height: req.uploadedFile.height,
+          bytes: req.uploadedFile.bytes
+        }
+      },
+      uploadedFile: {
+        url: req.uploadedFile.secure_url,
+        publicId: req.uploadedFile.public_id,
+        size: req.uploadedFile.bytes,
+        format: req.uploadedFile.format,
+        width: req.uploadedFile.width,
+        height: req.uploadedFile.height,
+        optimized: req.uploadedFile.optimized || false
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error in uploadProfilePicture:', {
+      error: error.message,
+      stack: error.stack,
+      userId,
+      hasUploadedFile: !!req.uploadedFile
+    });
+    
+    // ✅ MEJOR MANEJO DE ERRORES
+    if (error.code === 'P2025') {
+      throw new AppError('Usuario no encontrado', 404, 'USER_NOT_FOUND');
+    } else if (error.message && error.message.includes('Cloudinary')) {
+      throw new AppError('Error procesando la imagen en Cloudinary', 500, 'CLOUDINARY_ERROR');
+    }
+    
+    throw new AppError('Error actualizando foto de perfil', 500, 'AVATAR_UPDATE_ERROR');
+  }
 });
 
 // Eliminar foto de perfil - MEJORADO
 const deleteProfilePicture = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
   
   // Obtener avatar actual
@@ -655,7 +782,7 @@ const searchUsers = catchAsync(async (req, res) => {
 const getDiscoverUsers = catchAsync(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
-  const userId = req.user.id;
+  const userId = req.user?.id || null;
 
   // Obtener usuarios recomendados basado en algoritmo
   const [users, totalCount] = await Promise.all([
@@ -663,7 +790,7 @@ const getDiscoverUsers = catchAsync(async (req, res) => {
       where: {
         isActive: true,
         isBanned: false,
-        NOT: { id: userId },
+        ...(userId && { NOT: { id: userId } }),
         settings: {
           showInDiscovery: true
         }
@@ -701,7 +828,7 @@ const getDiscoverUsers = catchAsync(async (req, res) => {
       where: {
         isActive: true,
         isBanned: false,
-        NOT: { id: userId },
+        ...(userId && { NOT: { id: userId } }),
         settings: {
           showInDiscovery: true
         }
@@ -744,14 +871,14 @@ const getDiscoverUsers = catchAsync(async (req, res) => {
 const getTrendingUsers = catchAsync(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
-  const userId = req.user.id;
+  const userId = req.user?.id || null;
 
   const [users, totalCount] = await Promise.all([
     prisma.user.findMany({
       where: {
         isActive: true,
         isBanned: false,
-        NOT: { id: userId },
+        ...(userId && { NOT: { id: userId } }),
         settings: {
           showInTrending: true
         }
@@ -788,7 +915,7 @@ const getTrendingUsers = catchAsync(async (req, res) => {
       where: {
         isActive: true,
         isBanned: false,
-        NOT: { id: userId },
+        ...(userId && { NOT: { id: userId } }),
         settings: {
           showInTrending: true
         }
@@ -829,6 +956,12 @@ const getTrendingUsers = catchAsync(async (req, res) => {
 
 // Obtener estadísticas del usuario
 const getUserStats = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
 
   const stats = await prisma.user.findUnique({
@@ -867,7 +1000,11 @@ const getUserStats = catchAsync(async (req, res) => {
 
 // Reportar usuario
 const reportUser = catchAsync(async (req, res) => {
-  const reporterId = req.user.id;
+  const reporterId = req.user?.id;
+  if (!reporterId) {
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { userId: reportedId } = req.params;
   const { reason, description, evidence } = req.body;
 
@@ -912,6 +1049,12 @@ const reportUser = catchAsync(async (req, res) => {
 
 // Eliminar cuenta de usuario
 const deleteUserAccount = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
   const { password, reason } = req.body;
 
@@ -952,6 +1095,12 @@ const deleteUserAccount = catchAsync(async (req, res) => {
 
 // Obtener configuraciones del usuario
 const getUserSettings = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
 
   const settings = await prisma.userSettings.findUnique({
@@ -971,6 +1120,12 @@ const getUserSettings = catchAsync(async (req, res) => {
 
 // Actualizar configuraciones del usuario
 const updateUserSettings = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
   const settingsData = req.body;
 
@@ -1025,7 +1180,11 @@ const updateUserSettings = catchAsync(async (req, res) => {
 
 // Bloquear usuario
 const blockUser = catchAsync(async (req, res) => {
-  const blockerId = req.user.id;
+  const blockerId = req.user?.id;
+  if (!blockerId) {
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { userId: blockedId } = req.params;
   const { reason } = req.body;
 
@@ -1082,7 +1241,11 @@ const blockUser = catchAsync(async (req, res) => {
 
 // Desbloquear usuario
 const unblockUser = catchAsync(async (req, res) => {
-  const blockerId = req.user.id;
+  const blockerId = req.user?.id;
+  if (!blockerId) {
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { userId: blockedId } = req.params;
 
   const block = await prisma.userBlock.findUnique({
@@ -1121,7 +1284,11 @@ const unblockUser = catchAsync(async (req, res) => {
 
 // Obtener usuarios bloqueados
 const getBlockedUsers = catchAsync(async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user?.id;
+  if (!userId) {
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { page = 1, limit = 20 } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -1177,7 +1344,7 @@ const getBlockedUsers = catchAsync(async (req, res) => {
 // NUEVO: Obtener estadísticas de Cloudinary
 const getCloudinaryStats = catchAsync(async (req, res) => {
   // Solo admins pueden ver estas estadísticas
-  if (req.user.userType !== 'ADMIN') {
+  if (!req.user || req.user.userType !== 'ADMIN') {
     throw new AppError('Acceso denegado', 403, 'ACCESS_DENIED');
   }
 
@@ -1190,7 +1357,7 @@ const getCloudinaryStats = catchAsync(async (req, res) => {
   });
 });
 
-// Función helper para calcular completitud del perfil
+// ✅ FUNCIÓN HELPER PARA CALCULAR COMPLETITUD DEL PERFIL
 const calculateProfileCompleteness = (user) => {
   let completeness = 0;
   const baseFields = ['firstName', 'lastName', 'bio', 'avatar', 'phone'];

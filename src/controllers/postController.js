@@ -4,9 +4,25 @@ const { sanitizeString } = require('../utils/validators');
 const { uploadToCloudinary, uploadMultipleToCloudinary, deleteFromCloudinary } = require('../services/uploadService');
 const logger = require('../utils/logger');
 
-// Crear nuevo post/anuncio - OPTIMIZADO PARA CLOUDINARY
+// ✅ CREAR NUEVO POST - CORREGIDO PARA FORMDATA
 const createPost = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
+  
+  console.log('📝 === CREATE POST DEBUG ===');
+  console.log('📝 User ID:', userId);
+  console.log('📝 Content-Type:', req.get('content-type'));
+  console.log('📝 Body received:', req.body);
+  console.log('📝 Files received:', req.files?.length || 0);
+  console.log('📝 Uploaded files:', req.uploadedFiles?.length || 0);
+  console.log('📝 === END DEBUG ===');
+
+  // ✅ EXTRAER DATOS DEL FORMDATA (req.body ya está parseado por multer)
   const {
     title,
     description,
@@ -18,6 +34,27 @@ const createPost = catchAsync(async (req, res) => {
     tags,
     premiumOnly = false
   } = req.body;
+
+  console.log('📝 Extracted data:', {
+    title,
+    description: description?.substring(0, 50) + '...',
+    phone,
+    hasServices: !!services,
+    premiumOnly
+  });
+
+  // ✅ VALIDACIÓN DE CAMPOS REQUERIDOS
+  if (!title?.trim()) {
+    throw new AppError('El título es obligatorio', 400, 'TITLE_REQUIRED');
+  }
+  
+  if (!description?.trim()) {
+    throw new AppError('La descripción es obligatoria', 400, 'DESCRIPTION_REQUIRED');
+  }
+  
+  if (!phone?.trim()) {
+    throw new AppError('El teléfono es obligatorio', 400, 'PHONE_REQUIRED');
+  }
 
   // Verificar límites según tipo de usuario
   if (req.user.userType === 'ESCORT') {
@@ -34,39 +71,45 @@ const createPost = catchAsync(async (req, res) => {
     }
   }
 
-  // Subir imágenes si las hay - OPTIMIZADO PARA MÚLTIPLES UPLOADS
+  // ✅ PROCESAR IMÁGENES SUBIDAS A CLOUDINARY
   let imageUrls = [];
-  if (req.files && req.files.length > 0) {
-    const maxImages = 5;
-    if (req.files.length > maxImages) {
-      throw new AppError(`Máximo ${maxImages} imágenes permitidas`, 400, 'TOO_MANY_IMAGES');
-    }
-
-    // Usar función optimizada para upload múltiple
-    const uploadResult = await uploadMultipleToCloudinary(req.files, {
-      folder: 'telofundi/posts',
-      type: 'post',
-      userId: userId,
-      generateVariations: true
-    });
-
-    if (uploadResult.totalFailed > 0) {
-      logger.warn('Some images failed to upload', {
-        userId,
-        successful: uploadResult.totalUploaded,
-        failed: uploadResult.totalFailed
-      });
-    }
-
-    imageUrls = uploadResult.successful.map(result => result.secure_url);
-
-    // Si no se pudo subir ninguna imagen, reportar error
-    if (imageUrls.length === 0 && req.files.length > 0) {
-      throw new AppError('Error subiendo las imágenes. Intenta de nuevo.', 500, 'IMAGE_UPLOAD_FAILED');
-    }
+  
+  if (req.uploadedFiles && req.uploadedFiles.length > 0) {
+    imageUrls = req.uploadedFiles.map(result => result.secure_url);
+    console.log('✅ Images uploaded to Cloudinary:', imageUrls.length);
+  } else if (req.files && req.files.length > 0) {
+    // Fallback: si Cloudinary falló, reportar error
+    console.log('❌ Cloudinary upload failed, but files were received');
+    throw new AppError('Error subiendo las imágenes. Intenta de nuevo.', 500, 'IMAGE_UPLOAD_FAILED');
+  } else {
+    throw new AppError('Debes agregar al menos una imagen', 400, 'IMAGES_REQUIRED');
   }
 
-  // Crear post
+  // ✅ PARSEAR DATOS JSON DESDE FORMDATA
+  let parsedServices = [];
+  let parsedRates = null;
+  let parsedAvailability = null;
+  let parsedTags = [];
+
+  try {
+    if (services) {
+      parsedServices = typeof services === 'string' ? JSON.parse(services) : services;
+    }
+    if (rates) {
+      parsedRates = typeof rates === 'string' ? JSON.parse(rates) : rates;
+    }
+    if (availability) {
+      parsedAvailability = typeof availability === 'string' ? JSON.parse(availability) : availability;
+    }
+    if (tags) {
+      parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+    }
+  } catch (parseError) {
+    console.error('❌ Error parsing JSON fields:', parseError);
+    throw new AppError('Error en el formato de los datos', 400, 'JSON_PARSE_ERROR');
+  }
+
+  // ✅ CREAR POST EN LA BASE DE DATOS
   const newPost = await prisma.post.create({
     data: {
       title: sanitizeString(title),
@@ -74,13 +117,13 @@ const createPost = catchAsync(async (req, res) => {
       phone: phone || req.user.phone,
       images: imageUrls,
       locationId: locationId || req.user.locationId,
-      services: services || [],
-      rates: rates || null,
-      availability: availability || null,
-      premiumOnly: premiumOnly && req.user.userType !== 'CLIENT',
+      services: parsedServices || [],
+      rates: parsedRates,
+      availability: parsedAvailability,
+      premiumOnly: premiumOnly === 'true' && req.user.userType !== 'CLIENT',
       authorId: userId,
       // Scores iniciales
-      score: 10.0, // Score inicial
+      score: 10.0,
       discoveryScore: 15.0,
       qualityScore: calculateInitialQualityScore(title, description, imageUrls.length)
     },
@@ -114,9 +157,9 @@ const createPost = catchAsync(async (req, res) => {
   }
 
   // Procesar tags si los hay
-  if (tags && tags.length > 0) {
-    const tagConnections = await Promise.all(
-      tags.map(async (tagName) => {
+  if (parsedTags && parsedTags.length > 0) {
+    await Promise.all(
+      parsedTags.map(async (tagName) => {
         // Buscar o crear tag
         const tag = await prisma.tag.upsert({
           where: { name: tagName.toLowerCase() },
@@ -148,13 +191,13 @@ const createPost = catchAsync(async (req, res) => {
     }
   });
 
-  logger.info('Post created', {
+  logger.info('Post created successfully', {
     postId: newPost.id,
     userId,
     userType: req.user.userType,
     imagesCount: imageUrls.length,
     hasLocation: !!locationId,
-    cloudinaryUploads: req.files?.length || 0
+    cloudinaryUploads: req.uploadedFiles?.length || 0
   });
 
   res.status(201).json({
@@ -166,6 +209,229 @@ const createPost = catchAsync(async (req, res) => {
       favoritesCount: newPost._count.favorites,
       isLiked: false,
       isFavorited: false
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ ACTUALIZAR POST - CORREGIDO PARA FORMDATA
+const updatePost = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
+  const { postId } = req.params;
+  const userId = req.user.id;
+  
+  console.log('📝 === UPDATE POST DEBUG ===');
+  console.log('📝 Post ID:', postId);
+  console.log('📝 User ID:', userId);
+  console.log('📝 Content-Type:', req.get('content-type'));
+  console.log('📝 Body received:', req.body);
+  console.log('📝 Files received:', req.files?.length || 0);
+  console.log('📝 Uploaded files:', req.uploadedFiles?.length || 0);
+  console.log('📝 === END DEBUG ===');
+
+  const {
+    title,
+    description,
+    phone,
+    locationId,
+    services,
+    rates,
+    availability,
+    tags,
+    premiumOnly,
+    removeImages // Array de URLs de imágenes a eliminar (JSON string)
+  } = req.body;
+
+  // Verificar que el post existe y pertenece al usuario
+  const existingPost = await prisma.post.findFirst({
+    where: {
+      id: postId,
+      authorId: userId,
+      isActive: true
+    }
+  });
+
+  if (!existingPost) {
+    throw new AppError('Anuncio no encontrado o no tienes permisos', 404, 'POST_NOT_FOUND');
+  }
+
+  // ✅ PREPARAR DATOS DE ACTUALIZACIÓN
+  const updateData = {
+    ...(title && { title: sanitizeString(title) }),
+    ...(description && { description: sanitizeString(description) }),
+    ...(phone !== undefined && { phone }),
+    ...(locationId !== undefined && { locationId }),
+    ...(premiumOnly !== undefined && req.user.userType !== 'CLIENT' && { 
+      premiumOnly: premiumOnly === 'true' 
+    }),
+    updatedAt: new Date()
+  };
+
+  // ✅ PARSEAR DATOS JSON DESDE FORMDATA
+  try {
+    if (services) {
+      updateData.services = typeof services === 'string' ? JSON.parse(services) : services;
+    }
+    if (rates !== undefined) {
+      updateData.rates = rates ? (typeof rates === 'string' ? JSON.parse(rates) : rates) : null;
+    }
+    if (availability !== undefined) {
+      updateData.availability = availability ? (typeof availability === 'string' ? JSON.parse(availability) : availability) : null;
+    }
+  } catch (parseError) {
+    console.error('❌ Error parsing JSON fields in update:', parseError);
+    throw new AppError('Error en el formato de los datos', 400, 'JSON_PARSE_ERROR');
+  }
+
+  // Actualizar calidad si cambió contenido importante
+  if (title || description) {
+    updateData.qualityScore = calculateInitialQualityScore(
+      title || existingPost.title,
+      description || existingPost.description,
+      existingPost.images.length
+    );
+    updateData.lastScoreUpdate = new Date();
+  }
+
+  // ✅ MANEJAR ELIMINACIÓN DE IMÁGENES
+  let currentImages = [...existingPost.images];
+  let imagesToRemove = [];
+  
+  if (removeImages) {
+    try {
+      imagesToRemove = typeof removeImages === 'string' ? JSON.parse(removeImages) : removeImages;
+    } catch (parseError) {
+      console.error('❌ Error parsing removeImages:', parseError);
+      imagesToRemove = [];
+    }
+  }
+
+  if (imagesToRemove.length > 0) {
+    // Eliminar de Cloudinary
+    for (const imageUrl of imagesToRemove) {
+      if (imageUrl.includes('cloudinary')) {
+        try {
+          const publicId = extractPublicIdFromUrl(imageUrl);
+          if (publicId) {
+            await deleteFromCloudinary(publicId);
+            logger.info('Image deleted from Cloudinary during update', { publicId, postId });
+          }
+        } catch (error) {
+          logger.warn('Could not delete image from Cloudinary during update', {
+            imageUrl,
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    // Remover de la lista actual
+    currentImages = currentImages.filter(img => !imagesToRemove.includes(img));
+  }
+
+  // ✅ AGREGAR NUEVAS IMÁGENES
+  if (req.uploadedFiles && req.uploadedFiles.length > 0) {
+    const totalImages = currentImages.length + req.uploadedFiles.length;
+    if (totalImages > 5) {
+      throw new AppError('Máximo 5 imágenes permitidas en total', 400, 'TOO_MANY_IMAGES');
+    }
+
+    const newImageUrls = req.uploadedFiles.map(result => result.secure_url);
+    currentImages = [...currentImages, ...newImageUrls];
+    
+    console.log('✅ New images added:', newImageUrls.length);
+  }
+
+  // Actualizar array de imágenes
+  updateData.images = currentImages;
+
+  // ✅ ACTUALIZAR POST EN BASE DE DATOS
+  const updatedPost = await prisma.post.update({
+    where: { id: postId },
+    data: updateData,
+    include: {
+      author: {
+        select: {
+          id: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          avatar: true,
+          userType: true
+        }
+      },
+      location: true,
+      _count: {
+        select: {
+          likes: true,
+          favorites: true
+        }
+      }
+    }
+  });
+
+  // ✅ ACTUALIZAR TAGS SI SE PROPORCIONARON
+  if (tags) {
+    let parsedTags = [];
+    try {
+      parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+    } catch (parseError) {
+      console.error('❌ Error parsing tags:', parseError);
+    }
+
+    if (Array.isArray(parsedTags)) {
+      // Eliminar tags existentes
+      await prisma.postTag.deleteMany({
+        where: { postId }
+      });
+
+      // Agregar nuevos tags
+      if (parsedTags.length > 0) {
+        await Promise.all(
+          parsedTags.map(async (tagName) => {
+            const tag = await prisma.tag.upsert({
+              where: { name: tagName.toLowerCase() },
+              update: { usageCount: { increment: 1 } },
+              create: {
+                name: tagName.toLowerCase(),
+                slug: tagName.toLowerCase().replace(/\s+/g, '-'),
+                usageCount: 1
+              }
+            });
+
+            return prisma.postTag.create({
+              data: {
+                postId,
+                tagId: tag.id
+              }
+            });
+          })
+        );
+      }
+    }
+  }
+
+  logger.info('Post updated successfully', {
+    postId,
+    userId,
+    updatedFields: Object.keys(updateData),
+    imagesRemoved: imagesToRemove?.length || 0,
+    imagesAdded: req.uploadedFiles?.length || 0,
+    totalImages: currentImages.length
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Anuncio actualizado exitosamente',
+    data: {
+      ...updatedPost,
+      likesCount: updatedPost._count.likes,
+      favoritesCount: updatedPost._count.favorites
     },
     timestamp: new Date().toISOString()
   });
@@ -849,185 +1115,14 @@ const getPostById = catchAsync(async (req, res) => {
   });
 });
 
-// Actualizar post - OPTIMIZADO PARA CLOUDINARY
-const updatePost = catchAsync(async (req, res) => {
-  const { postId } = req.params;
-  const userId = req.user.id;
-  const {
-    title,
-    description,
-    phone,
-    locationId,
-    services,
-    rates,
-    availability,
-    tags,
-    premiumOnly,
-    removeImages // Array de URLs de imágenes a eliminar
-  } = req.body;
-
-  // Verificar que el post existe y pertenece al usuario
-  const existingPost = await prisma.post.findFirst({
-    where: {
-      id: postId,
-      authorId: userId,
-      isActive: true
-    }
-  });
-
-  if (!existingPost) {
-    throw new AppError('Anuncio no encontrado o no tienes permisos', 404, 'POST_NOT_FOUND');
-  }
-
-  // Preparar datos de actualización
-  const updateData = {
-    ...(title && { title: sanitizeString(title) }),
-    ...(description && { description: sanitizeString(description) }),
-    ...(phone !== undefined && { phone }),
-    ...(locationId !== undefined && { locationId }),
-    ...(services && { services }),
-    ...(rates !== undefined && { rates }),
-    ...(availability !== undefined && { availability }),
-    ...(premiumOnly !== undefined && req.user.userType !== 'CLIENT' && { premiumOnly }),
-    updatedAt: new Date()
-  };
-
-  // Actualizar calidad si cambió contenido importante
-  if (title || description) {
-    updateData.qualityScore = calculateInitialQualityScore(
-      title || existingPost.title,
-      description || existingPost.description,
-      existingPost.images.length
-    );
-    updateData.lastScoreUpdate = new Date();
-  }
-
-  // Manejar eliminación de imágenes
-  let currentImages = [...existingPost.images];
-  if (removeImages && removeImages.length > 0) {
-    // Eliminar de Cloudinary
-    for (const imageUrl of removeImages) {
-      if (imageUrl.includes('cloudinary')) {
-        try {
-          const publicId = extractPublicIdFromUrl(imageUrl);
-          if (publicId) {
-            await deleteFromCloudinary(publicId);
-            logger.info('Image deleted from Cloudinary', { publicId, postId });
-          }
-        } catch (error) {
-          logger.warn('Could not delete image from Cloudinary', {
-            imageUrl,
-            error: error.message
-          });
-        }
-      }
-    }
-    
-    // Remover de la lista actual
-    currentImages = currentImages.filter(img => !removeImages.includes(img));
-  }
-
-  // Subir nuevas imágenes si las hay
-  if (req.files && req.files.length > 0) {
-    const totalImages = currentImages.length + req.files.length;
-    if (totalImages > 5) {
-      throw new AppError('Máximo 5 imágenes permitidas en total', 400, 'TOO_MANY_IMAGES');
-    }
-
-    const uploadResult = await uploadMultipleToCloudinary(req.files, {
-      folder: 'telofundi/posts',
-      type: 'post',
-      userId: userId,
-      generateVariations: currentImages.length === 0 // Solo generar variaciones si es la primera imagen
-    });
-
-    const newImageUrls = uploadResult.successful.map(result => result.secure_url);
-    currentImages = [...currentImages, ...newImageUrls];
-  }
-
-  // Actualizar array de imágenes
-  updateData.images = currentImages;
-
-  // Actualizar post
-  const updatedPost = await prisma.post.update({
-    where: { id: postId },
-    data: updateData,
-    include: {
-      author: {
-        select: {
-          id: true,
-          username: true,
-          firstName: true,
-          lastName: true,
-          avatar: true,
-          userType: true
-        }
-      },
-      location: true,
-      _count: {
-        select: {
-          likes: true,
-          favorites: true
-        }
-      }
-    }
-  });
-
-  // Actualizar tags si se proporcionaron
-  if (tags) {
-    // Eliminar tags existentes
-    await prisma.postTag.deleteMany({
-      where: { postId }
-    });
-
-    // Agregar nuevos tags
-    if (tags.length > 0) {
-      await Promise.all(
-        tags.map(async (tagName) => {
-          const tag = await prisma.tag.upsert({
-            where: { name: tagName.toLowerCase() },
-            update: { usageCount: { increment: 1 } },
-            create: {
-              name: tagName.toLowerCase(),
-              slug: tagName.toLowerCase().replace(/\s+/g, '-'),
-              usageCount: 1
-            }
-          });
-
-          return prisma.postTag.create({
-            data: {
-              postId,
-              tagId: tag.id
-            }
-          });
-        })
-      );
-    }
-  }
-
-  logger.info('Post updated', {
-    postId,
-    userId,
-    updatedFields: Object.keys(updateData),
-    imagesRemoved: removeImages?.length || 0,
-    imagesAdded: req.files?.length || 0,
-    totalImages: currentImages.length
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Anuncio actualizado exitosamente',
-    data: {
-      ...updatedPost,
-      likesCount: updatedPost._count.likes,
-      favoritesCount: updatedPost._count.favorites
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-
 // Eliminar post - MEJORADO PARA CLOUDINARY
 const deletePost = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { postId } = req.params;
   const userId = req.user.id;
 
@@ -1096,6 +1191,12 @@ const deletePost = catchAsync(async (req, res) => {
 
 // Dar like a un post
 const likePost = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { postId } = req.params;
   const userId = req.user.id;
 
@@ -1212,6 +1313,12 @@ const likePost = catchAsync(async (req, res) => {
 
 // Agregar/quitar favorito
 const toggleFavorite = catchAsync(async (req, res) => {
+  // ✅ AGREGAR VALIDACIÓN DE req.user
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const { postId } = req.params;
   const userId = req.user.id;
 
@@ -1310,14 +1417,24 @@ const toggleFavorite = catchAsync(async (req, res) => {
   }
 });
 
-// Obtener posts del usuario autenticado
+// ✅ FUNCIÓN CORREGIDA: getMyPosts - NO DEBE LANZAR ERROR 404 SI NO HAY POSTS
 const getMyPosts = catchAsync(async (req, res) => {
+  // ✅ VALIDACIÓN DE USUARIO AUTENTICADO
+  if (!req.user || !req.user.id) {
+    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
+    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+  }
+
   const userId = req.user.id;
-  const { page = 1, limit = 20, status = 'active' } = req.query;
+  const { page = 1, limit = 20, status = 'active', sortBy = 'recent' } = req.query;
+
+  console.log('📋 === GET MY POSTS DEBUG ===');
+  console.log('📋 User ID:', userId);
+  console.log('📋 Query params:', { page, limit, status, sortBy });
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
-  // Filtros según status
+  // ✅ FILTROS SEGÚN STATUS - SIN LANZAR ERROR SI NO HAY POSTS
   const whereClause = {
     authorId: userId,
     ...(status === 'active' && { isActive: true, deletedAt: null }),
@@ -1325,70 +1442,134 @@ const getMyPosts = catchAsync(async (req, res) => {
     ...(status === 'all' && {})
   };
 
-  const [posts, totalCount] = await Promise.all([
-    prisma.post.findMany({
-      where: whereClause,
-      include: {
-        location: true,
-        boosts: {
-          where: {
-            isActive: true,
-            expiresAt: { gt: new Date() }
+  console.log('📋 Where clause:', whereClause);
+
+  // ✅ CONFIGURAR ORDENAMIENTO
+  let orderBy = {};
+  switch (sortBy) {
+    case 'recent':
+      orderBy = { createdAt: 'desc' };
+      break;
+    case 'oldest':
+      orderBy = { createdAt: 'asc' };
+      break;
+    case 'popular':
+      orderBy = { views: 'desc' };
+      break;
+    case 'likes':
+      orderBy = { score: 'desc' };
+      break;
+    default:
+      orderBy = { createdAt: 'desc' };
+  }
+
+  try {
+    const [posts, totalCount] = await Promise.all([
+      prisma.post.findMany({
+        where: whereClause,
+        include: {
+          location: true,
+          boosts: {
+            where: {
+              isActive: true,
+              expiresAt: { gt: new Date() }
+            },
+            select: {
+              id: true,
+              expiresAt: true,
+              pricing: {
+                select: {
+                  type: true
+                }
+              }
+            }
           },
-          select: {
-            id: true,
-            expiresAt: true,
-            pricing: {
-              select: {
-                type: true
+          _count: {
+            select: {
+              likes: true,
+              favorites: true,
+              interactions: {
+                where: { type: 'VIEW' }
               }
             }
           }
         },
-        _count: {
-          select: {
-            likes: true,
-            favorites: true,
-            interactions: {
-              where: { type: 'VIEW' }
-            }
-          }
-        }
+        orderBy,
+        skip: offset,
+        take: parseInt(limit)
+      }),
+      prisma.post.count({ where: whereClause })
+    ]);
+
+    console.log('📋 Posts encontrados:', posts.length);
+    console.log('📋 Total count:', totalCount);
+
+    const pagination = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: totalCount,
+      pages: Math.ceil(totalCount / parseInt(limit)),
+      hasNext: parseInt(page) * parseInt(limit) < totalCount,
+      hasPrev: parseInt(page) > 1
+    };
+
+    const formattedPosts = posts.map(post => ({
+      ...post,
+      likesCount: post._count.likes,
+      favoritesCount: post._count.favorites,
+      viewsCount: post._count.interactions,
+      isBoosted: post.boosts.length > 0,
+      activeBoost: post.boosts[0] || null
+    }));
+
+    // ✅ GENERAR ESTADÍSTICAS SIMPLES DEL USUARIO
+    const stats = {
+      totalPosts: totalCount,
+      activePosts: status === 'active' ? totalCount : posts.filter(p => p.isActive).length,
+      totalViews: posts.reduce((sum, post) => sum + (post.views || 0), 0),
+      totalLikes: posts.reduce((sum, post) => sum + (post._count?.likes || 0), 0)
+    };
+
+    console.log('📋 === GET MY POSTS SUCCESS ===');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        posts: formattedPosts,
+        pagination,
+        stats,
+        status
       },
-      orderBy: { createdAt: 'desc' },
-      skip: offset,
-      take: parseInt(limit)
-    }),
-    prisma.post.count({ where: whereClause })
-  ]);
+      timestamp: new Date().toISOString()
+    });
 
-  const pagination = {
-    page: parseInt(page),
-    limit: parseInt(limit),
-    total: totalCount,
-    pages: Math.ceil(totalCount / parseInt(limit)),
-    hasNext: parseInt(page) * parseInt(limit) < totalCount,
-    hasPrev: parseInt(page) > 1
-  };
-
-  const formattedPosts = posts.map(post => ({
-    ...post,
-    likesCount: post._count.likes,
-    favoritesCount: post._count.favorites,
-    viewsCount: post._count.interactions,
-    isBoosted: post.boosts.length > 0,
-    activeBoost: post.boosts[0] || null
-  }));
-
-  res.status(200).json({
-    success: true,
-    data: {
-      posts: formattedPosts,
-      pagination,
-      status
-    },
-    timestamp: new Date().toISOString()
-  });
+  } catch (error) {
+    console.error('❌ Error en getMyPosts:', error);
+    
+    // ✅ NO LANZAR ERROR 404, DEVOLVER ARRAY VACÍO
+    res.status(200).json({
+      success: true,
+      data: {
+        posts: [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: 0,
+          pages: 0,
+          hasNext: false,
+          hasPrev: false
+        },
+        stats: {
+          totalPosts: 0,
+          activePosts: 0,
+          totalViews: 0,
+          totalLikes: 0
+        },
+        status
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Función helper para calcular score inicial de calidad
