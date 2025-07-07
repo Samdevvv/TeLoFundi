@@ -2,14 +2,655 @@ const { prisma } = require('../config/database');
 const { AppError, catchAsync } = require('../middleware/errorHandler');
 const { sanitizeString } = require('../utils/validators');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../services/uploadService');
+const chatService = require('../services/chatService');
 const logger = require('../utils/logger');
+
+// ✅ NUEVO: Crear chat desde perfil de usuario (botón "Chat" en perfil)
+const createChatFromProfile = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const currentUserId = req.user.id;
+
+  // Validar que no sea el mismo usuario
+  if (currentUserId === userId) {
+    throw new AppError('No puedes chatear contigo mismo', 400, 'CANNOT_CHAT_WITH_SELF');
+  }
+
+  // Verificar que el usuario del perfil existe y está activo
+  const targetUser = await prisma.user.findUnique({
+    where: { 
+      id: userId,
+      isActive: true,
+      isBanned: false
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
+      avatar: true,
+      userType: true,
+      lastActiveAt: true,
+      settings: {
+        select: {
+          allowDirectMessages: true
+        }
+      },
+      blockedUsers: {
+        where: {
+          blockedId: currentUserId
+        },
+        select: { id: true }
+      }
+    }
+  });
+
+  if (!targetUser) {
+    throw new AppError('Usuario no encontrado o no disponible', 404, 'USER_NOT_FOUND');
+  }
+
+  // Verificar configuraciones de privacidad
+  if (!targetUser.settings?.allowDirectMessages) {
+    throw new AppError('Este usuario no permite mensajes directos', 403, 'DIRECT_MESSAGES_DISABLED');
+  }
+
+  // Verificar si estás bloqueado
+  if (targetUser.blockedUsers.length > 0) {
+    throw new AppError('No puedes enviar mensajes a este usuario', 403, 'USER_BLOCKED_YOU');
+  }
+
+  // Verificar si has bloqueado al usuario
+  const hasBlocked = await prisma.userBlock.findUnique({
+    where: {
+      blockerId_blockedId: {
+        blockerId: currentUserId,
+        blockedId: userId
+      }
+    }
+  });
+
+  if (hasBlocked) {
+    throw new AppError('Has bloqueado a este usuario', 403, 'YOU_BLOCKED_USER');
+  }
+
+  // Verificar límites de cliente si aplica
+  if (req.user.userType === 'CLIENT') {
+    const canCreate = await chatService.canCreateNewChat(currentUserId, req.user.userType);
+    if (!canCreate.canCreate) {
+      throw new AppError(canCreate.error, 400, 'CHAT_LIMIT_REACHED');
+    }
+  }
+
+  // Buscar chat existente
+  let chat = await prisma.chat.findFirst({
+    where: {
+      isGroup: false,
+      isDisputeChat: false,
+      AND: [
+        {
+          members: {
+            some: {
+              userId: currentUserId
+            }
+          }
+        },
+        {
+          members: {
+            some: {
+              userId: userId
+            }
+          }
+        }
+      ]
+    },
+    select: {
+      id: true,
+      lastActivity: true,
+      createdAt: true
+    }
+  });
+
+  let isNewChat = false;
+
+  // Si no existe chat, crear uno nuevo
+  if (!chat) {
+    chat = await prisma.chat.create({
+      data: {
+        isGroup: false,
+        isPrivate: true,
+        isDisputeChat: false,
+        members: {
+          create: [
+            {
+              userId: currentUserId,
+              role: 'MEMBER'
+            },
+            {
+              userId: userId,
+              role: 'MEMBER'
+            }
+          ]
+        }
+      },
+      select: {
+        id: true,
+        lastActivity: true,
+        createdAt: true
+      }
+    });
+
+    isNewChat = true;
+
+    logger.info('New chat created from profile', {
+      chatId: chat.id,
+      currentUserId,
+      targetUserId: userId,
+      targetUserType: targetUser.userType
+    });
+
+    // Crear interacción para algoritmos
+    try {
+      await prisma.userInteraction.create({
+        data: {
+          userId: currentUserId,
+          targetUserId: userId,
+          type: 'CHAT',
+          weight: 3.0, // Mayor peso por iniciar chat desde perfil
+          source: 'profile',
+          deviceType: req.headers['user-agent']?.includes('Mobile') ? 'mobile' : 'desktop'
+        }
+      });
+    } catch (error) {
+      // Ignorar errores de interacción
+      logger.warn('Failed to create interaction from profile chat:', error);
+    }
+  } else {
+    // Actualizar actividad del chat existente
+    await prisma.chat.update({
+      where: { id: chat.id },
+      data: { lastActivity: new Date() }
+    });
+
+    logger.info('Existing chat opened from profile', {
+      chatId: chat.id,
+      currentUserId,
+      targetUserId: userId
+    });
+  }
+
+  // Marcar chat como prioritario si es cliente premium
+  if (req.user.userType === 'CLIENT' && req.user.client) {
+    try {
+      await chatService.markChatAsPriority(chat.id, userId, req.user.client.id);
+    } catch (error) {
+      logger.warn('Failed to mark chat as priority:', error);
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: isNewChat ? 'Chat iniciado exitosamente' : 'Chat abierto exitosamente',
+    data: {
+      chatId: chat.id,
+      isNewChat,
+      otherUser: {
+        id: targetUser.id,
+        firstName: targetUser.firstName,
+        lastName: targetUser.lastName,
+        username: targetUser.username,
+        avatar: targetUser.avatar,
+        userType: targetUser.userType,
+        lastActiveAt: targetUser.lastActiveAt
+      },
+      redirectUrl: `/chat/${chat.id}` // URL para redirección en frontend
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ NUEVO: Crear chat tripartito para disputas (solo admins)
+const createDisputeChat = catchAsync(async (req, res) => {
+  const { escortId, agencyId, reason } = req.body;
+  const adminId = req.user.id;
+
+  // Verificar que solo admins pueden crear chats tripartitos
+  if (req.user.userType !== 'ADMIN') {
+    throw new AppError('Solo administradores pueden crear chats de disputa', 403, 'ADMIN_ONLY');
+  }
+
+  // Validar que escort y agencia existen y están relacionados
+  const membership = await prisma.agencyMembership.findFirst({
+    where: {
+      escortId,
+      agencyId,
+      status: 'ACTIVE'
+    },
+    include: {
+      escort: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true
+            }
+          }
+        }
+      },
+      agency: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!membership) {
+    throw new AppError('No existe una relación activa entre el escort y la agencia', 400, 'NO_ACTIVE_MEMBERSHIP');
+  }
+
+  // Verificar que no existe ya un chat de disputa activo entre estos usuarios
+  const existingDispute = await prisma.chat.findFirst({
+    where: {
+      isDisputeChat: true,
+      disputeStatus: 'ACTIVE',
+      members: {
+        every: {
+          userId: {
+            in: [adminId, membership.escort.user.id, membership.agency.user.id]
+          }
+        }
+      }
+    }
+  });
+
+  if (existingDispute) {
+    throw new AppError('Ya existe un chat de disputa activo entre estos usuarios', 400, 'DISPUTE_ALREADY_EXISTS');
+  }
+
+  // Crear chat tripartito
+  const disputeChat = await prisma.chat.create({
+    data: {
+      isGroup: true,
+      isDisputeChat: true,
+      disputeStatus: 'ACTIVE',
+      disputeReason: reason,
+      name: `Disputa: ${membership.escort.user.firstName} - ${membership.agency.user.firstName}`,
+      description: `Chat tripartito para resolver disputa. Razón: ${reason}`,
+      members: {
+        create: [
+          {
+            userId: adminId,
+            role: 'ADMIN',
+            maxMessages: 10 // Admin puede enviar más mensajes
+          },
+          {
+            userId: membership.escort.user.id,
+            role: 'MEMBER',
+            maxMessages: 3 // Escort limitado a 3 mensajes
+          },
+          {
+            userId: membership.agency.user.id,
+            role: 'MEMBER',
+            maxMessages: 3 // Agencia limitada a 3 mensajes
+          }
+        ]
+      }
+    },
+    include: {
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              userType: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Enviar mensaje de sistema inicial
+  await prisma.message.create({
+    data: {
+      content: `Chat de disputa iniciado por el administrador. Razón: ${reason}. Cada parte puede enviar máximo 3 mensajes para exponer su caso.`,
+      messageType: 'SYSTEM',
+      senderId: adminId,
+      chatId: disputeChat.id
+    }
+  });
+
+  // Crear notificaciones para los participantes
+  await chatService.createDisputeNotification(
+    disputeChat.id,
+    [membership.escort.user.id, membership.agency.user.id],
+    'DISPUTE_CREATED',
+    `Se ha creado un chat de disputa. Razón: ${reason}`
+  );
+
+  logger.info('Dispute chat created', {
+    chatId: disputeChat.id,
+    adminId,
+    escortId,
+    agencyId,
+    reason
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Chat de disputa creado exitosamente',
+    data: {
+      chat: disputeChat
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ NUEVO: Obtener chats de disputa (solo admins)
+const getDisputeChats = catchAsync(async (req, res) => {
+  const { status = 'ACTIVE' } = req.query;
+  const userId = req.user.id;
+
+  // Verificar que solo admins pueden ver chats de disputa
+  if (req.user.userType !== 'ADMIN') {
+    throw new AppError('Solo administradores pueden ver chats de disputa', 403, 'ADMIN_ONLY');
+  }
+
+  const disputeChats = await prisma.chat.findMany({
+    where: {
+      isDisputeChat: true,
+      ...(status && { disputeStatus: status }),
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    include: {
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              userType: true
+            }
+          }
+        }
+      },
+      messages: {
+        take: 1,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          content: true,
+          createdAt: true,
+          messageType: true,
+          sender: {
+            select: {
+              firstName: true,
+              userType: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Obtener resumen de disputas
+  const summary = await chatService.getDisputeChatsummary();
+
+  res.status(200).json({
+    success: true,
+    data: {
+      disputeChats,
+      summary,
+      total: disputeChats.length
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ NUEVO: Cerrar chat de disputa (solo admins)
+const closeDisputeChat = catchAsync(async (req, res) => {
+  const { chatId } = req.params;
+  const { resolution, finalDecision } = req.body;
+  const adminId = req.user.id;
+
+  // Verificar que solo admins pueden cerrar disputas
+  if (req.user.userType !== 'ADMIN') {
+    throw new AppError('Solo administradores pueden cerrar disputas', 403, 'ADMIN_ONLY');
+  }
+
+  // Verificar que el chat existe y es de disputa
+  const disputeChat = await prisma.chat.findFirst({
+    where: {
+      id: chatId,
+      isDisputeChat: true,
+      members: {
+        some: {
+          userId: adminId
+        }
+      }
+    },
+    include: {
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              userType: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!disputeChat) {
+    throw new AppError('Chat de disputa no encontrado', 404, 'DISPUTE_CHAT_NOT_FOUND');
+  }
+
+  if (disputeChat.disputeStatus === 'CLOSED') {
+    throw new AppError('La disputa ya está cerrada', 400, 'DISPUTE_ALREADY_CLOSED');
+  }
+
+  // Actualizar estado del chat
+  await prisma.chat.update({
+    where: { id: chatId },
+    data: {
+      disputeStatus: 'CLOSED'
+    }
+  });
+
+  // Enviar mensaje de cierre
+  await prisma.message.create({
+    data: {
+      content: `DISPUTA CERRADA POR ADMINISTRADOR\n\nResolución: ${resolution}\n\nDecisión final: ${finalDecision}\n\nEste chat queda cerrado y no se pueden enviar más mensajes.`,
+      messageType: 'SYSTEM',
+      senderId: adminId,
+      chatId
+    }
+  });
+
+  // Notificar a los participantes
+  const participantIds = disputeChat.members
+    .filter(member => member.user.userType !== 'ADMIN')
+    .map(member => member.userId);
+
+  await chatService.createDisputeNotification(
+    chatId,
+    participantIds,
+    'DISPUTE_CLOSED',
+    `La disputa ha sido cerrada. Resolución: ${resolution}`
+  );
+
+  logger.info('Dispute chat closed', {
+    chatId,
+    adminId,
+    resolution,
+    finalDecision
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Chat de disputa cerrado exitosamente',
+    data: {
+      chatId,
+      disputeStatus: 'CLOSED',
+      resolution,
+      finalDecision
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ NUEVO: Enviar mensaje en chat tripartito (con límites)
+const addDisputeMessage = catchAsync(async (req, res) => {
+  const { chatId } = req.params;
+  const { content } = req.body;
+  const userId = req.user.id;
+
+  if (!content || content.trim().length === 0) {
+    throw new AppError('Contenido del mensaje es requerido', 400, 'MISSING_MESSAGE_CONTENT');
+  }
+
+  if (content.length > 1000) {
+    throw new AppError('Mensaje muy largo. Máximo 1000 caracteres en disputas', 400, 'MESSAGE_TOO_LONG');
+  }
+
+  // Verificar que es un chat de disputa y está activo
+  const disputeChat = await prisma.chat.findFirst({
+    where: {
+      id: chatId,
+      isDisputeChat: true,
+      disputeStatus: 'ACTIVE'
+    },
+    include: {
+      members: {
+        where: {
+          userId
+        }
+      }
+    }
+  });
+
+  if (!disputeChat) {
+    throw new AppError('Chat de disputa no encontrado o cerrado', 404, 'DISPUTE_CHAT_NOT_FOUND');
+  }
+
+  const member = disputeChat.members[0];
+  if (!member) {
+    throw new AppError('No eres miembro de este chat de disputa', 403, 'NOT_DISPUTE_MEMBER');
+  }
+
+  // Verificar límite de mensajes (excepto para admins)
+  if (req.user.userType !== 'ADMIN' && member.messageCount >= member.maxMessages) {
+    throw new AppError(
+      `Has alcanzado el límite de ${member.maxMessages} mensajes en este chat de disputa`,
+      400,
+      'DISPUTE_MESSAGE_LIMIT'
+    );
+  }
+
+  // Transacción para crear mensaje y actualizar contador
+  const result = await prisma.$transaction(async (tx) => {
+    // Crear mensaje
+    const message = await tx.message.create({
+      data: {
+        content: sanitizeString(content),
+        messageType: 'TEXT',
+        senderId: userId,
+        chatId
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            userType: true
+          }
+        }
+      }
+    });
+
+    // Actualizar contador de mensajes del miembro
+    await tx.chatMember.update({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId
+        }
+      },
+      data: {
+        messageCount: { increment: 1 }
+      }
+    });
+
+    // Actualizar última actividad del chat
+    await tx.chat.update({
+      where: { id: chatId },
+      data: { lastActivity: new Date() }
+    });
+
+    return message;
+  });
+
+  logger.info('Dispute message sent', {
+    messageId: result.id,
+    chatId,
+    userId,
+    userType: req.user.userType,
+    messageCount: member.messageCount + 1,
+    maxMessages: member.maxMessages
+  });
+
+  // Emitir evento de socket si está disponible
+  try {
+    if (req.app.get('io')) {
+      req.app.get('io').to(chatId).emit('newDisputeMessage', {
+        ...result,
+        isMine: false
+      });
+    }
+  } catch (error) {
+    logger.warn('Failed to emit socket event:', error);
+  }
+
+  res.status(201).json({
+    success: true,
+    message: 'Mensaje de disputa enviado exitosamente',
+    data: {
+      ...result,
+      isMine: true,
+      remainingMessages: req.user.userType === 'ADMIN' ? 'unlimited' : Math.max(0, member.maxMessages - (member.messageCount + 1))
+    },
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Crear o obtener chat entre dos usuarios
 const createOrGetChat = catchAsync(async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
 
-  // ✅ CORREGIDO: Validación de input
+  // Validación de input
   if (!receiverId) {
     throw new AppError('ID del receptor es requerido', 400, 'MISSING_RECEIVER_ID');
   }
@@ -68,15 +709,16 @@ const createOrGetChat = catchAsync(async (req, res) => {
     throw new AppError('Has bloqueado a este usuario', 403, 'YOU_BLOCKED_USER');
   }
 
-  // ✅ CORREGIDO: Verificar límites de cliente con validación
+  // Verificar límites de cliente con validación
   if (req.user.userType === 'CLIENT') {
     await checkClientMessageLimits(req.user);
   }
 
-  // Buscar chat existente entre los dos usuarios
+  // Buscar chat existente entre los dos usuarios (excluir chats de disputa)
   let chat = await prisma.chat.findFirst({
     where: {
       isGroup: false,
+      isDisputeChat: false,
       AND: [
         {
           members: {
@@ -128,6 +770,7 @@ const createOrGetChat = catchAsync(async (req, res) => {
       data: {
         isGroup: false,
         isPrivate: true,
+        isDisputeChat: false,
         members: {
           create: [
             {
@@ -183,6 +826,7 @@ const createOrGetChat = catchAsync(async (req, res) => {
       chat: {
         id: chat.id,
         isGroup: chat.isGroup,
+        isDisputeChat: chat.isDisputeChat,
         members: chat.members,
         lastMessage: chat.messages[0] || null,
         lastActivity: chat.lastActivity,
@@ -196,23 +840,33 @@ const createOrGetChat = catchAsync(async (req, res) => {
 // Obtener lista de chats del usuario
 const getChats = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { page = 1, limit = 20, archived = false } = req.query;
+  const { page = 1, limit = 20, archived = false, includeDisputes = false } = req.query;
 
-  // ✅ CORREGIDO: Validación de paginación consistente
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
   const offset = (pageNum - 1) * limitNum;
 
-  const chats = await prisma.chat.findMany({
-    where: {
-      members: {
-        some: {
-          userId,
-          ...(archived === 'true' ? {} : { chat: { isArchived: false } })
-        }
-      },
-      deletedAt: null
+  // Construir filtros según tipo de usuario
+  const whereClause = {
+    members: {
+      some: {
+        userId,
+        ...(archived === 'true' ? {} : { chat: { isArchived: false } })
+      }
     },
+    deletedAt: null
+  };
+
+  // Solo admins pueden ver chats de disputa
+  if (includeDisputes === 'true' && req.user.userType === 'ADMIN') {
+    // Incluir chats de disputa
+  } else {
+    // Excluir chats de disputa para usuarios normales
+    whereClause.isDisputeChat = false;
+  }
+
+  const chats = await prisma.chat.findMany({
+    where: whereClause,
     include: {
       members: {
         where: {
@@ -269,6 +923,8 @@ const getChats = catchAsync(async (req, res) => {
   const formattedChats = chats.map(chat => ({
     id: chat.id,
     isGroup: chat.isGroup,
+    isDisputeChat: chat.isDisputeChat,
+    disputeStatus: chat.disputeStatus,
     name: chat.name,
     avatar: chat.avatar,
     isArchived: chat.isArchived,
@@ -301,12 +957,10 @@ const getChatMessages = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { page = 1, limit = 50, before } = req.query;
 
-  // ✅ CORREGIDO: Validación de input
   if (!chatId) {
     throw new AppError('ID del chat es requerido', 400, 'MISSING_CHAT_ID');
   }
 
-  // ✅ CORREGIDO: Validación de paginación consistente
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
   const offset = (pageNum - 1) * limitNum;
@@ -317,6 +971,14 @@ const getChatMessages = catchAsync(async (req, res) => {
       userId_chatId: {
         userId,
         chatId
+      }
+    },
+    include: {
+      chat: {
+        select: {
+          isDisputeChat: true,
+          disputeStatus: true
+        }
       }
     }
   });
@@ -353,12 +1015,13 @@ const getChatMessages = catchAsync(async (req, res) => {
     take: limitNum
   });
 
-  // Marcar mensajes como leídos
+  // Marcar mensajes como leídos (solo si no es chat de disputa cerrado)
   const unreadMessageIds = messages
     .filter(msg => msg.senderId !== userId && !msg.isRead)
     .map(msg => msg.id);
 
-  if (unreadMessageIds.length > 0) {
+  if (unreadMessageIds.length > 0 && 
+      (!chatMember.chat.isDisputeChat || chatMember.chat.disputeStatus === 'ACTIVE')) {
     await Promise.all([
       prisma.message.updateMany({
         where: {
@@ -369,7 +1032,6 @@ const getChatMessages = catchAsync(async (req, res) => {
           readAt: new Date()
         }
       }),
-      // Actualizar lastRead del miembro
       prisma.chatMember.update({
         where: {
           userId_chatId: {
@@ -403,10 +1065,21 @@ const getChatMessages = catchAsync(async (req, res) => {
     isMine: message.senderId === userId
   }));
 
+  // Información adicional para chats tripartitos
+  let chatInfo = {};
+  if (chatMember.chat.isDisputeChat) {
+    chatInfo = {
+      isDisputeChat: true,
+      disputeStatus: chatMember.chat.disputeStatus,
+      remainingMessages: req.user.userType === 'ADMIN' ? 'unlimited' : Math.max(0, chatMember.maxMessages - chatMember.messageCount)
+    };
+  }
+
   res.status(200).json({
     success: true,
     data: {
       messages: formattedMessages,
+      chatInfo,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -417,7 +1090,7 @@ const getChatMessages = catchAsync(async (req, res) => {
   });
 });
 
-// ✅ CORREGIDO: ENVIAR MENSAJE - OPTIMIZADO PARA CLOUDINARY CON VALIDACIONES
+// ENVIAR MENSAJE - OPTIMIZADO PARA CLOUDINARY CON VALIDACIONES ROBUSTAS
 const sendMessage = catchAsync(async (req, res) => {
   const { chatId } = req.params;
   const senderId = req.user.id;
@@ -428,12 +1101,12 @@ const sendMessage = catchAsync(async (req, res) => {
     isPremiumMessage = false
   } = req.body;
 
-  // ✅ CORREGIDO: Validación de inputs
+  // Validación de inputs
   if (!chatId) {
     throw new AppError('ID del chat es requerido', 400, 'MISSING_CHAT_ID');
   }
 
-  if (!content && !req.uploadedFile) {
+  if (!content && !req.file) {
     throw new AppError('Contenido del mensaje o archivo es requerido', 400, 'MISSING_MESSAGE_CONTENT');
   }
 
@@ -479,25 +1152,41 @@ const sendMessage = catchAsync(async (req, res) => {
     throw new AppError('No tienes acceso a este chat', 403, 'CHAT_ACCESS_DENIED');
   }
 
-  // ✅ CORREGIDO: Verificar límites de cliente con validación mejorada
+  // Verificar si es chat de disputa y aplicar restricciones
+  if (chatMember.chat.isDisputeChat) {
+    if (chatMember.chat.disputeStatus !== 'ACTIVE') {
+      throw new AppError('No se pueden enviar mensajes en un chat de disputa cerrado', 403, 'DISPUTE_CHAT_CLOSED');
+    }
+
+    // Solo mensajes de texto en chats de disputa
+    if (messageType !== 'TEXT') {
+      throw new AppError('Solo se permiten mensajes de texto en chats de disputa', 400, 'DISPUTE_TEXT_ONLY');
+    }
+
+    // Verificar límite de mensajes (excepto para admins)
+    if (req.user.userType !== 'ADMIN' && chatMember.messageCount >= chatMember.maxMessages) {
+      throw new AppError(
+        `Has alcanzado el límite de ${chatMember.maxMessages} mensajes en este chat de disputa`,
+        400,
+        'DISPUTE_MESSAGE_LIMIT'
+      );
+    }
+
+    // Límite de caracteres para disputas
+    if (content && content.length > 1000) {
+      throw new AppError('Mensaje muy largo. Máximo 1000 caracteres en disputas', 400, 'MESSAGE_TOO_LONG');
+    }
+  }
+
+  // Verificar límites de cliente con validación mejorada
   let pointsCost = 0;
   if (req.user.userType === 'CLIENT') {
     const limits = await checkClientMessageLimits(req.user);
     
-    // Calcular costo en puntos según el tipo de mensaje
-    if (isPremiumMessage) {
-      pointsCost = 5;
-    } else if (messageType === 'IMAGE') {
-      pointsCost = 2;
-    } else if (messageType === 'FILE') {
-      pointsCost = 3;
-    } else if (messageType === 'AUDIO' || messageType === 'VIDEO') {
-      pointsCost = 4;
-    } else {
-      pointsCost = 1;
-    }
+    // El pointsCost ya fue calculado en el middleware validateChatCapabilities
+    pointsCost = req.pointsCost || 0;
 
-    // ✅ CORREGIDO: Verificar si tiene puntos suficientes
+    // Verificar si tiene puntos suficientes
     if (!req.user.client) {
       throw new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING');
     }
@@ -507,32 +1196,39 @@ const sendMessage = catchAsync(async (req, res) => {
     }
   }
 
-  // ✅ CORREGIDO: PROCESAR ARCHIVO CON CLOUDINARY SI EXISTE
+  // PROCESAR ARCHIVO CON CLOUDINARY SI EXISTE
   let fileData = {};
-  if (req.uploadedFile && (messageType === 'IMAGE' || messageType === 'FILE' || messageType === 'AUDIO' || messageType === 'VIDEO')) {
-    // ✅ CORREGIDO: Validación de que uploadedFile tiene las propiedades necesarias
-    if (!req.uploadedFile.secure_url) {
-      throw new AppError('Error al procesar archivo subido', 500, 'FILE_UPLOAD_ERROR');
+  if (req.file && (messageType === 'IMAGE' || messageType === 'FILE' || messageType === 'AUDIO' || messageType === 'VIDEO')) {
+    try {
+      // Subir archivo a Cloudinary
+      const uploadResult = await uploadToCloudinary(req.file.buffer, {
+        folder: 'telofundi/chat',
+        resource_type: 'auto',
+        public_id: `chat_${senderId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      });
+
+      fileData = {
+        fileUrl: uploadResult.secure_url,
+        fileName: req.file.originalname || 'archivo_chat',
+        fileSize: req.file.size || uploadResult.bytes || 0,
+        mimeType: req.file.mimetype || uploadResult.format || 'application/octet-stream'
+      };
+
+      logger.info('Chat file uploaded to Cloudinary', {
+        chatId,
+        senderId,
+        fileUrl: uploadResult.secure_url,
+        publicId: uploadResult.public_id,
+        fileSize: fileData.fileSize,
+        messageType
+      });
+    } catch (uploadError) {
+      logger.error('Error uploading chat file to Cloudinary:', uploadError);
+      throw new AppError('Error subiendo archivo', 500, 'FILE_UPLOAD_ERROR');
     }
-
-    fileData = {
-      fileUrl: req.uploadedFile.secure_url,
-      fileName: req.uploadedFile.originalname || req.uploadedFile.original_filename || 'archivo',
-      fileSize: req.uploadedFile.size || req.uploadedFile.bytes || 0,
-      mimeType: req.uploadedFile.mimetype || req.uploadedFile.format || 'application/octet-stream'
-    };
-
-    logger.info('Chat file uploaded to Cloudinary', {
-      chatId,
-      senderId,
-      fileUrl: req.uploadedFile.secure_url,
-      publicId: req.uploadedFile.public_id,
-      fileSize: fileData.fileSize,
-      messageType
-    });
   }
 
-  // ✅ CORREGIDO: Transacción para operaciones críticas
+  // Transacción para operaciones críticas
   const result = await prisma.$transaction(async (tx) => {
     // Crear mensaje
     const message = await tx.message.create({
@@ -560,7 +1256,8 @@ const sendMessage = catchAsync(async (req, res) => {
         chat: {
           select: {
             id: true,
-            isGroup: true
+            isGroup: true,
+            isDisputeChat: true
           }
         }
       }
@@ -571,6 +1268,21 @@ const sendMessage = catchAsync(async (req, res) => {
       where: { id: chatId },
       data: { lastActivity: new Date() }
     });
+
+    // Para chats de disputa, actualizar contador de mensajes
+    if (chatMember.chat.isDisputeChat && req.user.userType !== 'ADMIN') {
+      await tx.chatMember.update({
+        where: {
+          userId_chatId: {
+            userId: senderId,
+            chatId
+          }
+        },
+        data: {
+          messageCount: { increment: 1 }
+        }
+      });
+    }
 
     // Descontar puntos y actualizar estadísticas si es cliente
     if (req.user.userType === 'CLIENT' && pointsCost > 0) {
@@ -597,26 +1309,27 @@ const sendMessage = catchAsync(async (req, res) => {
       ]);
     }
 
-    // Actualizar contador de mensajes del miembro
-    await tx.chatMember.update({
-      where: {
-        userId_chatId: {
-          userId: senderId,
-          chatId
-        }
-      },
-      data: { messagesCount: { increment: 1 } }
-    });
+    // Actualizar contador de mensajes del miembro (para chats normales)
+    if (!chatMember.chat.isDisputeChat) {
+      await tx.chatMember.update({
+        where: {
+          userId_chatId: {
+            userId: senderId,
+            chatId
+          }
+        },
+        data: { messagesCount: { increment: 1 } }
+      });
+    }
 
     return message;
   });
 
   // Registrar interacción para algoritmos
   const otherMembers = chatMember.chat.members;
-  if (otherMembers.length > 0) {
+  if (otherMembers.length > 0 && !chatMember.chat.isDisputeChat) {
     const receiverId = otherMembers[0].userId;
     
-    // ✅ Crear interacción con manejo de errores
     try {
       await prisma.userInteraction.create({
         data: {
@@ -667,10 +1380,11 @@ const sendMessage = catchAsync(async (req, res) => {
     messageType,
     pointsCost,
     isPremiumMessage,
-    hasFile: !!fileData.fileUrl
+    hasFile: !!fileData.fileUrl,
+    isDisputeChat: chatMember.chat.isDisputeChat
   });
 
-  // ✅ CORREGIDO: Emitir evento de socket para tiempo real con manejo de errores
+  // Emitir evento de socket para tiempo real con manejo de errores
   try {
     if (req.app.get('io')) {
       req.app.get('io').to(chatId).emit('newMessage', {
@@ -682,12 +1396,19 @@ const sendMessage = catchAsync(async (req, res) => {
     logger.warn('Failed to emit socket event:', error);
   }
 
+  // Información adicional para respuesta
+  let additionalInfo = {};
+  if (chatMember.chat.isDisputeChat && req.user.userType !== 'ADMIN') {
+    additionalInfo.remainingMessages = Math.max(0, chatMember.maxMessages - (chatMember.messageCount + 1));
+  }
+
   res.status(201).json({
     success: true,
     message: 'Mensaje enviado exitosamente',
     data: {
       ...result,
-      isMine: true
+      isMine: true,
+      ...additionalInfo
     },
     timestamp: new Date().toISOString()
   });
@@ -699,7 +1420,6 @@ const editMessage = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { content } = req.body;
 
-  // ✅ CORREGIDO: Validación de inputs
   if (!messageId) {
     throw new AppError('ID del mensaje es requerido', 400, 'MISSING_MESSAGE_ID');
   }
@@ -714,11 +1434,24 @@ const editMessage = catchAsync(async (req, res) => {
       id: messageId,
       senderId: userId,
       deletedAt: null
+    },
+    include: {
+      chat: {
+        select: {
+          isDisputeChat: true,
+          disputeStatus: true
+        }
+      }
     }
   });
 
   if (!message) {
     throw new AppError('Mensaje no encontrado o no tienes permisos', 404, 'MESSAGE_NOT_FOUND');
+  }
+
+  // No permitir edición en chats de disputa
+  if (message.chat.isDisputeChat) {
+    throw new AppError('No se pueden editar mensajes en chats de disputa', 400, 'CANNOT_EDIT_DISPUTE_MESSAGE');
   }
 
   // Verificar que el mensaje no es muy antiguo (máximo 24 horas)
@@ -759,7 +1492,7 @@ const editMessage = catchAsync(async (req, res) => {
     chatId: message.chatId
   });
 
-  // ✅ CORREGIDO: Emitir evento de socket con manejo de errores
+  // Emitir evento de socket con manejo de errores
   try {
     if (req.app.get('io')) {
       req.app.get('io').to(message.chatId).emit('messageEdited', updatedMessage);
@@ -776,12 +1509,11 @@ const editMessage = catchAsync(async (req, res) => {
   });
 });
 
-// ✅ CORREGIDO: ELIMINAR MENSAJE - CON LIMPIEZA DE CLOUDINARY MEJORADA
+// ELIMINAR MENSAJE - CON LIMPIEZA DE CLOUDINARY MEJORADA
 const deleteMessage = catchAsync(async (req, res) => {
   const { messageId } = req.params;
   const userId = req.user.id;
 
-  // ✅ CORREGIDO: Validación de input
   if (!messageId) {
     throw new AppError('ID del mensaje es requerido', 400, 'MISSING_MESSAGE_ID');
   }
@@ -792,6 +1524,14 @@ const deleteMessage = catchAsync(async (req, res) => {
       id: messageId,
       senderId: userId,
       deletedAt: null
+    },
+    include: {
+      chat: {
+        select: {
+          isDisputeChat: true,
+          disputeStatus: true
+        }
+      }
     }
   });
 
@@ -799,7 +1539,12 @@ const deleteMessage = catchAsync(async (req, res) => {
     throw new AppError('Mensaje no encontrado o no tienes permisos', 404, 'MESSAGE_NOT_FOUND');
   }
 
-  // ✅ CORREGIDO: Eliminar archivo de Cloudinary si existe
+  // No permitir eliminación en chats de disputa
+  if (message.chat.isDisputeChat) {
+    throw new AppError('No se pueden eliminar mensajes en chats de disputa', 400, 'CANNOT_DELETE_DISPUTE_MESSAGE');
+  }
+
+  // Eliminar archivo de Cloudinary si existe
   if (message.fileUrl && message.fileUrl.includes('cloudinary')) {
     try {
       const publicId = extractPublicIdFromUrl(message.fileUrl);
@@ -817,7 +1562,6 @@ const deleteMessage = catchAsync(async (req, res) => {
         fileUrl: message.fileUrl,
         error: error.message
       });
-      // Continuar con el proceso aunque falle la eliminación de Cloudinary
     }
   }
 
@@ -834,7 +1578,7 @@ const deleteMessage = catchAsync(async (req, res) => {
     hadFile: !!message.fileUrl
   });
 
-  // ✅ CORREGIDO: Emitir evento de socket con manejo de errores
+  // Emitir evento de socket con manejo de errores
   try {
     if (req.app.get('io')) {
       req.app.get('io').to(message.chatId).emit('messageDeleted', { messageId });
@@ -855,7 +1599,6 @@ const toggleChatArchive = catchAsync(async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
 
-  // ✅ CORREGIDO: Validación de input
   if (!chatId) {
     throw new AppError('ID del chat es requerido', 400, 'MISSING_CHAT_ID');
   }
@@ -872,7 +1615,8 @@ const toggleChatArchive = catchAsync(async (req, res) => {
       chat: {
         select: {
           id: true,
-          isArchived: true
+          isArchived: true,
+          isDisputeChat: true
         }
       }
     }
@@ -880,6 +1624,11 @@ const toggleChatArchive = catchAsync(async (req, res) => {
 
   if (!chatMember) {
     throw new AppError('No tienes acceso a este chat', 403, 'CHAT_ACCESS_DENIED');
+  }
+
+  // No permitir archivar chats de disputa
+  if (chatMember.chat.isDisputeChat) {
+    throw new AppError('No se pueden archivar chats de disputa', 400, 'CANNOT_ARCHIVE_DISPUTE_CHAT');
   }
 
   // Alternar estado de archivado
@@ -909,9 +1658,8 @@ const toggleChatArchive = catchAsync(async (req, res) => {
 const toggleChatMute = catchAsync(async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
-  const { mutedUntil } = req.body; // Timestamp o null para desactivar
+  const { mutedUntil } = req.body;
 
-  // ✅ CORREGIDO: Validación de input
   if (!chatId) {
     throw new AppError('ID del chat es requerido', 400, 'MISSING_CHAT_ID');
   }
@@ -930,7 +1678,7 @@ const toggleChatMute = catchAsync(async (req, res) => {
     throw new AppError('No tienes acceso a este chat', 403, 'CHAT_ACCESS_DENIED');
   }
 
-  // ✅ CORREGIDO: Validación de fecha si se proporciona
+  // Validación de fecha si se proporciona
   let mutedUntilDate = null;
   if (mutedUntil) {
     mutedUntilDate = new Date(mutedUntil);
@@ -982,7 +1730,6 @@ const searchMessages = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { q: query, messageType, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
 
-  // ✅ CORREGIDO: Validaciones de input
   if (!chatId) {
     throw new AppError('ID del chat es requerido', 400, 'MISSING_CHAT_ID');
   }
@@ -1005,7 +1752,6 @@ const searchMessages = catchAsync(async (req, res) => {
     throw new AppError('No tienes acceso a este chat', 403, 'CHAT_ACCESS_DENIED');
   }
 
-  // ✅ CORREGIDO: Validación de paginación consistente
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
   const offset = (pageNum - 1) * limitNum;
@@ -1088,7 +1834,6 @@ const getChatStats = catchAsync(async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user.id;
 
-  // ✅ CORREGIDO: Validación de input
   if (!chatId) {
     throw new AppError('ID del chat es requerido', 400, 'MISSING_CHAT_ID');
   }
@@ -1107,83 +1852,8 @@ const getChatStats = catchAsync(async (req, res) => {
     throw new AppError('No tienes acceso a este chat', 403, 'CHAT_ACCESS_DENIED');
   }
 
-  // Obtener estadísticas
-  const [
-    totalMessages,
-    messagesByType,
-    messagesByMember,
-    firstMessage
-  ] = await Promise.all([
-    // Total de mensajes
-    prisma.message.count({
-      where: {
-        chatId,
-        deletedAt: null
-      }
-    }),
-    // Mensajes por tipo (incluye estadísticas de archivos de Cloudinary)
-    prisma.message.groupBy({
-      by: ['messageType'],
-      where: {
-        chatId,
-        deletedAt: null
-      },
-      _count: true
-    }),
-    // Mensajes por miembro
-    prisma.message.groupBy({
-      by: ['senderId'],
-      where: {
-        chatId,
-        deletedAt: null
-      },
-      _count: true
-    }),
-    // Primer mensaje
-    prisma.message.findFirst({
-      where: {
-        chatId,
-        deletedAt: null
-      },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        createdAt: true
-      }
-    })
-  ]);
-
-  // Obtener información de miembros para estadísticas
-  const members = await prisma.chatMember.findMany({
-    where: { chatId },
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          avatar: true
-        }
-      }
-    }
-  });
-
-  const memberMap = new Map(members.map(m => [m.userId, m.user]));
-
-  const stats = {
-    totalMessages,
-    messagesByType: messagesByType.reduce((acc, item) => {
-      acc[item.messageType] = item._count;
-      return acc;
-    }, {}),
-    messagesByMember: messagesByMember.map(item => ({
-      user: memberMap.get(item.senderId),
-      count: item._count
-    })),
-    chatAge: firstMessage ? 
-      Math.floor((Date.now() - firstMessage.createdAt.getTime()) / (24 * 60 * 60 * 1000)) : 0,
-    averageMessagesPerDay: firstMessage ? 
-      totalMessages / Math.max(1, (Date.now() - firstMessage.createdAt.getTime()) / (24 * 60 * 60 * 1000)) : 0
-  };
+  // Obtener estadísticas usando el servicio
+  const stats = await chatService.getChatAnalytics(chatId, userId);
 
   res.status(200).json({
     success: true,
@@ -1198,7 +1868,6 @@ const reportMessage = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reason, description } = req.body;
 
-  // ✅ CORREGIDO: Validaciones de input
   if (!messageId) {
     throw new AppError('ID del mensaje es requerido', 400, 'MISSING_MESSAGE_ID');
   }
@@ -1253,7 +1922,7 @@ const reportMessage = catchAsync(async (req, res) => {
         messageType: message.messageType,
         fileUrl: message.fileUrl || null
       },
-      severity: 'MEDIUM' // Default severity
+      severity: 'MEDIUM'
     }
   });
 
@@ -1276,13 +1945,12 @@ const reportMessage = catchAsync(async (req, res) => {
   });
 });
 
-// ✅ CORREGIDO: Función helper para verificar límites de cliente CON VALIDACIONES
+// Función helper para verificar límites de cliente CON VALIDACIONES
 const checkClientMessageLimits = async (user) => {
   if (user.userType !== 'CLIENT') {
     return { canSend: true };
   }
 
-  // ✅ CORREGIDO: Verificación de que client existe
   const client = user.client;
   if (!client) {
     throw new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING');
@@ -1304,14 +1972,13 @@ const checkClientMessageLimits = async (user) => {
   }
 
   // Verificar límite diario según tier
-  let dailyLimit = client.dailyMessageLimit || 10; // Default para BASIC
+  let dailyLimit = client.dailyMessageLimit || 5; // Default para BASIC
   
-  // VIP tiene mensajes ilimitados
-  if (client.premiumTier === 'VIP') {
-    dailyLimit = Infinity;
+  // VIP y Premium tienen mensajes ilimitados
+  if (client.isPremium || ['PREMIUM', 'VIP'].includes(client.premiumTier)) {
+    dailyLimit = -1; // Ilimitado
   }
 
-  // ✅ CORREGIDO: Verificación más robusta del límite
   const messagesUsed = client.messagesUsedToday || 0;
   
   if (dailyLimit !== -1 && messagesUsed >= dailyLimit) {
@@ -1330,7 +1997,7 @@ const checkClientMessageLimits = async (user) => {
   };
 };
 
-// ✅ CORREGIDO: Función helper para extraer public_id de URL de Cloudinary MEJORADA
+// Función helper para extraer public_id de URL de Cloudinary MEJORADA
 const extractPublicIdFromUrl = (cloudinaryUrl) => {
   try {
     if (!cloudinaryUrl || typeof cloudinaryUrl !== 'string' || !cloudinaryUrl.includes('cloudinary')) {
@@ -1338,7 +2005,6 @@ const extractPublicIdFromUrl = (cloudinaryUrl) => {
     }
     
     // Extraer public_id de la URL de Cloudinary
-    // Formato típico: https://res.cloudinary.com/[cloud]/[resource_type]/upload/v[version]/[public_id].[format]
     const matches = cloudinaryUrl.match(/\/v\d+\/([^/.]+)(?:\.[^/]*)?$/);
     if (matches && matches[1]) {
       return matches[1];
@@ -1348,6 +2014,12 @@ const extractPublicIdFromUrl = (cloudinaryUrl) => {
     const altMatches = cloudinaryUrl.match(/\/upload\/([^/.]+)(?:\.[^/]*)?$/);
     if (altMatches && altMatches[1]) {
       return altMatches[1];
+    }
+
+    // Para archivos en carpetas (como telofundi/chat/...)
+    const folderMatches = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^/.]*)?$/);
+    if (folderMatches && folderMatches[1]) {
+      return folderMatches[1];
     }
 
     return null;
@@ -1371,5 +2043,12 @@ module.exports = {
   toggleChatMute,
   searchMessages,
   getChatStats,
-  reportMessage
+  reportMessage,
+  // ✅ NUEVAS: Funciones para chat tripartito
+  createDisputeChat,
+  getDisputeChats,
+  closeDisputeChat,
+  addDisputeMessage,
+  // ✅ NUEVA: Función para crear chat desde perfil
+  createChatFromProfile
 };

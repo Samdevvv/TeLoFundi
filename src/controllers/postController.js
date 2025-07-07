@@ -4,25 +4,24 @@ const { sanitizeString } = require('../utils/validators');
 const { uploadToCloudinary, uploadMultipleToCloudinary, deleteFromCloudinary } = require('../services/uploadService');
 const logger = require('../utils/logger');
 
-// ✅ CREAR NUEVO POST - CORREGIDO PARA FORMDATA
+// ✅ CREAR NUEVO POST - COMPLETAMENTE CORREGIDO
 const createPost = catchAsync(async (req, res) => {
-  // ✅ AGREGAR VALIDACIÓN DE req.user
-  if (!req.user || !req.user.id) {
-    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
-    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
-  }
-
+  // ✅ ASSERT DEFENSIVO - MÁS LIMPIO QUE VALIDACIÓN COMPLETA
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
   const userId = req.user.id;
   
-  console.log('📝 === CREATE POST DEBUG ===');
-  console.log('📝 User ID:', userId);
-  console.log('📝 Content-Type:', req.get('content-type'));
-  console.log('📝 Body received:', req.body);
-  console.log('📝 Files received:', req.files?.length || 0);
-  console.log('📝 Uploaded files:', req.uploadedFiles?.length || 0);
-  console.log('📝 === END DEBUG ===');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📝 === CREATE POST DEBUG ===');
+    console.log('📝 User ID:', userId);
+    console.log('📝 Content-Type:', req.get('content-type'));
+    console.log('📝 Body received:', Object.keys(req.body));
+    console.log('📝 Files received:', req.files?.length || 0);
+    console.log('📝 Uploaded files:', req.uploadedFiles?.length || 0);
+    console.log('📝 === END DEBUG ===');
+  }
 
   // ✅ EXTRAER DATOS DEL FORMDATA (req.body ya está parseado por multer)
+  // ❌ ELIMINADO isPaidPost - No existe en el schema
   const {
     title,
     description,
@@ -34,14 +33,6 @@ const createPost = catchAsync(async (req, res) => {
     tags,
     premiumOnly = false
   } = req.body;
-
-  console.log('📝 Extracted data:', {
-    title,
-    description: description?.substring(0, 50) + '...',
-    phone,
-    hasServices: !!services,
-    premiumOnly
-  });
 
   // ✅ VALIDACIÓN DE CAMPOS REQUERIDOS
   if (!title?.trim()) {
@@ -56,7 +47,7 @@ const createPost = catchAsync(async (req, res) => {
     throw new AppError('El teléfono es obligatorio', 400, 'PHONE_REQUIRED');
   }
 
-  // Verificar límites según tipo de usuario
+  // ✅ VERIFICAR LÍMITES SEGÚN TIPO DE USUARIO
   if (req.user.userType === 'ESCORT') {
     const currentPosts = await prisma.post.count({
       where: {
@@ -65,9 +56,15 @@ const createPost = catchAsync(async (req, res) => {
       }
     });
 
-    const maxPosts = req.user.escort?.maxPosts || 5;
-    if (currentPosts >= maxPosts) {
-      throw new AppError(`Has alcanzado el límite de ${maxPosts} anuncios activos`, 400, 'POST_LIMIT_REACHED');
+    // ✅ LÍMITE DE 5 POSTS GRATUITOS PARA ESCORTS
+    const freePostsLimit = 5;
+    
+    if (currentPosts >= freePostsLimit) {
+      throw new AppError(
+        `Has alcanzado el límite máximo de ${freePostsLimit} anuncios activos`, 
+        400, 
+        'POST_LIMIT_REACHED'
+      );
     }
   }
 
@@ -76,7 +73,9 @@ const createPost = catchAsync(async (req, res) => {
   
   if (req.uploadedFiles && req.uploadedFiles.length > 0) {
     imageUrls = req.uploadedFiles.map(result => result.secure_url);
-    console.log('✅ Images uploaded to Cloudinary:', imageUrls.length);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Images uploaded to Cloudinary:', imageUrls.length);
+    }
   } else if (req.files && req.files.length > 0) {
     // Fallback: si Cloudinary falló, reportar error
     console.log('❌ Cloudinary upload failed, but files were received');
@@ -109,7 +108,7 @@ const createPost = catchAsync(async (req, res) => {
     throw new AppError('Error en el formato de los datos', 400, 'JSON_PARSE_ERROR');
   }
 
-  // ✅ CREAR POST EN LA BASE DE DATOS
+  // ✅ CREAR POST EN LA BASE DE DATOS - SIN isPaidPost
   const newPost = await prisma.post.create({
     data: {
       title: sanitizeString(title),
@@ -117,10 +116,11 @@ const createPost = catchAsync(async (req, res) => {
       phone: phone || req.user.phone,
       images: imageUrls,
       locationId: locationId || req.user.locationId,
-      services: parsedServices || [],
+      services: Array.isArray(parsedServices) ? parsedServices.join(', ') : parsedServices || '', // String libre según specs
       rates: parsedRates,
       availability: parsedAvailability,
       premiumOnly: premiumOnly === 'true' && req.user.userType !== 'CLIENT',
+      // ❌ ELIMINADO isPaidPost - No existe en el schema de Prisma
       authorId: userId,
       // Scores iniciales
       score: 10.0,
@@ -214,25 +214,65 @@ const createPost = catchAsync(async (req, res) => {
   });
 });
 
-// ✅ ACTUALIZAR POST - CORREGIDO PARA FORMDATA
-const updatePost = catchAsync(async (req, res) => {
-  // ✅ AGREGAR VALIDACIÓN DE req.user
-  if (!req.user || !req.user.id) {
-    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
-    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
+// ✅ FUNCIÓN PARA VERIFICAR LÍMITES DE POSTS
+const checkPostLimits = catchAsync(async (req, res) => {
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
+  const userId = req.user.id;
+
+  // Solo escorts tienen límites
+  if (req.user.userType !== 'ESCORT') {
+    return res.status(200).json({
+      success: true,
+      data: {
+        canCreateFreePost: true,
+        freePostsRemaining: -1, // Ilimitado para no-escorts
+        totalPosts: 0,
+        freePostsLimit: -1
+      },
+      timestamp: new Date().toISOString()
+    });
   }
 
+  const currentPosts = await prisma.post.count({
+    where: {
+      authorId: userId,
+      isActive: true
+    }
+  });
+
+  const freePostsLimit = 5; // ✅ CORREGIDO: 5 posts gratis para escorts
+  const freePostsRemaining = Math.max(0, freePostsLimit - currentPosts);
+  const canCreateFreePost = currentPosts < freePostsLimit;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      canCreateFreePost,
+      freePostsRemaining,
+      totalPosts: currentPosts,
+      freePostsLimit,
+      message: canCreateFreePost 
+        ? `Puedes crear ${freePostsRemaining} anuncios más` 
+        : 'Has alcanzado el límite de anuncios gratuitos'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ ACTUALIZAR POST - OPTIMIZADO
+const updatePost = catchAsync(async (req, res) => {
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
   const { postId } = req.params;
   const userId = req.user.id;
   
-  console.log('📝 === UPDATE POST DEBUG ===');
-  console.log('📝 Post ID:', postId);
-  console.log('📝 User ID:', userId);
-  console.log('📝 Content-Type:', req.get('content-type'));
-  console.log('📝 Body received:', req.body);
-  console.log('📝 Files received:', req.files?.length || 0);
-  console.log('📝 Uploaded files:', req.uploadedFiles?.length || 0);
-  console.log('📝 === END DEBUG ===');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📝 === UPDATE POST DEBUG ===');
+    console.log('📝 Post ID:', postId);
+    console.log('📝 User ID:', userId);
+    console.log('📝 Body received:', Object.keys(req.body));
+    console.log('📝 Files received:', req.files?.length || 0);
+    console.log('📝 === END DEBUG ===');
+  }
 
   const {
     title,
@@ -275,7 +315,8 @@ const updatePost = catchAsync(async (req, res) => {
   // ✅ PARSEAR DATOS JSON DESDE FORMDATA
   try {
     if (services) {
-      updateData.services = typeof services === 'string' ? JSON.parse(services) : services;
+      const parsedServices = typeof services === 'string' ? JSON.parse(services) : services;
+      updateData.services = Array.isArray(parsedServices) ? parsedServices.join(', ') : parsedServices || '';
     }
     if (rates !== undefined) {
       updateData.rates = rates ? (typeof rates === 'string' ? JSON.parse(rates) : rates) : null;
@@ -344,7 +385,9 @@ const updatePost = catchAsync(async (req, res) => {
     const newImageUrls = req.uploadedFiles.map(result => result.secure_url);
     currentImages = [...currentImages, ...newImageUrls];
     
-    console.log('✅ New images added:', newImageUrls.length);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ New images added:', newImageUrls.length);
+    }
   }
 
   // Actualizar array de imágenes
@@ -478,7 +521,8 @@ const getFeed = catchAsync(async (req, res) => {
     }),
     ...(services && services.length > 0 && {
       services: {
-        hasSome: Array.isArray(services) ? services : [services]
+        contains: Array.isArray(services) ? services.join(' ') : services,
+        mode: 'insensitive'
       }
     }),
     ...(verified === 'true' && {
@@ -1115,14 +1159,9 @@ const getPostById = catchAsync(async (req, res) => {
   });
 });
 
-// Eliminar post - MEJORADO PARA CLOUDINARY
+// Eliminar post - OPTIMIZADO
 const deletePost = catchAsync(async (req, res) => {
-  // ✅ AGREGAR VALIDACIÓN DE req.user
-  if (!req.user || !req.user.id) {
-    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
-    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
-  }
-
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
   const { postId } = req.params;
   const userId = req.user.id;
 
@@ -1191,12 +1230,7 @@ const deletePost = catchAsync(async (req, res) => {
 
 // Dar like a un post
 const likePost = catchAsync(async (req, res) => {
-  // ✅ AGREGAR VALIDACIÓN DE req.user
-  if (!req.user || !req.user.id) {
-    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
-    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
-  }
-
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
   const { postId } = req.params;
   const userId = req.user.id;
 
@@ -1313,12 +1347,7 @@ const likePost = catchAsync(async (req, res) => {
 
 // Agregar/quitar favorito
 const toggleFavorite = catchAsync(async (req, res) => {
-  // ✅ AGREGAR VALIDACIÓN DE req.user
-  if (!req.user || !req.user.id) {
-    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
-    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
-  }
-
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
   const { postId } = req.params;
   const userId = req.user.id;
 
@@ -1417,32 +1446,27 @@ const toggleFavorite = catchAsync(async (req, res) => {
   }
 });
 
-// ✅ FUNCIÓN CORREGIDA: getMyPosts - NO DEBE LANZAR ERROR 404 SI NO HAY POSTS
+// ✅ FUNCIÓN OPTIMIZADA: getMyPosts - SIN THROW ERROR INNECESARIO
 const getMyPosts = catchAsync(async (req, res) => {
-  // ✅ VALIDACIÓN DE USUARIO AUTENTICADO
-  if (!req.user || !req.user.id) {
-    console.error('❌ ERROR: req.user is undefined or missing id:', req.user);
-    throw new AppError('Usuario no autenticado', 401, 'USER_NOT_AUTHENTICATED');
-  }
-
+  console.assert(req.user?.id, 'User should be authenticated by middleware');
   const userId = req.user.id;
   const { page = 1, limit = 20, status = 'active', sortBy = 'recent' } = req.query;
 
-  console.log('📋 === GET MY POSTS DEBUG ===');
-  console.log('📋 User ID:', userId);
-  console.log('📋 Query params:', { page, limit, status, sortBy });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📋 === GET MY POSTS DEBUG ===');
+    console.log('📋 User ID:', userId);
+    console.log('📋 Query params:', { page, limit, status, sortBy });
+  }
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
-  // ✅ FILTROS SEGÚN STATUS - SIN LANZAR ERROR SI NO HAY POSTS
+  // ✅ FILTROS SEGÚN STATUS
   const whereClause = {
     authorId: userId,
     ...(status === 'active' && { isActive: true, deletedAt: null }),
     ...(status === 'deleted' && { isActive: false }),
     ...(status === 'all' && {})
   };
-
-  console.log('📋 Where clause:', whereClause);
 
   // ✅ CONFIGURAR ORDENAMIENTO
   let orderBy = {};
@@ -1501,8 +1525,10 @@ const getMyPosts = catchAsync(async (req, res) => {
       prisma.post.count({ where: whereClause })
     ]);
 
-    console.log('📋 Posts encontrados:', posts.length);
-    console.log('📋 Total count:', totalCount);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📋 Posts encontrados:', posts.length);
+      console.log('📋 Total count:', totalCount);
+    }
 
     const pagination = {
       page: parseInt(page),
@@ -1530,8 +1556,6 @@ const getMyPosts = catchAsync(async (req, res) => {
       totalLikes: posts.reduce((sum, post) => sum + (post._count?.likes || 0), 0)
     };
 
-    console.log('📋 === GET MY POSTS SUCCESS ===');
-
     res.status(200).json({
       success: true,
       data: {
@@ -1546,7 +1570,7 @@ const getMyPosts = catchAsync(async (req, res) => {
   } catch (error) {
     console.error('❌ Error en getMyPosts:', error);
     
-    // ✅ NO LANZAR ERROR 404, DEVOLVER ARRAY VACÍO
+    // ✅ DEVOLVER ARRAY VACÍO EN LUGAR DE ERROR
     res.status(200).json({
       success: true,
       data: {
@@ -1613,11 +1637,12 @@ const extractPublicIdFromUrl = (cloudinaryUrl) => {
 
 module.exports = {
   createPost,
+  checkPostLimits,
+  updatePost,
   getFeed,
   getTrendingPosts,
   getDiscoveryPosts,
   getPostById,
-  updatePost,
   deletePost,
   likePost,
   toggleFavorite,

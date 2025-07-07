@@ -1,7 +1,9 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/database');
 const logger = require('../utils/logger');
-
+// ====================================================================
+// Middleware de auth
+// ====================================================================
 // ====================================================================
 // 🚨 CUSTOM ERROR CLASS - INTEGRADA
 // ====================================================================
@@ -162,11 +164,52 @@ const requireUserType = (...allowedTypes) => {
   };
 };
 
+// ✅ Middleware requireRole que faltaba
+const requireRole = (role) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(new AppError('Usuario no autenticado', 401, 'NOT_AUTHENTICATED'));
+    }
+
+    // Verificar si es ADMIN
+    if (role === 'ADMIN') {
+      if (req.user.userType !== 'ADMIN') {
+        if (logger.logSecurity && typeof logger.logSecurity === 'function') {
+          logger.logSecurity('unauthorized_admin_access', 'high', {
+            userId: req.user.id,
+            userType: req.user.userType,
+            attemptedRoute: req.originalUrl,
+            ip: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+        } else {
+          logger.warn('Unauthorized admin access attempt', {
+            userId: req.user.id,
+            userType: req.user.userType
+          });
+        }
+
+        return next(new AppError('Se requieren permisos de administrador', 403, 'ADMIN_REQUIRED'));
+      }
+
+      // Verificar que el usuario no esté baneado
+      if (req.user.isBanned) {
+        return next(new AppError('Cuenta de administrador suspendida', 403, 'ADMIN_BANNED'));
+      }
+
+      return next();
+    }
+
+    // Para otros roles, usar requireUserType
+    return requireUserType(role)(req, res, next);
+  };
+};
+
 // ====================================================================
-// 🛡️ MIDDLEWARES DE ADMINISTRACIÓN - INTEGRADOS
+// 🛡️ MIDDLEWARES DE ADMINISTRACIÓN - CORREGIDOS
 // ====================================================================
 
-// ✅ Middleware principal para verificar que el usuario es administrador
+// ✅ Middleware principal para verificar que el usuario es administrador - COMPLETAMENTE CORREGIDO
 const requireAdmin = async (req, res, next) => {
   try {
     const user = req.user;
@@ -200,7 +243,7 @@ const requireAdmin = async (req, res, next) => {
       throw new AppError('Cuenta de administrador suspendida', 403, 'ADMIN_BANNED');
     }
 
-    // ✅ VERIFICACIÓN OPCIONAL: Obtener datos completos del admin si existen
+    // ✅ CORREGIDO: Obtener datos del admin CON LOS CAMPOS CORRECTOS DEL SCHEMA
     try {
       const adminData = await prisma.admin.findUnique({
         where: { userId: user.id },
@@ -208,27 +251,29 @@ const requireAdmin = async (req, res, next) => {
           id: true,
           role: true,
           permissions: true,
-          isActive: true,
-          lastActiveAt: true,
+          // ❌ REMOVIDO: isActive - Este campo no existe en el schema
+          // ❌ REMOVIDO: lastActiveAt - Este campo no existe en el schema
           totalBans: true,
-          totalReports: true
+          totalReports: true,
+          totalVerifications: true,
+          totalAgencyApprovals: true,
+          canDeletePosts: true,
+          canBanUsers: true,
+          canModifyPrices: true,
+          canAccessMetrics: true,
+          canApproveAgencies: true,
+          createdAt: true,
+          updatedAt: true
         }
       });
 
       if (adminData) {
-        // Verificar si el admin está activo (si existe el registro admin)
-        if (!adminData.isActive) {
-          throw new AppError('Cuenta de administrador desactivada', 403, 'ADMIN_INACTIVE');
-        }
-
+        // ✅ CORREGIDO: Sin verificación de isActive ya que no existe
         // Agregar datos de admin al request
         req.user.admin = adminData;
 
-        // Actualizar última actividad del admin
-        await prisma.admin.update({
-          where: { userId: user.id },
-          data: { lastActiveAt: new Date() }
-        });
+        // ✅ CORREGIDO: Sin actualización de lastActiveAt ya que no existe en Admin
+        // Solo actualizamos la actividad del User, no del Admin
       } else {
         // ✅ COMPORTAMIENTO MEJORADO: Si no existe registro admin, crear uno básico
         console.log(`⚠️ Admin record not found for user ${user.id}, creating basic admin record`);
@@ -238,10 +283,17 @@ const requireAdmin = async (req, res, next) => {
             userId: user.id,
             role: 'ADMIN',
             permissions: ['manage_users', 'view_metrics', 'moderate_content'],
-            isActive: true,
-            lastActiveAt: new Date(),
+            // ❌ REMOVIDO: isActive - No existe en schema
+            // ❌ REMOVIDO: lastActiveAt - No existe en schema
             totalBans: 0,
-            totalReports: 0
+            totalReports: 0,
+            totalVerifications: 0,
+            totalAgencyApprovals: 0,
+            canDeletePosts: false,
+            canBanUsers: false,
+            canModifyPrices: false,
+            canAccessMetrics: true,
+            canApproveAgencies: true
           }
         });
 
@@ -254,6 +306,7 @@ const requireAdmin = async (req, res, next) => {
       }
     } catch (adminError) {
       // ✅ MANEJO GRACEFUL: Si hay error con la tabla admin, continuar sin bloquear
+      console.error('💥 Prisma Error:', adminError.message);
       console.warn('Warning: Admin table access failed, continuing with basic admin permissions:', adminError.message);
       
       // Crear objeto admin básico temporal
@@ -261,10 +314,15 @@ const requireAdmin = async (req, res, next) => {
         id: 'temp-admin',
         role: 'ADMIN',
         permissions: ['manage_users', 'view_metrics', 'moderate_content'],
-        isActive: true,
-        lastActiveAt: new Date(),
         totalBans: 0,
-        totalReports: 0
+        totalReports: 0,
+        totalVerifications: 0,
+        totalAgencyApprovals: 0,
+        canDeletePosts: false,
+        canBanUsers: false,
+        canModifyPrices: false,
+        canAccessMetrics: true,
+        canApproveAgencies: true
       };
     }
 
@@ -283,7 +341,7 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
-// ✅ Middleware para verificar permisos específicos de administrador
+// ✅ Middleware para verificar permisos específicos de administrador - CORREGIDO
 const requireAdminPermission = (permission) => {
   return async (req, res, next) => {
     try {
@@ -724,7 +782,7 @@ const verifyRefreshToken = (token) => {
   return jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
 };
 
-// ✅ FUNCIONES HELPER PARA ADMINISTRACIÓN
+// ✅ FUNCIONES HELPER PARA ADMINISTRACIÓN - CORREGIDAS
 
 // Función helper para verificar si el usuario es admin
 const isAdmin = (user) => {
@@ -791,7 +849,7 @@ const getAdminAccessLevel = (user) => {
   }
 };
 
-// ✅ Función helper para formatear datos de admin para logs
+// ✅ Función helper para formatear datos de admin para logs - CORREGIDA
 const formatAdminForLog = (user) => {
   if (!user) return { id: 'unknown', role: 'none' };
   
@@ -802,10 +860,12 @@ const formatAdminForLog = (user) => {
     userType: user.userType,
     adminRole: user.admin?.role || 'ADMIN',
     permissions: user.admin?.permissions || [],
-    lastActiveAt: user.admin?.lastActiveAt,
+    // ❌ REMOVIDO: lastActiveAt - No existe en modelo Admin
     totalActions: {
       bans: user.admin?.totalBans || 0,
-      reports: user.admin?.totalReports || 0
+      reports: user.admin?.totalReports || 0,
+      verifications: user.admin?.totalVerifications || 0,
+      agencyApprovals: user.admin?.totalAgencyApprovals || 0
     }
   };
 };
@@ -817,6 +877,7 @@ module.exports = {
   // ✅ Autenticación básica
   authenticate,
   requireUserType,
+  requireRole,
   optionalAuth,
   
   // ✅ Tipos de usuario específicos
@@ -825,7 +886,7 @@ module.exports = {
   requireClient,
   requireEscortOrAgency,
   
-  // ✅ Administración - TODAS LAS FUNCIONES INTEGRADAS
+  // ✅ Administración - TODAS LAS FUNCIONES CORREGIDAS
   requireAdmin,
   requireAdminPermission,
   requireSuperAdmin,
@@ -844,7 +905,7 @@ module.exports = {
   generateRefreshToken,
   verifyRefreshToken,
   
-  // ✅ Admin Helper functions
+  // ✅ Admin Helper functions - CORREGIDAS
   isAdmin,
   canAccessAdmin,
   canPerformAction,

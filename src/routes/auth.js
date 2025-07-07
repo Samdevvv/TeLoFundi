@@ -6,9 +6,13 @@ const router = express.Router();
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const { validateRegistration, validateLogin, validatePasswordReset } = require('../middleware/validation');
 
+// ✅ CORREGIDO: Importar middleware de upload correcto
+const { handleAgencyUpload, handleMulterError } = require('../middleware/upload');
+
 // Controllers (los crearemos después)
 const {
   register,
+  registerAgency, // ✅ FUNCIÓN ESPECÍFICA PARA AGENCIAS
   login,
   logout,
   refreshToken,
@@ -81,6 +85,77 @@ const {
  *           nullable: true
  *           example: "cm123location456"
  *     
+ *     AgencyRegisterRequest:
+ *       type: object
+ *       required:
+ *         - email
+ *         - username
+ *         - firstName
+ *         - lastName
+ *         - password
+ *         - companyName
+ *         - businessLicense
+ *         - contactPerson
+ *         - address
+ *         - cedulaFrente
+ *         - cedulaTrasera
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: "agencia@ejemplo.com"
+ *         username:
+ *           type: string
+ *           minLength: 3
+ *           maxLength: 30
+ *           example: "agencia_vip"
+ *         firstName:
+ *           type: string
+ *           example: "Juan"
+ *         lastName:
+ *           type: string
+ *           example: "Pérez"
+ *         password:
+ *           type: string
+ *           minLength: 8
+ *           example: "MiPassword123!"
+ *         companyName:
+ *           type: string
+ *           example: "Agencia VIP Services"
+ *         businessLicense:
+ *           type: string
+ *           example: "RNC-123456789"
+ *         contactPerson:
+ *           type: string
+ *           example: "Juan Pérez"
+ *         address:
+ *           type: string
+ *           example: "Calle Principal #123, Santiago"
+ *         phone:
+ *           type: string
+ *           nullable: true
+ *           example: "+1809-555-0123"
+ *         bio:
+ *           type: string
+ *           nullable: true
+ *           example: "Agencia líder en servicios de acompañamiento"
+ *         website:
+ *           type: string
+ *           nullable: true
+ *           example: "https://agenciavip.com"
+ *         locationId:
+ *           type: string
+ *           nullable: true
+ *           example: "cm123location456"
+ *         cedulaFrente:
+ *           type: string
+ *           format: binary
+ *           description: "Foto de la cédula (frente)"
+ *         cedulaTrasera:
+ *           type: string
+ *           format: binary
+ *           description: "Foto de la cédula (trasera)"
+ *     
  *     LoginRequest:
  *       type: object
  *       required:
@@ -121,13 +196,68 @@ const {
  *             expiresIn:
  *               type: string
  *               example: "7d"
+ *             verificationRequired:
+ *               type: boolean
+ *               example: true
+ *               description: "Solo para agencias"
+ *             verificationStatus:
+ *               type: string
+ *               enum: [PENDING, APPROVED, REJECTED]
+ *               example: "PENDING"
+ *               description: "Solo para agencias"
+ *     
+ *     AgencyPendingResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: "Solicitud de agencia recibida. Te notificaremos cuando sea aprobada."
+ *         data:
+ *           type: object
+ *           properties:
+ *             user:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 username:
+ *                   type: string
+ *                 firstName:
+ *                   type: string
+ *                 lastName:
+ *                   type: string
+ *                 userType:
+ *                   type: string
+ *                   example: "AGENCY"
+ *                 accountStatus:
+ *                   type: string
+ *                   example: "PENDING_APPROVAL"
+ *                 canLogin:
+ *                   type: boolean
+ *                   example: false
+ *             applicationStatus:
+ *               type: string
+ *               example: "PENDING_APPROVAL"
+ *             estimatedReviewTime:
+ *               type: string
+ *               example: "24-48 horas"
+ *             nextSteps:
+ *               type: array
+ *               items:
+ *                 type: string
+ *               example: ["Nuestro equipo revisará tu documentación", "Te notificaremos por email"]
  */
 
 /**
  * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Registrar nuevo usuario
+ *     summary: Registrar nuevo usuario (Cliente, Escort)
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -157,6 +287,58 @@ router.post('/register', /* registerLimiter, */ validateRegistration, register);
 
 /**
  * @swagger
+ * /api/auth/register/agency:
+ *   post:
+ *     summary: Registrar nueva agencia (con documentos de cédula) - REQUIERE APROBACIÓN MANUAL
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             $ref: '#/components/schemas/AgencyRegisterRequest'
+ *     responses:
+ *       201:
+ *         description: Agencia registrada, pendiente de verificación (NO incluye tokens de acceso)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AgencyPendingResponse'
+ *       400:
+ *         description: Error de validación o fotos de cédula faltantes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Fotos de cédula (frente y trasera) son obligatorias"
+ *                 errorCode:
+ *                   type: string
+ *                   example: "CEDULA_PHOTOS_REQUIRED"
+ *       409:
+ *         description: Email o username ya existe
+ *       500:
+ *         description: Error subiendo documentos a Cloudinary
+ */
+// ✅ RUTA CORREGIDA: Registro específico para agencias con upload de cédula
+router.post('/register/agency', 
+  // ✅ MIDDLEWARE DE UPLOAD PARA FOTOS DE CÉDULA
+  handleAgencyUpload, // Este middleware maneja múltiples archivos y Cloudinary
+  // ✅ VALIDACIÓN ESPECÍFICA
+  validateRegistration,
+  // ✅ CONTROLADOR ESPECÍFICO
+  registerAgency,
+  // ✅ MANEJO DE ERRORES DE MULTER
+  handleMulterError
+);
+
+/**
+ * @swagger
  * /api/auth/login:
  *   post:
  *     summary: Iniciar sesión
@@ -173,11 +355,41 @@ router.post('/register', /* registerLimiter, */ validateRegistration, register);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/AuthResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         verificationStatus:
+ *                           type: string
+ *                           description: "Estado de verificación para agencias"
+ *                           example: "PENDING"
+ *                         accountStatus:
+ *                           type: string
+ *                           description: "Estado de la cuenta"
+ *                           example: "ACTIVE"
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         description: Credenciales inválidas
+ *       403:
+ *         description: Cuenta suspendida, agencia pendiente o rechazada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Tu solicitud está siendo revisada. Te notificaremos cuando sea aprobada."
+ *                 errorCode:
+ *                   type: string
+ *                   example: "AGENCY_PENDING_APPROVAL"
  *       429:
  *         description: Demasiados intentos de login
  */
@@ -489,7 +701,7 @@ router.get('/google/callback', googleCallback);
  *                 example: "prueba@ejemplo.com"
  *               type:
  *                 type: string
- *                 enum: [reset, welcome, verification]
+ *                 enum: [reset, welcome, verification, agency_pending]
  *                 example: "reset"
  *     responses:
  *       200:

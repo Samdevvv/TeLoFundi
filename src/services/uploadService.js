@@ -159,11 +159,42 @@ const optimizeImage = async (buffer, type = 'post') => {
 };
 
 // ✅ FUNCIÓN PRINCIPAL CORREGIDA PARA SUBIR A CLOUDINARY
-const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
+const uploadToCloudinary = async (file, folderOrOptions = 'telofundi', options = {}) => {
   try {
+    console.log('📤 === UPLOAD TO CLOUDINARY DEBUG ===');
+    console.log('📤 Parameters received:', {
+      fileType: typeof file,
+      hasBuffer: !!(file && file.buffer),
+      folderOrOptions: typeof folderOrOptions,
+      folderValue: folderOrOptions,
+      optionsType: typeof options,
+      optionsKeys: Object.keys(options || {})
+    });
+
     if (!isCloudinaryConfigured) {
       throw new Error('Cloudinary not configured');
     }
+
+    // ✅ CORREGIR PARÁMETROS - El problema está aquí
+    let folder, finalOptions;
+    
+    if (typeof folderOrOptions === 'string') {
+      folder = folderOrOptions;
+      finalOptions = options || {};
+    } else if (typeof folderOrOptions === 'object' && folderOrOptions !== null) {
+      // Si el segundo parámetro es un objeto, es options
+      folder = folderOrOptions.folder || 'telofundi';
+      finalOptions = folderOrOptions;
+    } else {
+      folder = 'telofundi';
+      finalOptions = options || {};
+    }
+
+    console.log('📤 Corrected parameters:', {
+      folder: folder,
+      folderType: typeof folder,
+      finalOptions: Object.keys(finalOptions)
+    });
 
     let uploadBuffer;
     let fileType = 'post';
@@ -172,21 +203,28 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
     // Manejar diferentes tipos de input
     if (Buffer.isBuffer(file)) {
       uploadBuffer = file;
-      mimetype = options.mimetype || 'image/jpeg';
-      fileType = options.type || determineFileType(options.fieldname, folder);
-    } else if (file.buffer) {
+      mimetype = finalOptions.mimetype || 'image/jpeg';
+      fileType = finalOptions.type || determineFileType(finalOptions.fieldname, folder);
+    } else if (file && file.buffer) {
       uploadBuffer = file.buffer;
       mimetype = file.mimetype;
       fileType = determineFileType(file.fieldname, folder);
     } else {
-      throw new Error('Invalid file format');
+      throw new Error('Invalid file format - expected Buffer or file with buffer property');
     }
     
+    console.log('📤 File processing:', {
+      fileType,
+      mimetype,
+      bufferSize: uploadBuffer.length,
+      isImage: mimetype.startsWith('image/')
+    });
+
     // Determinar tipo de archivo
     const isImage = mimetype.startsWith('image/');
 
     // ✅ OPTIMIZAR IMAGEN SOLO SI NO ES AVATAR (para evitar errores con face detection)
-    if (isImage && !options.skipOptimization && fileType !== 'avatar') {
+    if (isImage && !finalOptions.skipOptimization && fileType !== 'avatar') {
       logger.debug('Optimizing image with Sharp');
       uploadBuffer = await optimizeImage(uploadBuffer, fileType);
     } else if (fileType === 'avatar') {
@@ -196,26 +234,33 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
     // Generar ID único
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
-    const userId = options.userId || (options.public_id?.includes('_') ? options.public_id.split('_')[1] : 'user');
-    const publicId = options.public_id || `${fileType}_${userId}_${timestamp}_${random}`;
+    const userId = finalOptions.userId || (finalOptions.public_id?.includes('_') ? finalOptions.public_id.split('_')[1] : 'user');
+    const publicId = finalOptions.public_id || `${fileType}_${userId}_${timestamp}_${random}`;
 
     // ✅ CONFIGURAR OPCIONES DE SUBIDA CORREGIDAS - FILTRAR CAMPOS INVÁLIDOS
     const uploadOptions = {
-      folder,
+      folder: folder, // ✅ Asegurar que folder es string
       resource_type: isImage ? 'image' : 'raw',
       public_id: publicId,
       overwrite: false,
       unique_filename: true,
       use_filename: false,
-      // ✅ CRÍTICO: Solo incluir campos válidos de Cloudinary, NO incluir 'type' personalizado
-      ...(options.transformation && { transformation: options.transformation }),
-      ...(options.tags && { tags: options.tags }),
-      ...(options.context && { context: options.context }),
-      ...(options.notification_url && { notification_url: options.notification_url }),
-      ...(options.eager && { eager: options.eager }),
-      ...(options.backup && { backup: options.backup }),
-      ...(options.return_delete_token && { return_delete_token: options.return_delete_token })
+      // ✅ CRÍTICO: Solo incluir campos válidos de Cloudinary
+      ...(finalOptions.transformation && { transformation: finalOptions.transformation }),
+      ...(finalOptions.tags && { tags: finalOptions.tags }),
+      ...(finalOptions.context && { context: finalOptions.context }),
+      ...(finalOptions.notification_url && { notification_url: finalOptions.notification_url }),
+      ...(finalOptions.eager && { eager: finalOptions.eager }),
+      ...(finalOptions.backup && { backup: finalOptions.backup }),
+      ...(finalOptions.return_delete_token && { return_delete_token: finalOptions.return_delete_token })
     };
+
+    console.log('📤 Upload options:', {
+      folder: uploadOptions.folder,
+      folderType: typeof uploadOptions.folder,
+      resource_type: uploadOptions.resource_type,
+      public_id: uploadOptions.public_id
+    });
 
     // ✅ APLICAR TRANSFORMACIONES ESPECÍFICAS PARA IMÁGENES (ESPECIALMENTE AVATARES)
     if (isImage && transformations[fileType]) {
@@ -249,7 +294,7 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       }
     }
 
-    logger.info('Files processed by multer');
+    console.log('📤 Final upload options:', JSON.stringify(uploadOptions, null, 2));
 
     // ✅ SUBIR ARCHIVO CON MEJOR MANEJO DE ERRORES
     const result = await new Promise((resolve, reject) => {
@@ -257,10 +302,17 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
         uploadOptions,
         (error, result) => {
           if (error) {
+            console.error('❌ Cloudinary upload error:', error);
             logger.error('Cloudinary upload error:', error);
             reject(error);
           } else {
-            logger.info('File uploaded successfully');
+            console.log('✅ Cloudinary upload successful:', {
+              public_id: result.public_id,
+              secure_url: result.secure_url,
+              format: result.format,
+              bytes: result.bytes
+            });
+            logger.info('File uploaded successfully to Cloudinary');
             resolve(result);
           }
         }
@@ -271,7 +323,7 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
 
     // ✅ GENERAR VARIACIONES DE LA IMAGEN SI ES NECESARIO (SOLO PARA POSTS)
     let variations = {};
-    if (isImage && fileType === 'post' && !options.skipVariations) {
+    if (isImage && fileType === 'post' && !finalOptions.skipVariations) {
       try {
         variations = await generateImageVariations(result.public_id);
       } catch (error) {
@@ -291,7 +343,7 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
       created_at: result.created_at,
       folder,
       variations,
-      optimized: isImage && !options.skipOptimization && fileType !== 'avatar'
+      optimized: isImage && !finalOptions.skipOptimization && fileType !== 'avatar'
     };
 
     logger.info('File uploaded to Cloudinary successfully', {
@@ -307,6 +359,7 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
     return uploadResult;
 
   } catch (error) {
+    console.error('❌ Error uploading to Cloudinary:', error);
     logger.error('Error uploading to Cloudinary:', error);
     
     // ✅ MEJOR MANEJO DE ERRORES ESPECÍFICOS
@@ -320,8 +373,9 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
     
     // Fallback a almacenamiento local si Cloudinary falla
     if (process.env.NODE_ENV !== 'production') {
+      console.log('📤 Falling back to local storage...');
       logger.info('Falling back to local storage');
-      return await uploadToLocal(file, folder, options);
+      return await uploadToLocal(file, folder, finalOptions);
     }
     
     throw error;
@@ -331,12 +385,17 @@ const uploadToCloudinary = async (file, folder = 'telofundi', options = {}) => {
 // ✅ FUNCIÓN PARA UPLOAD MÚLTIPLE CORREGIDA
 const uploadMultipleToCloudinary = async (files, options = {}) => {
   try {
+    console.log('📤 === MULTIPLE UPLOAD TO CLOUDINARY ===');
+    console.log('📤 Files count:', files.length);
+    console.log('📤 Options:', Object.keys(options));
+
     const uploadPromises = files.map((file, index) => {
       const fileOptions = {
-        // ✅ CRÍTICO: Solo incluir opciones válidas de Cloudinary, NO 'type' personalizado
+        // ✅ CRÍTICO: Solo incluir opciones válidas de Cloudinary
         public_id: `post_${options.userId || 'user'}_${Date.now()}_${index}`,
         skipVariations: index > 0, // Solo generar variaciones para la primera imagen
-        // ✅ Solo incluir opciones válidas de Cloudinary
+        userId: options.userId,
+        // ✅ Solo incluir opciones válidas de Cloudinary, NO 'type' personalizado
         ...(options.transformation && { transformation: options.transformation }),
         ...(options.tags && { tags: options.tags }),
         ...(options.context && { context: options.context }),
@@ -379,9 +438,38 @@ const uploadMultipleToCloudinary = async (files, options = {}) => {
   }
 };
 
-// Fallback: subir a almacenamiento local
-const uploadToLocal = async (file, folder = 'misc', options = {}) => {
+// ✅ FUNCIÓN CORREGIDA PARA UPLOAD LOCAL - CORREGIR PARÁMETROS
+const uploadToLocal = async (file, folderOrOptions = 'misc', options = {}) => {
   try {
+    console.log('💾 === UPLOAD TO LOCAL DEBUG ===');
+    console.log('💾 Parameters received:', {
+      fileType: typeof file,
+      hasBuffer: !!(file && file.buffer),
+      folderOrOptions: typeof folderOrOptions,
+      folderValue: folderOrOptions,
+      optionsType: typeof options
+    });
+
+    // ✅ CORREGIR PARÁMETROS - Mismo fix que Cloudinary
+    let folder, finalOptions;
+    
+    if (typeof folderOrOptions === 'string') {
+      folder = folderOrOptions;
+      finalOptions = options || {};
+    } else if (typeof folderOrOptions === 'object' && folderOrOptions !== null) {
+      // Si el segundo parámetro es un objeto, es options
+      folder = finalOptions.folder || 'misc';
+      finalOptions = folderOrOptions;
+    } else {
+      folder = 'misc';
+      finalOptions = options || {};
+    }
+
+    console.log('💾 Corrected parameters:', {
+      folder: folder,
+      folderType: typeof folder
+    });
+
     const uploadDir = path.join(__dirname, '../../imagenes', folder);
     
     // Crear directorio si no existe
@@ -394,15 +482,19 @@ const uploadToLocal = async (file, folder = 'misc', options = {}) => {
     let fileBuffer;
     
     if (Buffer.isBuffer(file)) {
-      const extension = options.mimetype ? options.mimetype.split('/')[1] : 'jpg';
+      const extension = finalOptions.mimetype ? finalOptions.mimetype.split('/')[1] : 'jpg';
       fileName = generateUniqueFileName(`file.${extension}`);
       fileBuffer = file;
-    } else {
+    } else if (file && file.buffer) {
       fileName = generateUniqueFileName(file.originalname);
       fileBuffer = file.buffer;
+    } else {
+      throw new Error('Invalid file format for local upload');
     }
     
     const filePath = path.join(uploadDir, fileName);
+
+    console.log('💾 Saving to:', filePath);
 
     // Guardar archivo
     await fs.promises.writeFile(filePath, fileBuffer);
@@ -418,6 +510,7 @@ const uploadToLocal = async (file, folder = 'misc', options = {}) => {
       local: true
     };
 
+    console.log('✅ Local upload successful:', result);
     logger.info('File uploaded to local storage', {
       path: filePath,
       size: fileBuffer.length,
@@ -427,6 +520,7 @@ const uploadToLocal = async (file, folder = 'misc', options = {}) => {
     return result;
 
   } catch (error) {
+    console.error('❌ Error uploading to local storage:', error);
     logger.error('Error uploading to local storage:', error);
     throw error;
   }
@@ -564,10 +658,11 @@ const transformCloudinaryImage = async (publicId, transformations) => {
 // Funciones auxiliares
 
 const determineFileType = (fieldname, folder) => {
-  if (fieldname === 'avatar' || folder.includes('avatar')) return 'avatar';
-  if (fieldname === 'images' || fieldname === 'postImages' || folder.includes('post')) return 'post';
-  if (fieldname === 'documents' || folder.includes('document')) return 'document';
-  if (folder.includes('chat')) return 'chat';
+  if (fieldname === 'avatar' || (typeof folder === 'string' && folder.includes('avatar'))) return 'avatar';
+  if (fieldname === 'images' || fieldname === 'postImages' || (typeof folder === 'string' && folder.includes('post'))) return 'post';
+  if (fieldname === 'documents' || (typeof folder === 'string' && folder.includes('document'))) return 'document';
+  if (fieldname === 'cedulaFrente' || fieldname === 'cedulaTrasera' || (typeof folder === 'string' && folder.includes('agency'))) return 'agency';
+  if (typeof folder === 'string' && folder.includes('chat')) return 'chat';
   return 'post'; // Por defecto
 };
 

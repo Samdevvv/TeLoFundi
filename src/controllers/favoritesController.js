@@ -1,6 +1,6 @@
 const { prisma } = require('../config/database');
 const { AppError, catchAsync } = require('../middleware/errorHandler');
-const { sanitizeString } = require('../utils/validators');
+const { sanitizeString, canAddFavorite } = require('../utils/validators');
 const logger = require('../utils/logger');
 
 // Obtener posts favoritos del usuario
@@ -15,25 +15,36 @@ const getUserFavorites = catchAsync(async (req, res) => {
     location 
   } = req.query;
   
-  // ✅ Validación de paginación consistente
+  // ✅ NUEVA: Validar que solo clientes puedan ver favoritos
+  if (req.user.userType !== 'CLIENT') {
+    throw new AppError('Solo los clientes pueden ver favoritos', 403, 'INVALID_USER_TYPE');
+  }
+  
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
   const offset = (pageNum - 1) * limitNum;
 
   // Construir filtros
   const whereClause = {
-    userId: userId
+    userId: userId,
+    // ✅ NUEVA: Solo favoritos con posts activos y no eliminados
+    post: {
+      isActive: true,
+      deletedAt: null,
+      author: {
+        isActive: true,
+        isBanned: false
+      }
+    }
   };
 
-  // Filtros de posts
-  let postWhere = {};
+  // Filtros adicionales
   if (userType) {
-    postWhere.author = {
-      userType: userType.toUpperCase()
-    };
+    whereClause.post.author.userType = userType.toUpperCase();
   }
+  
   if (location) {
-    postWhere.location = {
+    whereClause.post.location = {
       OR: [
         { country: { contains: sanitizeString(location), mode: 'insensitive' } },
         { city: { contains: sanitizeString(location), mode: 'insensitive' } }
@@ -41,22 +52,23 @@ const getUserFavorites = catchAsync(async (req, res) => {
     };
   }
 
-  if (Object.keys(postWhere).length > 0) {
-    whereClause.post = postWhere;
-  }
-
-  // ✅ Ordenamiento corregido
+  // ✅ MEJORADO: Más opciones de ordenamiento
   let orderBy = {};
-  if (sortBy === 'postCreatedAt') {
-    orderBy = {
-      post: {
-        createdAt: sortOrder
-      }
-    };
-  } else {
-    orderBy = {
-      createdAt: sortOrder
-    };
+  switch (sortBy) {
+    case 'postCreatedAt':
+      orderBy = { post: { createdAt: sortOrder } };
+      break;
+    case 'postPopularity':
+      orderBy = { post: { score: sortOrder } };
+      break;
+    case 'postViews':
+      orderBy = { post: { views: sortOrder } };
+      break;
+    case 'authorRating':
+      orderBy = { post: { author: { escort: { rating: sortOrder } } } };
+      break;
+    default:
+      orderBy = { createdAt: sortOrder };
   }
 
   const [favorites, totalCount] = await Promise.all([
@@ -70,10 +82,9 @@ const getUserFavorites = catchAsync(async (req, res) => {
                 id: true,
                 username: true,
                 firstName: true,
-                lastName: true, // ✅ Campos correctos
+                lastName: true,
                 avatar: true,
                 userType: true,
-                // ✅ Campos específicos por tipo
                 escort: {
                   select: {
                     isVerified: true,
@@ -140,6 +151,18 @@ const addToFavorites = catchAsync(async (req, res) => {
     throw new AppError('ID del post es requerido', 400, 'MISSING_POST_ID');
   }
 
+  // ✅ NUEVA: Validar que solo clientes puedan tener favoritos
+  if (req.user.userType !== 'CLIENT') {
+    throw new AppError('Solo los clientes pueden tener favoritos', 403, 'INVALID_USER_TYPE');
+  }
+
+  // ✅ NUEVA: Verificar límites de favoritos usando validador existente
+  const canAdd = await canAddFavorite(req.user.client.id);
+  
+  if (!canAdd.canAdd) {
+    throw new AppError(canAdd.error, 400, 'FAVORITE_LIMIT_EXCEEDED');
+  }
+
   // Verificar que el post existe y está activo
   const post = await prisma.post.findUnique({
     where: { 
@@ -172,28 +195,41 @@ const addToFavorites = catchAsync(async (req, res) => {
     throw new AppError('Post ya está en favoritos', 409, 'POST_ALREADY_FAVORITED');
   }
 
-  // Crear favorito
-  const favorite = await prisma.favorite.create({
-    data: {
-      userId: userId,
-      postId: postId,
-      isNotified: isNotified
-    },
-    include: {
-      post: {
-        include: {
-          author: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              avatar: true
+  // ✅ CORREGIDO: Usar transacción para operaciones atómicas
+  const result = await prisma.$transaction(async (tx) => {
+    // Crear favorito
+    const favorite = await tx.favorite.create({
+      data: {
+        userId: userId,
+        postId: postId,
+        isNotified: isNotified
+      },
+      include: {
+        post: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatar: true
+              }
             }
           }
         }
       }
-    }
+    });
+
+    // ✅ NUEVA: Incrementar contador de favoritos del cliente
+    await tx.client.update({
+      where: { userId: userId },
+      data: {
+        currentFavorites: { increment: 1 }
+      }
+    });
+
+    return favorite;
   });
 
   // ✅ Registrar interacción para algoritmos
@@ -221,7 +257,7 @@ const addToFavorites = catchAsync(async (req, res) => {
   res.status(201).json({
     success: true,
     message: 'Post agregado a favoritos',
-    data: favorite,
+    data: result,
     timestamp: new Date().toISOString()
   });
 });
@@ -234,6 +270,11 @@ const removeFromFavorites = catchAsync(async (req, res) => {
   // ✅ Validación de input
   if (!postId) {
     throw new AppError('ID del post es requerido', 400, 'MISSING_POST_ID');
+  }
+
+  // ✅ NUEVA: Validar que solo clientes puedan remover favoritos
+  if (req.user.userType !== 'CLIENT') {
+    throw new AppError('Solo los clientes pueden gestionar favoritos', 403, 'INVALID_USER_TYPE');
   }
 
   // Verificar que el favorito existe
@@ -250,14 +291,25 @@ const removeFromFavorites = catchAsync(async (req, res) => {
     throw new AppError('Post no encontrado en favoritos', 404, 'FAVORITE_NOT_FOUND');
   }
 
-  // Eliminar favorito
-  await prisma.favorite.delete({
-    where: {
-      userId_postId: {
-        userId: userId,
-        postId: postId
+  // ✅ CORREGIDO: Usar transacción para operaciones atómicas
+  await prisma.$transaction(async (tx) => {
+    // Eliminar favorito
+    await tx.favorite.delete({
+      where: {
+        userId_postId: {
+          userId: userId,
+          postId: postId
+        }
       }
-    }
+    });
+
+    // ✅ NUEVA: Decrementar contador de favoritos del cliente
+    await tx.client.update({
+      where: { userId: userId },
+      data: {
+        currentFavorites: { decrement: 1 }
+      }
+    });
   });
 
   logger.info('Post removed from favorites', {
@@ -282,12 +334,11 @@ const getUserLikes = catchAsync(async (req, res) => {
     sortOrder = 'desc'
   } = req.query;
   
-  // ✅ Validación de paginación consistente
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
   const offset = (pageNum - 1) * limitNum;
 
-  // ✅ Ordenamiento corregido
+  // ✅ MEJORADO: Ordenamiento corregido
   let orderBy = {};
   if (sortBy === 'postCreatedAt') {
     orderBy = {
@@ -304,7 +355,16 @@ const getUserLikes = catchAsync(async (req, res) => {
   const [likes, totalCount] = await Promise.all([
     prisma.like.findMany({
       where: {
-        userId: userId
+        userId: userId,
+        // ✅ NUEVA: Solo likes de posts activos
+        post: {
+          isActive: true,
+          deletedAt: null,
+          author: {
+            isActive: true,
+            isBanned: false
+          }
+        }
       },
       include: {
         post: {
@@ -346,7 +406,11 @@ const getUserLikes = catchAsync(async (req, res) => {
     }),
     prisma.like.count({
       where: {
-        userId: userId
+        userId: userId,
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
       }
     })
   ]);
@@ -558,6 +622,11 @@ const removeLike = catchAsync(async (req, res) => {
 const getFavoritesStats = catchAsync(async (req, res) => {
   const userId = req.user.id;
   
+  // ✅ NUEVA: Validar que solo clientes puedan ver estadísticas de favoritos
+  if (req.user.userType !== 'CLIENT') {
+    throw new AppError('Solo los clientes pueden ver estadísticas de favoritos', 403, 'INVALID_USER_TYPE');
+  }
+  
   // Calcular fecha para "esta semana"
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -570,25 +639,56 @@ const getFavoritesStats = catchAsync(async (req, res) => {
     likesThisWeek,
     favoritedPosts,
     recentFavorites,
-    recentLikes
+    recentLikes,
+    clientData
   ] = await Promise.all([
-    prisma.favorite.count({ where: { userId } }),
-    prisma.like.count({ where: { userId } }),
     prisma.favorite.count({ 
       where: { 
         userId,
-        createdAt: { gte: oneWeekAgo }
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
       }
     }),
     prisma.like.count({ 
       where: { 
         userId,
-        createdAt: { gte: oneWeekAgo }
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
+      }
+    }),
+    prisma.favorite.count({ 
+      where: { 
+        userId,
+        createdAt: { gte: oneWeekAgo },
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
+      }
+    }),
+    prisma.like.count({ 
+      where: { 
+        userId,
+        createdAt: { gte: oneWeekAgo },
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
       }
     }),
     // Obtener posts favoritos para estadísticas por tipo
     prisma.favorite.findMany({
-      where: { userId },
+      where: { 
+        userId,
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
+      },
       include: {
         post: {
           include: {
@@ -601,7 +701,13 @@ const getFavoritesStats = catchAsync(async (req, res) => {
     }),
     // Actividad reciente - favoritos
     prisma.favorite.findMany({
-      where: { userId },
+      where: { 
+        userId,
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
+      },
       include: {
         post: {
           select: {
@@ -615,7 +721,13 @@ const getFavoritesStats = catchAsync(async (req, res) => {
     }),
     // Actividad reciente - likes
     prisma.like.findMany({
-      where: { userId },
+      where: { 
+        userId,
+        post: {
+          isActive: true,
+          deletedAt: null
+        }
+      },
       include: {
         post: {
           select: {
@@ -626,6 +738,16 @@ const getFavoritesStats = catchAsync(async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
       take: 5
+    }),
+    // ✅ NUEVA: Obtener datos del cliente para límites
+    prisma.client.findUnique({
+      where: { userId },
+      select: {
+        maxFavorites: true,
+        currentFavorites: true,
+        isPremium: true,
+        premiumTier: true
+      }
     })
   ]);
 
@@ -665,7 +787,15 @@ const getFavoritesStats = catchAsync(async (req, res) => {
       favoritesThisWeek,
       likesThisWeek,
       topCategories,
-      recentActivity
+      recentActivity,
+      // ✅ NUEVA: Información de límites del cliente
+      limits: {
+        maxFavorites: clientData?.maxFavorites || 5,
+        currentFavorites: clientData?.currentFavorites || 0,
+        remainingFavorites: Math.max(0, (clientData?.maxFavorites || 5) - (clientData?.currentFavorites || 0)),
+        isPremium: clientData?.isPremium || false,
+        isUnlimited: clientData?.isPremium && ['PREMIUM', 'VIP'].includes(clientData?.premiumTier)
+      }
     },
     timestamp: new Date().toISOString()
   });

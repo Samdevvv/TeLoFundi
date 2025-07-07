@@ -2,10 +2,19 @@
 CREATE TYPE "UserType" AS ENUM ('ESCORT', 'AGENCY', 'CLIENT', 'ADMIN');
 
 -- CreateEnum
+CREATE TYPE "AccountStatus" AS ENUM ('ACTIVE', 'PENDING_APPROVAL', 'SUSPENDED', 'BANNED');
+
+-- CreateEnum
+CREATE TYPE "RegistrationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'UNDER_REVIEW');
+
+-- CreateEnum
 CREATE TYPE "AdminRole" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'MODERATOR');
 
 -- CreateEnum
 CREATE TYPE "PremiumTier" AS ENUM ('BASIC', 'PREMIUM', 'VIP');
+
+-- CreateEnum
+CREATE TYPE "PointAction" AS ENUM ('PREMIUM_DAY', 'CHAT_PRIORITY', 'EXTRA_FAVORITE', 'PROFILE_BOOST', 'PHONE_ACCESS', 'IMAGE_MESSAGE');
 
 -- CreateEnum
 CREATE TYPE "RateLimitType" AS ENUM ('DAILY_MESSAGES', 'HOURLY_MESSAGES', 'PHONE_ACCESS', 'IMAGE_MESSAGES', 'VOICE_MESSAGES', 'FILE_UPLOADS');
@@ -26,6 +35,9 @@ CREATE TYPE "AgencyRole" AS ENUM ('OWNER', 'ADMIN', 'MANAGER', 'MEMBER');
 CREATE TYPE "ChatRole" AS ENUM ('ADMIN', 'MODERATOR', 'MEMBER');
 
 -- CreateEnum
+CREATE TYPE "DisputeStatus" AS ENUM ('ACTIVE', 'RESOLVED', 'ESCALATED', 'CLOSED');
+
+-- CreateEnum
 CREATE TYPE "MessageType" AS ENUM ('TEXT', 'IMAGE', 'FILE', 'AUDIO', 'VIDEO', 'SYSTEM', 'LOCATION', 'CONTACT');
 
 -- CreateEnum
@@ -41,7 +53,7 @@ CREATE TYPE "ReportSeverity" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 CREATE TYPE "AppealStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'UNDER_REVIEW');
 
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('MESSAGE', 'LIKE', 'FAVORITE', 'REVIEW', 'BOOST_EXPIRED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'AGENCY_INVITE', 'VERIFICATION_COMPLETED', 'MEMBERSHIP_REQUEST', 'SYSTEM', 'TRENDING', 'PROMOTION', 'SECURITY_ALERT', 'SUBSCRIPTION_EXPIRING', 'NEW_FOLLOWER', 'POST_APPROVED', 'POST_REJECTED');
+CREATE TYPE "NotificationType" AS ENUM ('MESSAGE', 'LIKE', 'FAVORITE', 'REVIEW', 'BOOST_EXPIRED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'AGENCY_INVITE', 'VERIFICATION_COMPLETED', 'VERIFICATION_EXPIRING', 'MEMBERSHIP_REQUEST', 'SYSTEM', 'TRENDING', 'PROMOTION', 'SECURITY_ALERT', 'SUBSCRIPTION_EXPIRING', 'NEW_FOLLOWER', 'POST_APPROVED', 'POST_REJECTED', 'PROFILE_INCOMPLETE', 'AGENCY_APPROVED', 'AGENCY_REJECTED', 'POINTS_LOW', 'DAILY_POINTS_AVAILABLE', 'PREMIUM_EXPIRED');
 
 -- CreateEnum
 CREATE TYPE "NotificationPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'URGENT');
@@ -50,16 +62,16 @@ CREATE TYPE "NotificationPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'URGENT');
 CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'CANCELLED', 'DISPUTED', 'PROCESSING');
 
 -- CreateEnum
-CREATE TYPE "PaymentType" AS ENUM ('BOOST', 'PREMIUM', 'POINTS', 'VERIFICATION', 'SUBSCRIPTION', 'TIP', 'COMMISSION');
+CREATE TYPE "PaymentType" AS ENUM ('BOOST', 'PREMIUM', 'POINTS', 'VERIFICATION', 'SUBSCRIPTION', 'TIP', 'COMMISSION', 'POST_ADDITIONAL', 'STACK_BOOST');
 
 -- CreateEnum
 CREATE TYPE "BoostType" AS ENUM ('BASIC', 'PREMIUM', 'FEATURED', 'SUPER', 'MEGA');
 
 -- CreateEnum
-CREATE TYPE "PointTransactionType" AS ENUM ('PURCHASE', 'CHAT_MESSAGE', 'PROFILE_VIEW', 'PREMIUM_FEATURE', 'BOOST_PURCHASE', 'VERIFICATION_FEE', 'PHONE_NUMBER_ACCESS', 'IMAGE_MESSAGE', 'PRIORITY_SUPPORT', 'TIP', 'REFUND', 'BONUS', 'REFERRAL_REWARD');
+CREATE TYPE "PointTransactionType" AS ENUM ('PURCHASE', 'BONUS_POINTS', 'DAILY_LOGIN', 'REGISTRATION_BONUS', 'REFERRAL_REWARD', 'STREAK_BONUS', 'PREMIUM_DAY', 'CHAT_PRIORITY', 'EXTRA_FAVORITE', 'PROFILE_BOOST', 'PHONE_ACCESS', 'IMAGE_MESSAGE', 'REFUND', 'ADMIN_ADJUSTMENT', 'EXPIRED_PREMIUM');
 
 -- CreateEnum
-CREATE TYPE "InteractionType" AS ENUM ('VIEW', 'LIKE', 'CHAT', 'PROFILE_VISIT', 'POST_CLICK', 'FAVORITE', 'SHARE', 'REPORT', 'BOOST_VIEW', 'CONTACT_CLICK', 'IMAGE_VIEW', 'PHONE_VIEW', 'LOCATION_VIEW');
+CREATE TYPE "InteractionType" AS ENUM ('VIEW', 'LIKE', 'CHAT', 'PROFILE_VISIT', 'POST_CLICK', 'FAVORITE', 'SHARE', 'REPORT', 'BOOST_VIEW', 'CONTACT_CLICK', 'IMAGE_VIEW', 'PHONE_VIEW', 'LOCATION_VIEW', 'WHATSAPP_CLICK', 'WHATSAPP_OPEN', 'TIME_SPENT');
 
 -- CreateEnum
 CREATE TYPE "BanSeverity" AS ENUM ('WARNING', 'TEMPORARY', 'PERMANENT', 'SHADOW');
@@ -79,8 +91,6 @@ CREATE TABLE "locations" (
     "country" TEXT NOT NULL,
     "state" TEXT,
     "city" TEXT NOT NULL,
-    "latitude" DOUBLE PRECISION,
-    "longitude" DOUBLE PRECISION,
 
     CONSTRAINT "locations_pkey" PRIMARY KEY ("id")
 );
@@ -98,6 +108,8 @@ CREATE TABLE "users" (
     "bio" TEXT,
     "website" TEXT,
     "userType" "UserType" NOT NULL,
+    "accountStatus" "AccountStatus" NOT NULL DEFAULT 'ACTIVE',
+    "canLogin" BOOLEAN NOT NULL DEFAULT true,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isBanned" BOOLEAN NOT NULL DEFAULT false,
     "banReason" TEXT,
@@ -111,6 +123,7 @@ CREATE TABLE "users" (
     "timezone" TEXT DEFAULT 'UTC',
     "language" TEXT DEFAULT 'en',
     "lastLoginIP" TEXT,
+    "lastDailyReset" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "lastLogin" TIMESTAMP(3),
@@ -122,6 +135,26 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
+CREATE TABLE "agency_registration_requests" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "documentNumber" TEXT NOT NULL,
+    "businessPhone" TEXT NOT NULL,
+    "businessEmail" TEXT NOT NULL,
+    "documentFrontImage" TEXT NOT NULL,
+    "documentBackImage" TEXT NOT NULL,
+    "status" "RegistrationStatus" NOT NULL DEFAULT 'PENDING',
+    "reviewNotes" TEXT,
+    "rejectionReason" TEXT,
+    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewedBy" TEXT,
+
+    CONSTRAINT "agency_registration_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "user_settings" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -130,6 +163,8 @@ CREATE TABLE "user_settings" (
     "messageNotifications" BOOLEAN NOT NULL DEFAULT true,
     "likeNotifications" BOOLEAN NOT NULL DEFAULT true,
     "boostNotifications" BOOLEAN NOT NULL DEFAULT true,
+    "profileReminders" BOOLEAN NOT NULL DEFAULT true,
+    "verificationReminders" BOOLEAN NOT NULL DEFAULT true,
     "showOnline" BOOLEAN NOT NULL DEFAULT true,
     "showLastSeen" BOOLEAN NOT NULL DEFAULT true,
     "allowDirectMessages" BOOLEAN NOT NULL DEFAULT true,
@@ -280,10 +315,12 @@ CREATE TABLE "admins" (
     "totalBans" INTEGER NOT NULL DEFAULT 0,
     "totalReports" INTEGER NOT NULL DEFAULT 0,
     "totalVerifications" INTEGER NOT NULL DEFAULT 0,
+    "totalAgencyApprovals" INTEGER NOT NULL DEFAULT 0,
     "canDeletePosts" BOOLEAN NOT NULL DEFAULT false,
     "canBanUsers" BOOLEAN NOT NULL DEFAULT false,
     "canModifyPrices" BOOLEAN NOT NULL DEFAULT false,
     "canAccessMetrics" BOOLEAN NOT NULL DEFAULT false,
+    "canApproveAgencies" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -322,6 +359,7 @@ CREATE TABLE "escorts" (
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
     "verifiedAt" TIMESTAMP(3),
     "verifiedBy" TEXT,
+    "verificationExpiresAt" TIMESTAMP(3),
     "rating" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     "totalRatings" INTEGER NOT NULL DEFAULT 0,
     "age" INTEGER,
@@ -331,11 +369,11 @@ CREATE TABLE "escorts" (
     "ethnicity" TEXT,
     "hairColor" TEXT,
     "eyeColor" TEXT,
-    "services" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "services" TEXT,
     "rates" JSONB,
     "availability" JSONB,
     "languages" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "maxPosts" INTEGER NOT NULL DEFAULT 5,
+    "maxPosts" INTEGER NOT NULL DEFAULT 3,
     "currentPosts" INTEGER NOT NULL DEFAULT 0,
     "totalBookings" INTEGER NOT NULL DEFAULT 0,
     "completedBookings" INTEGER NOT NULL DEFAULT 0,
@@ -349,7 +387,13 @@ CREATE TABLE "agencies" (
     "userId" TEXT NOT NULL,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
     "verifiedAt" TIMESTAMP(3),
+    "companyName" TEXT NOT NULL,
     "businessLicense" TEXT,
+    "contactPerson" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "cedulaFrente" TEXT,
+    "cedulaTrasera" TEXT,
+    "verificationStatus" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
     "taxId" TEXT,
     "maxPosts" INTEGER,
     "totalEscorts" INTEGER NOT NULL DEFAULT 0,
@@ -365,11 +409,20 @@ CREATE TABLE "agencies" (
 CREATE TABLE "clients" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "points" INTEGER NOT NULL DEFAULT 0,
+    "points" INTEGER NOT NULL DEFAULT 10,
     "isPremium" BOOLEAN NOT NULL DEFAULT false,
     "premiumUntil" TIMESTAMP(3),
     "premiumTier" "PremiumTier" NOT NULL DEFAULT 'BASIC',
-    "dailyMessageLimit" INTEGER NOT NULL DEFAULT 10,
+    "lastDailyPointsClaim" TIMESTAMP(3),
+    "dailyLoginStreak" INTEGER NOT NULL DEFAULT 0,
+    "totalDailyPointsEarned" INTEGER NOT NULL DEFAULT 0,
+    "totalPointsEarned" INTEGER NOT NULL DEFAULT 10,
+    "totalPointsSpent" INTEGER NOT NULL DEFAULT 0,
+    "pointsLastUpdated" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "maxFavorites" INTEGER NOT NULL DEFAULT 5,
+    "currentFavorites" INTEGER NOT NULL DEFAULT 0,
+    "dailyMessageLimit" INTEGER NOT NULL DEFAULT 5,
+    "messagesUsedToday" INTEGER NOT NULL DEFAULT 0,
     "canViewPhoneNumbers" BOOLEAN NOT NULL DEFAULT false,
     "canSendImages" BOOLEAN NOT NULL DEFAULT false,
     "canSendVoiceMessages" BOOLEAN NOT NULL DEFAULT false,
@@ -377,15 +430,101 @@ CREATE TABLE "clients" (
     "prioritySupport" BOOLEAN NOT NULL DEFAULT false,
     "canSeeOnlineStatus" BOOLEAN NOT NULL DEFAULT false,
     "totalMessagesUsed" INTEGER NOT NULL DEFAULT 0,
-    "messagesUsedToday" INTEGER NOT NULL DEFAULT 0,
     "lastMessageReset" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "totalPointsSpent" INTEGER NOT NULL DEFAULT 0,
     "totalPointsPurchased" INTEGER NOT NULL DEFAULT 0,
     "agePreferenceMin" INTEGER,
     "agePreferenceMax" INTEGER,
     "locationPreference" TEXT,
 
     CONSTRAINT "clients_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "points_packages" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "points" INTEGER NOT NULL,
+    "price" DOUBLE PRECISION NOT NULL,
+    "bonus" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isPopular" BOOLEAN NOT NULL DEFAULT false,
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "points_packages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "points_purchases" (
+    "id" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "packageId" TEXT NOT NULL,
+    "pointsPurchased" INTEGER NOT NULL,
+    "bonusPoints" INTEGER NOT NULL DEFAULT 0,
+    "totalPoints" INTEGER NOT NULL,
+    "amountPaid" DOUBLE PRECISION NOT NULL,
+    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+    "stripePaymentId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+
+    CONSTRAINT "points_purchases_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "point_transactions" (
+    "id" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "type" "PointTransactionType" NOT NULL,
+    "description" TEXT,
+    "cost" DOUBLE PRECISION,
+    "postId" TEXT,
+    "messageId" TEXT,
+    "paymentId" TEXT,
+    "purchaseId" TEXT,
+    "actionId" TEXT,
+    "balanceBefore" INTEGER NOT NULL,
+    "balanceAfter" INTEGER NOT NULL,
+    "metadata" JSONB,
+    "source" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "point_transactions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "points_history" (
+    "id" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "type" "PointTransactionType" NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "description" TEXT NOT NULL,
+    "balanceBefore" INTEGER NOT NULL,
+    "balanceAfter" INTEGER NOT NULL,
+    "metadata" JSONB,
+    "source" TEXT,
+    "purchaseId" TEXT,
+    "actionId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "points_history_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "premium_activations" (
+    "id" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "tier" "PremiumTier" NOT NULL,
+    "duration" INTEGER NOT NULL,
+    "pointsCost" INTEGER NOT NULL,
+    "activatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "activatedBy" TEXT NOT NULL DEFAULT 'points',
+
+    CONSTRAINT "premium_activations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -443,24 +582,6 @@ CREATE TABLE "ban_appeals" (
 );
 
 -- CreateTable
-CREATE TABLE "point_transactions" (
-    "id" TEXT NOT NULL,
-    "clientId" TEXT NOT NULL,
-    "amount" INTEGER NOT NULL,
-    "type" "PointTransactionType" NOT NULL,
-    "description" TEXT,
-    "cost" DOUBLE PRECISION,
-    "postId" TEXT,
-    "messageId" TEXT,
-    "paymentId" TEXT,
-    "balanceBefore" INTEGER NOT NULL,
-    "balanceAfter" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "point_transactions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "user_interactions" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -469,6 +590,7 @@ CREATE TABLE "user_interactions" (
     "type" "InteractionType" NOT NULL,
     "weight" DOUBLE PRECISION NOT NULL DEFAULT 1,
     "duration" INTEGER,
+    "whatsappOpened" BOOLEAN NOT NULL DEFAULT false,
     "deviceType" TEXT,
     "source" TEXT,
     "location" TEXT,
@@ -538,11 +660,14 @@ CREATE TABLE "escort_verifications" (
     "pricingId" TEXT NOT NULL,
     "status" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
     "membershipId" TEXT,
+    "startsAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "isAutoRenewal" BOOLEAN NOT NULL DEFAULT false,
+    "reminderSent" BOOLEAN NOT NULL DEFAULT false,
     "documentsSubmitted" JSONB,
     "verificationNotes" TEXT,
     "rejectionReason" TEXT,
     "verificationSteps" JSONB,
-    "expiresAt" TIMESTAMP(3),
     "verifiedBy" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "completedAt" TIMESTAMP(3),
@@ -555,11 +680,11 @@ CREATE TABLE "escort_verifications" (
 CREATE TABLE "verification_pricing" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "cost" DOUBLE PRECISION NOT NULL,
+    "cost" DOUBLE PRECISION NOT NULL DEFAULT 10.0,
     "description" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "features" JSONB,
-    "duration" INTEGER,
+    "duration" INTEGER NOT NULL DEFAULT 30,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -598,7 +723,7 @@ CREATE TABLE "posts" (
     "engagementRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "lastBoosted" TIMESTAMP(3),
     "locationId" TEXT,
-    "services" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "services" TEXT,
     "rates" JSONB,
     "availability" JSONB,
     "trendingScore" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -612,6 +737,9 @@ CREATE TABLE "posts" (
     "uniqueViews" INTEGER NOT NULL DEFAULT 0,
     "totalTime" INTEGER NOT NULL DEFAULT 0,
     "bounceRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "whatsappClicks" INTEGER NOT NULL DEFAULT 0,
+    "hasActiveBoost" BOOLEAN NOT NULL DEFAULT false,
+    "boostEndsAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -640,6 +768,9 @@ CREATE TABLE "chats" (
     "name" TEXT,
     "description" TEXT,
     "avatar" TEXT,
+    "isDisputeChat" BOOLEAN NOT NULL DEFAULT false,
+    "disputeStatus" "DisputeStatus" NOT NULL DEFAULT 'ACTIVE',
+    "disputeReason" TEXT,
     "isArchived" BOOLEAN NOT NULL DEFAULT false,
     "mutedUntil" TIMESTAMP(3),
     "maxMembers" INTEGER DEFAULT 100,
@@ -665,6 +796,8 @@ CREATE TABLE "chat_members" (
     "lastRead" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "isMuted" BOOLEAN NOT NULL DEFAULT false,
     "role" "ChatRole" NOT NULL DEFAULT 'MEMBER',
+    "messageCount" INTEGER NOT NULL DEFAULT 0,
+    "maxMessages" INTEGER NOT NULL DEFAULT 3,
     "canAddMembers" BOOLEAN NOT NULL DEFAULT false,
     "canDeleteMessages" BOOLEAN NOT NULL DEFAULT false,
     "canManageChat" BOOLEAN NOT NULL DEFAULT false,
@@ -781,6 +914,8 @@ CREATE TABLE "notifications" (
     "isSent" BOOLEAN NOT NULL DEFAULT false,
     "sentAt" TIMESTAMP(3),
     "deliveryMethod" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "isEmailSent" BOOLEAN NOT NULL DEFAULT false,
+    "emailSentAt" TIMESTAMP(3),
     "actionUrl" TEXT,
     "actionText" TEXT,
     "userId" TEXT NOT NULL,
@@ -806,7 +941,9 @@ CREATE TABLE "payments" (
     "netAmount" DOUBLE PRECISION,
     "taxAmount" DOUBLE PRECISION,
     "taxRate" DOUBLE PRECISION,
-    "clientId" TEXT NOT NULL,
+    "clientId" TEXT,
+    "escortId" TEXT,
+    "agencyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -831,6 +968,8 @@ CREATE TABLE "boosts" (
     "conversionRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "targetAudience" JSONB,
     "geography" TEXT,
+    "stackLevel" INTEGER NOT NULL DEFAULT 1,
+    "isStackBoost" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -853,8 +992,15 @@ CREATE TABLE "app_metrics" (
     "bannedUsers" INTEGER NOT NULL DEFAULT 0,
     "verifiedEscorts" INTEGER NOT NULL DEFAULT 0,
     "premiumClients" INTEGER NOT NULL DEFAULT 0,
-    "totalMessages" INTEGER NOT NULL DEFAULT 0,
+    "pendingAgencies" INTEGER NOT NULL DEFAULT 0,
+    "totalVerifications" INTEGER NOT NULL DEFAULT 0,
+    "expiredVerifications" INTEGER NOT NULL DEFAULT 0,
+    "totalPointsSold" INTEGER NOT NULL DEFAULT 0,
+    "totalPointsSpent" INTEGER NOT NULL DEFAULT 0,
     "totalBoosts" INTEGER NOT NULL DEFAULT 0,
+    "pointsRevenue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "dailyLoginStreaks" INTEGER NOT NULL DEFAULT 0,
+    "totalMessages" INTEGER NOT NULL DEFAULT 0,
     "averageSessionTime" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "conversionRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "churnRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -895,6 +1041,12 @@ CREATE INDEX "users_userType_isActive_lastLogin_idx" ON "users"("userType", "isA
 CREATE INDEX "users_userType_isActive_lastActiveAt_idx" ON "users"("userType", "isActive", "lastActiveAt");
 
 -- CreateIndex
+CREATE INDEX "users_accountStatus_idx" ON "users"("accountStatus");
+
+-- CreateIndex
+CREATE INDEX "users_canLogin_userType_idx" ON "users"("canLogin", "userType");
+
+-- CreateIndex
 CREATE INDEX "users_createdAt_idx" ON "users"("createdAt");
 
 -- CreateIndex
@@ -917,6 +1069,21 @@ CREATE INDEX "users_passwordResetToken_idx" ON "users"("passwordResetToken");
 
 -- CreateIndex
 CREATE INDEX "users_emailVerified_idx" ON "users"("emailVerified");
+
+-- CreateIndex
+CREATE INDEX "users_lastDailyReset_idx" ON "users"("lastDailyReset");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "agency_registration_requests_userId_key" ON "agency_registration_requests"("userId");
+
+-- CreateIndex
+CREATE INDEX "agency_registration_requests_status_idx" ON "agency_registration_requests"("status");
+
+-- CreateIndex
+CREATE INDEX "agency_registration_requests_submittedAt_idx" ON "agency_registration_requests"("submittedAt");
+
+-- CreateIndex
+CREATE INDEX "agency_registration_requests_reviewedBy_idx" ON "agency_registration_requests"("reviewedBy");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_settings_userId_key" ON "user_settings"("userId");
@@ -1027,6 +1194,9 @@ CREATE INDEX "escorts_currentPosts_maxPosts_idx" ON "escorts"("currentPosts", "m
 CREATE INDEX "escorts_age_idx" ON "escorts"("age");
 
 -- CreateIndex
+CREATE INDEX "escorts_verificationExpiresAt_idx" ON "escorts"("verificationExpiresAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "agencies_userId_key" ON "agencies"("userId");
 
 -- CreateIndex
@@ -1037,6 +1207,9 @@ CREATE INDEX "agencies_totalEscorts_idx" ON "agencies"("totalEscorts");
 
 -- CreateIndex
 CREATE INDEX "agencies_activeEscorts_idx" ON "agencies"("activeEscorts");
+
+-- CreateIndex
+CREATE INDEX "agencies_verificationStatus_idx" ON "agencies"("verificationStatus");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "clients_userId_key" ON "clients"("userId");
@@ -1052,6 +1225,57 @@ CREATE INDEX "clients_premiumUntil_idx" ON "clients"("premiumUntil");
 
 -- CreateIndex
 CREATE INDEX "clients_totalPointsSpent_idx" ON "clients"("totalPointsSpent");
+
+-- CreateIndex
+CREATE INDEX "clients_maxFavorites_currentFavorites_idx" ON "clients"("maxFavorites", "currentFavorites");
+
+-- CreateIndex
+CREATE INDEX "clients_dailyMessageLimit_messagesUsedToday_idx" ON "clients"("dailyMessageLimit", "messagesUsedToday");
+
+-- CreateIndex
+CREATE INDEX "clients_lastDailyPointsClaim_idx" ON "clients"("lastDailyPointsClaim");
+
+-- CreateIndex
+CREATE INDEX "clients_dailyLoginStreak_idx" ON "clients"("dailyLoginStreak");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "points_packages_name_key" ON "points_packages"("name");
+
+-- CreateIndex
+CREATE INDEX "points_packages_isActive_isPopular_idx" ON "points_packages"("isActive", "isPopular");
+
+-- CreateIndex
+CREATE INDEX "points_packages_price_idx" ON "points_packages"("price");
+
+-- CreateIndex
+CREATE INDEX "points_purchases_clientId_status_idx" ON "points_purchases"("clientId", "status");
+
+-- CreateIndex
+CREATE INDEX "points_purchases_status_createdAt_idx" ON "points_purchases"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "point_transactions_clientId_createdAt_idx" ON "point_transactions"("clientId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "point_transactions_type_createdAt_idx" ON "point_transactions"("type", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "point_transactions_amount_type_idx" ON "point_transactions"("amount", "type");
+
+-- CreateIndex
+CREATE INDEX "points_history_clientId_createdAt_idx" ON "points_history"("clientId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "points_history_type_createdAt_idx" ON "points_history"("type", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "points_history_createdAt_idx" ON "points_history"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "premium_activations_clientId_isActive_idx" ON "premium_activations"("clientId", "isActive");
+
+-- CreateIndex
+CREATE INDEX "premium_activations_expiresAt_isActive_idx" ON "premium_activations"("expiresAt", "isActive");
 
 -- CreateIndex
 CREATE INDEX "client_reviews_escortId_rating_idx" ON "client_reviews"("escortId", "rating");
@@ -1087,15 +1311,6 @@ CREATE INDEX "ban_appeals_banId_idx" ON "ban_appeals"("banId");
 CREATE INDEX "ban_appeals_status_idx" ON "ban_appeals"("status");
 
 -- CreateIndex
-CREATE INDEX "point_transactions_clientId_createdAt_idx" ON "point_transactions"("clientId", "createdAt");
-
--- CreateIndex
-CREATE INDEX "point_transactions_type_createdAt_idx" ON "point_transactions"("type", "createdAt");
-
--- CreateIndex
-CREATE INDEX "point_transactions_amount_type_idx" ON "point_transactions"("amount", "type");
-
--- CreateIndex
 CREATE INDEX "user_interactions_userId_type_createdAt_idx" ON "user_interactions"("userId", "type", "createdAt");
 
 -- CreateIndex
@@ -1112,6 +1327,9 @@ CREATE INDEX "user_interactions_type_weight_createdAt_idx" ON "user_interactions
 
 -- CreateIndex
 CREATE INDEX "user_interactions_source_type_idx" ON "user_interactions"("source", "type");
+
+-- CreateIndex
+CREATE INDEX "user_interactions_whatsappOpened_idx" ON "user_interactions"("whatsappOpened");
 
 -- CreateIndex
 CREATE INDEX "chat_rate_limits_windowStart_limitType_idx" ON "chat_rate_limits"("windowStart", "limitType");
@@ -1148,6 +1366,9 @@ CREATE INDEX "escort_verifications_agencyId_status_idx" ON "escort_verifications
 
 -- CreateIndex
 CREATE INDEX "escort_verifications_status_createdAt_idx" ON "escort_verifications"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "escort_verifications_expiresAt_reminderSent_idx" ON "escort_verifications"("expiresAt", "reminderSent");
 
 -- CreateIndex
 CREATE INDEX "verification_pricing_isActive_idx" ON "verification_pricing"("isActive");
@@ -1201,6 +1422,12 @@ CREATE INDEX "posts_isFeatured_isActive_idx" ON "posts"("isFeatured", "isActive"
 CREATE INDEX "posts_premiumOnly_isActive_idx" ON "posts"("premiumOnly", "isActive");
 
 -- CreateIndex
+CREATE INDEX "posts_hasActiveBoost_boostEndsAt_idx" ON "posts"("hasActiveBoost", "boostEndsAt");
+
+-- CreateIndex
+CREATE INDEX "posts_whatsappClicks_isActive_idx" ON "posts"("whatsappClicks", "isActive");
+
+-- CreateIndex
 CREATE INDEX "trending_history_date_position_idx" ON "trending_history"("date", "position");
 
 -- CreateIndex
@@ -1216,6 +1443,9 @@ CREATE INDEX "chats_isGroup_isArchived_idx" ON "chats"("isGroup", "isArchived");
 CREATE INDEX "chats_lastActivity_idx" ON "chats"("lastActivity");
 
 -- CreateIndex
+CREATE INDEX "chats_isDisputeChat_disputeStatus_idx" ON "chats"("isDisputeChat", "disputeStatus");
+
+-- CreateIndex
 CREATE INDEX "chat_members_chatId_idx" ON "chat_members"("chatId");
 
 -- CreateIndex
@@ -1223,6 +1453,9 @@ CREATE INDEX "chat_members_userId_idx" ON "chat_members"("userId");
 
 -- CreateIndex
 CREATE INDEX "chat_members_lastRead_idx" ON "chat_members"("lastRead");
+
+-- CreateIndex
+CREATE INDEX "chat_members_messageCount_maxMessages_idx" ON "chat_members"("messageCount", "maxMessages");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "chat_members_userId_chatId_key" ON "chat_members"("userId", "chatId");
@@ -1244,6 +1477,9 @@ CREATE INDEX "messages_isRead_chatId_idx" ON "messages"("isRead", "chatId");
 
 -- CreateIndex
 CREATE INDEX "messages_replyToId_idx" ON "messages"("replyToId");
+
+-- CreateIndex
+CREATE INDEX "messages_costPoints_idx" ON "messages"("costPoints");
 
 -- CreateIndex
 CREATE INDEX "favorites_userId_idx" ON "favorites"("userId");
@@ -1315,7 +1551,16 @@ CREATE INDEX "notifications_createdAt_idx" ON "notifications"("createdAt");
 CREATE INDEX "notifications_type_isRead_idx" ON "notifications"("type", "isRead");
 
 -- CreateIndex
+CREATE INDEX "notifications_isEmailSent_emailSentAt_idx" ON "notifications"("isEmailSent", "emailSentAt");
+
+-- CreateIndex
 CREATE INDEX "payments_clientId_status_idx" ON "payments"("clientId", "status");
+
+-- CreateIndex
+CREATE INDEX "payments_escortId_status_idx" ON "payments"("escortId", "status");
+
+-- CreateIndex
+CREATE INDEX "payments_agencyId_status_idx" ON "payments"("agencyId", "status");
 
 -- CreateIndex
 CREATE INDEX "payments_status_createdAt_idx" ON "payments"("status", "createdAt");
@@ -1342,10 +1587,16 @@ CREATE INDEX "boosts_userId_idx" ON "boosts"("userId");
 CREATE INDEX "boosts_expiresAt_idx" ON "boosts"("expiresAt");
 
 -- CreateIndex
+CREATE INDEX "boosts_stackLevel_isStackBoost_idx" ON "boosts"("stackLevel", "isStackBoost");
+
+-- CreateIndex
 CREATE INDEX "app_metrics_date_idx" ON "app_metrics"("date");
 
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "locations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "agency_registration_requests" ADD CONSTRAINT "agency_registration_requests_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_settings" ADD CONSTRAINT "user_settings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1393,6 +1644,21 @@ ALTER TABLE "agencies" ADD CONSTRAINT "agencies_userId_fkey" FOREIGN KEY ("userI
 ALTER TABLE "clients" ADD CONSTRAINT "clients_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "points_purchases" ADD CONSTRAINT "points_purchases_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "points_purchases" ADD CONSTRAINT "points_purchases_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "points_packages"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "point_transactions" ADD CONSTRAINT "point_transactions_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "points_history" ADD CONSTRAINT "points_history_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "premium_activations" ADD CONSTRAINT "premium_activations_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "client_reviews" ADD CONSTRAINT "client_reviews_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1403,9 +1669,6 @@ ALTER TABLE "bans" ADD CONSTRAINT "bans_userId_fkey" FOREIGN KEY ("userId") REFE
 
 -- AddForeignKey
 ALTER TABLE "ban_appeals" ADD CONSTRAINT "ban_appeals_banId_fkey" FOREIGN KEY ("banId") REFERENCES "bans"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "point_transactions" ADD CONSTRAINT "point_transactions_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_interactions" ADD CONSTRAINT "user_interactions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

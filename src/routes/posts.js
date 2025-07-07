@@ -9,6 +9,7 @@ const { validateUser } = require('../middleware/validation');
 // Controllers
 const {
   createPost,
+  checkPostLimits,
   getFeed,
   getTrendingPosts,
   getDiscoveryPosts,
@@ -24,11 +25,14 @@ const {
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  console.log('🔍 MULTER File filter - Processing file:', {
-    fieldname: file.fieldname,
-    originalname: file.originalname,
-    mimetype: file.mimetype
-  });
+  // Solo log en desarrollo
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 MULTER File filter - Processing file:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    });
+  }
 
   // Tipos de archivo permitidos
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
@@ -52,8 +56,8 @@ const upload = multer({
 
 const uploadPostImages = upload.array('images', 5);
 
-// ✅ MIDDLEWARE DE DEBUG MEJORADO
-const debugMulter = (req, res, next) => {
+// ✅ MIDDLEWARE DE DEBUG CONDICIONAL - SOLO EN DESARROLLO
+const debugMulter = process.env.NODE_ENV === 'development' ? (req, res, next) => {
   console.log('🔍 === MULTER DEBUG START ===');
   console.log('🔍 URL:', req.originalUrl);
   console.log('🔍 Method:', req.method);
@@ -65,82 +69,66 @@ const debugMulter = (req, res, next) => {
     hasBody: !!req.body,
     bodyKeys: Object.keys(req.body || {}),
     bodyType: typeof req.body,
-    isEmpty: Object.keys(req.body || {}).length === 0,
-    bodyContent: req.body
+    isEmpty: Object.keys(req.body || {}).length === 0
   });
 
   // Debug de headers importantes
   console.log('🔍 Headers:', {
     authorization: req.get('authorization') ? 'Present' : 'Missing',
     contentType: req.get('content-type'),
-    contentLength: req.get('content-length'),
-    userAgent: req.get('user-agent'),
-    host: req.get('host')
+    contentLength: req.get('content-length')
   });
-
-  // Debug de query parameters
-  console.log('🔍 Query params:', req.query);
-
-  // Debug de parámetros de ruta
-  console.log('🔍 Route params:', req.params);
 
   // Debug del usuario autenticado (si existe)
   console.log('🔍 User info:', {
     hasUser: !!req.user,
     userId: req.user?.id,
-    username: req.user?.username,
-    isValidated: req.user?.isValidated
+    username: req.user?.username
   });
 
   // Debug de archivos antes de multer (normalmente vacío)
   console.log('🔍 Files before multer:', {
     hasFiles: !!req.files,
-    filesCount: req.files?.length || 0,
-    hasFile: !!req.file
-  });
-
-  // Debug de la IP y otros datos de la request
-  console.log('🔍 Request info:', {
-    ip: req.ip,
-    ips: req.ips,
-    protocol: req.protocol,
-    secure: req.secure,
-    xhr: req.xhr
+    filesCount: req.files?.length || 0
   });
 
   console.log('🔍 === MULTER DEBUG END ===');
   next();
-};
+} : (req, res, next) => next(); // En producción, simplemente continúa
 
-// ✅ MIDDLEWARE PARA PROCESAR CLOUDINARY DESPUÉS DE MULTER - FIXED
+// ✅ MIDDLEWARE PARA PROCESAR CLOUDINARY DESPUÉS DE MULTER - OPTIMIZADO
 const processCloudinary = async (req, res, next) => {
   try {
-    console.log('☁️ Processing Cloudinary upload...');
-    console.log('☁️ Files received by multer:', req.files?.length || 0);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('☁️ Processing Cloudinary upload...');
+      console.log('☁️ Files received by multer:', req.files?.length || 0);
+    }
 
     if (!req.files || req.files.length === 0) {
-      console.log('ℹ️ No files to upload to Cloudinary');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('ℹ️ No files to upload to Cloudinary');
+      }
       return next();
     }
 
     const { uploadMultipleToCloudinary } = require('../services/uploadService');
 
-    // ✅ OPCIONES CORREGIDAS SIN 'type'
+    // ✅ OPCIONES CORREGIDAS SIN 'type' - SOLO OPCIONES VÁLIDAS DE CLOUDINARY
     const cloudinaryOptions = {
       folder: 'telofundi/posts',
       userId: req.user?.id,
       generateVariations: true,
-      // ✅ REMOVIDO: type: 'post' (esto causaba el error)
-      // ✅ OPCIONALES: Agregar solo opciones válidas de Cloudinary
       tags: ['post', 'telofundi'],
       context: { userId: req.user?.id }
     };
 
-    console.log('📤 Uploading to Cloudinary...', {
-      filesCount: req.files.length,
-      userId: req.user?.id,
-      folder: cloudinaryOptions.folder
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📤 Uploading to Cloudinary...', {
+        filesCount: req.files.length,
+        userId: req.user?.id,
+        folder: cloudinaryOptions.folder
+      });
+    }
 
     const uploadResult = await uploadMultipleToCloudinary(req.files, cloudinaryOptions);
     
@@ -151,10 +139,12 @@ const processCloudinary = async (req, res, next) => {
     req.uploadedFiles = uploadResult.successful;
     req.failedUploads = uploadResult.failed;
 
-    console.log('✅ Cloudinary upload completed:', {
-      successful: uploadResult.totalUploaded,
-      failed: uploadResult.totalFailed
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Cloudinary upload completed:', {
+        successful: uploadResult.totalUploaded,
+        failed: uploadResult.totalFailed
+      });
+    }
 
     next();
 
@@ -302,6 +292,42 @@ router.get('/discover', getDiscoveryPosts);
 
 /**
  * @swagger
+ * /api/posts/limits:
+ *   get:
+ *     summary: Verificar límites de posts del usuario
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Información de límites
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     canCreateFreePost:
+ *                       type: boolean
+ *                     freePostsRemaining:
+ *                       type: integer
+ *                     totalPosts:
+ *                       type: integer
+ *                     freePostsLimit:
+ *                       type: integer
+ *                     additionalPostCost:
+ *                       type: number
+ *                       example: 3.00
+ */
+router.get('/limits', authenticate, validateUser, checkPostLimits);
+
+/**
+ * @swagger
  * /api/posts/my:
  *   get:
  *     summary: Obtener mis posts
@@ -387,13 +413,17 @@ router.get('/my', authenticate, validateUser, getMyPosts);
  *                 type: string
  *                 example: "+1234567890"
  *               services:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ["Masajes", "Compañía", "Cenas"]
+ *                 type: string
+ *                 description: "JSON string con servicios (para FormData)"
+ *                 example: '["Masajes", "Compañía", "Cenas"]'
  *               locationId:
  *                 type: string
  *                 example: "cm123location"
+ *               isPaidPost:
+ *                 type: string
+ *                 enum: ["true", "false"]
+ *                 description: "String porque viene de FormData"
+ *                 example: "false"
  *               images:
  *                 type: array
  *                 items:
@@ -411,9 +441,11 @@ router.get('/my', authenticate, validateUser, getMyPosts);
  *         description: Error de validación o archivos
  *       401:
  *         description: No autorizado
+ *       402:
+ *         description: Pago requerido para post adicional
  */
 router.post('/', 
-  debugMulter,           // Debug mejorado
+  debugMulter,           // Debug condicional (solo desarrollo)
   authenticate,          // Autenticación
   validateUser,          // Validación de usuario
   uploadPostImages,      // Multer - procesar FormData
@@ -477,9 +509,11 @@ router.get('/:postId', getPostById);
  *               phone:
  *                 type: string
  *               services:
- *                 type: array
- *                 items:
- *                   type: string
+ *                 type: string
+ *                 description: "JSON string con servicios"
+ *               removeImages:
+ *                 type: string
+ *                 description: "JSON string con URLs de imágenes a eliminar"
  *               images:
  *                 type: array
  *                 items:
@@ -499,7 +533,7 @@ router.get('/:postId', getPostById);
  *         description: Post no encontrado
  */
 router.put('/:postId', 
-  debugMulter,           // Debug mejorado
+  debugMulter,           // Debug condicional
   authenticate,          // Autenticación
   validateUser,          // Validación de usuario
   uploadPostImages,      // Multer - procesar FormData
@@ -676,6 +710,8 @@ router.use((error, req, res, next) => {
   next(error);
 });
 
-console.log('✅ Posts routes configured with FIXED CLOUDINARY and ENHANCED DEBUG');
+if (process.env.NODE_ENV === 'development') {
+  console.log('✅ Posts routes configured with OPTIMIZED DEBUG and CLOUDINARY');
+}
 
 module.exports = router;

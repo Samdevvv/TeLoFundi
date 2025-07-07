@@ -86,6 +86,83 @@ const canCreatePost = async (userId, userType) => {
   }
 };
 
+// ✅ NUEVO: Validador para posts adicionales de escorts
+const canCreateAdditionalPost = async (userId, userType) => {
+  try {
+    if (userType !== 'ESCORT') {
+      return { 
+        canCreate: false, 
+        error: 'Solo escorts pueden crear posts adicionales',
+        requiresPayment: false
+      };
+    }
+
+    // Verificar que el escort existe
+    const escort = await prisma.escort.findUnique({
+      where: { userId },
+      select: { maxPosts: true, currentPosts: true }
+    });
+
+    if (!escort) {
+      return { 
+        canCreate: false, 
+        error: 'Perfil de escort no encontrado',
+        requiresPayment: false
+      };
+    }
+
+    // Contar posts activos actuales
+    const activePosts = await prisma.post.count({
+      where: {
+        authorId: userId,
+        isActive: true
+      }
+    });
+
+    const freePostsLimit = 3; // 3 posts gratuitos
+    const maxPostsAbsolute = 20; // Límite máximo absoluto
+
+    // Si está dentro del límite gratuito
+    if (activePosts < freePostsLimit) {
+      return {
+        canCreate: true,
+        requiresPayment: false,
+        remainingFreePost: freePostsLimit - activePosts,
+        currentPosts: activePosts,
+        freePostsLimit
+      };
+    }
+
+    // Si ha alcanzado el límite máximo absoluto
+    if (activePosts >= maxPostsAbsolute) {
+      return {
+        canCreate: false,
+        error: `Has alcanzado el límite máximo de ${maxPostsAbsolute} posts`,
+        requiresPayment: false,
+        currentPosts: activePosts,
+        maxPostsAbsolute
+      };
+    }
+
+    // Necesita pagar por posts adicionales
+    return {
+      canCreate: true,
+      requiresPayment: true,
+      currentPosts: activePosts,
+      freePostsLimit,
+      maxPostsAbsolute,
+      additionalPostCost: 3.00 // $3 USD por post adicional
+    };
+  } catch (error) {
+    logger.error('Error verificando posts adicionales:', error);
+    return { 
+      canCreate: false, 
+      error: 'Error del sistema',
+      requiresPayment: false
+    };
+  }
+};
+
 // Validador para verificar permisos de chat
 const canSendMessage = async (senderId, receiverId, chatId) => {
   try {
@@ -218,7 +295,7 @@ const isAgencyMember = async (escortId, agencyId) => {
   }
 };
 
-// Validador para verificar si un escort puede ser verificado por una agencia
+// ✅ MEJORADO: Validador para verificar si un escort puede ser verificado por una agencia
 const canVerifyEscort = async (agencyId, escortId) => {
   try {
     // Verificar que la agencia existe y está activa
@@ -242,6 +319,18 @@ const canVerifyEscort = async (agencyId, escortId) => {
         escortId: escortId,
         agencyId: agencyId,
         status: 'ACTIVE'
+      },
+      include: {
+        escort: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -249,23 +338,78 @@ const canVerifyEscort = async (agencyId, escortId) => {
       return { canVerify: false, error: 'El escort no es miembro de tu agencia' };
     }
 
-    // Verificar que el escort no está ya verificado
+    // Verificar que el escort no está ya verificado O necesita renovación
     const escort = await prisma.escort.findUnique({
       where: { id: escortId },
-      select: { isVerified: true, verifiedAt: true }
+      select: { isVerified: true, verifiedAt: true, verificationExpiresAt: true }
     });
 
     if (escort?.isVerified) {
+      // ✅ MEJORADO: Verificar si la verificación ha expirado
+      if (escort.verificationExpiresAt && escort.verificationExpiresAt < new Date()) {
+        return { 
+          canVerify: true, 
+          membership,
+          isRenewal: true,
+          hasExpired: true,
+          message: 'La verificación anterior ha expirado. Se puede renovar.'
+        };
+      }
+
+      // ✅ MEJORADO: Verificar si está próximo a expirar (dentro de 7 días)
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+      if (escort.verificationExpiresAt && escort.verificationExpiresAt < sevenDaysFromNow) {
+        return { 
+          canVerify: true, 
+          membership,
+          isRenewal: true,
+          expiringSoon: true,
+          expiresAt: escort.verificationExpiresAt,
+          daysUntilExpiry: Math.ceil((escort.verificationExpiresAt - new Date()) / (1000 * 60 * 60 * 24)),
+          message: 'La verificación expira pronto. Se puede renovar anticipadamente.'
+        };
+      }
+
       return { 
         canVerify: false, 
-        error: 'El escort ya está verificado',
-        verifiedAt: escort.verifiedAt
+        error: 'El escort ya está verificado y la verificación está vigente',
+        verifiedAt: escort.verifiedAt,
+        expiresAt: escort.verificationExpiresAt
       };
     }
 
-    return { canVerify: true, membership };
+    return { canVerify: true, membership, isRenewal: false };
   } catch (error) {
     logger.error('Error verificando posibilidad de verificar escort:', error);
+    return { canVerify: false, error: 'Error del sistema' };
+  }
+};
+
+// ✅ NUEVA: Validador específico para renovación de verificaciones
+const canVerifyEscortRenewal = async (agencyId, escortId) => {
+  try {
+    const result = await canVerifyEscort(agencyId, escortId);
+    
+    if (!result.canVerify) {
+      return result;
+    }
+
+    // Solo permitir si es renovación
+    if (!result.isRenewal) {
+      return { 
+        canVerify: false, 
+        error: 'El escort no necesita renovación de verificación' 
+      };
+    }
+
+    return {
+      ...result,
+      isValidRenewal: true
+    };
+  } catch (error) {
+    logger.error('Error verificando renovación de verificación:', error);
     return { canVerify: false, error: 'Error del sistema' };
   }
 };
@@ -290,6 +434,110 @@ const hasEnoughPoints = async (clientId, requiredPoints) => {
   } catch (error) {
     logger.error('Error verificando puntos del cliente:', error);
     return { hasEnough: false, error: 'Error del sistema' };
+  }
+};
+
+// ✅ NUEVO: Validador para verificar si un cliente puede agregar más favoritos
+const canAddFavorite = async (clientId) => {
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { 
+        maxFavorites: true, 
+        currentFavorites: true,
+        isPremium: true,
+        premiumTier: true
+      }
+    });
+
+    if (!client) {
+      return { canAdd: false, error: 'Cliente no encontrado' };
+    }
+
+    // Clientes premium tienen favoritos ilimitados
+    if (client.isPremium && ['PREMIUM', 'VIP'].includes(client.premiumTier)) {
+      return { canAdd: true, isUnlimited: true };
+    }
+
+    // Verificar límite para clientes básicos
+    if (client.currentFavorites >= client.maxFavorites) {
+      return {
+        canAdd: false,
+        error: `Has alcanzado el límite de ${client.maxFavorites} favoritos`,
+        currentFavorites: client.currentFavorites,
+        maxFavorites: client.maxFavorites,
+        suggestPremium: true
+      };
+    }
+
+    return {
+      canAdd: true,
+      remaining: client.maxFavorites - client.currentFavorites,
+      currentFavorites: client.currentFavorites,
+      maxFavorites: client.maxFavorites
+    };
+  } catch (error) {
+    logger.error('Error verificando límites de favoritos:', error);
+    return { canAdd: false, error: 'Error del sistema' };
+  }
+};
+
+// ✅ NUEVO: Validador para verificar si un pago es válido
+const canMakePayment = async (userId, userType, paymentType, amount) => {
+  try {
+    // Verificar que el usuario existe y está activo
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { 
+        isActive: true, 
+        isBanned: true,
+        userType: true
+      }
+    });
+
+    if (!user) {
+      return { canPay: false, error: 'Usuario no encontrado' };
+    }
+
+    if (!user.isActive || user.isBanned) {
+      return { canPay: false, error: 'Usuario inactivo o baneado' };
+    }
+
+    if (user.userType !== userType) {
+      return { canPay: false, error: 'Tipo de usuario no coincide' };
+    }
+
+    // Validar tipos de pago según tipo de usuario
+    const allowedPayments = {
+      CLIENT: ['POINTS', 'PREMIUM'],
+      ESCORT: ['BOOST', 'POST_ADDITIONAL'],
+      AGENCY: ['VERIFICATION', 'BOOST'],
+      ADMIN: []
+    };
+
+    if (!allowedPayments[userType]?.includes(paymentType)) {
+      return { 
+        canPay: false, 
+        error: `Tipo de usuario ${userType} no puede hacer pagos de tipo ${paymentType}` 
+      };
+    }
+
+    // Validar amount mínimo y máximo
+    const minAmount = 0.50; // $0.50 USD mínimo
+    const maxAmount = 10000; // $10,000 USD máximo
+
+    if (amount < minAmount) {
+      return { canPay: false, error: `Monto mínimo: $${minAmount}` };
+    }
+
+    if (amount > maxAmount) {
+      return { canPay: false, error: `Monto máximo: $${maxAmount}` };
+    }
+
+    return { canPay: true };
+  } catch (error) {
+    logger.error('Error verificando capacidad de pago:', error);
+    return { canPay: false, error: 'Error del sistema' };
   }
 };
 
@@ -365,6 +613,145 @@ const canAccessPremiumProfile = async (userId, targetUserId) => {
   }
 };
 
+// ✅ OPTIMIZADO: Validador para verificar si una verificación necesita renovación
+const needsVerificationRenewal = async (escortId) => {
+  try {
+    const escort = await prisma.escort.findUnique({
+      where: { id: escortId },
+      select: {
+        isVerified: true,
+        verifiedAt: true,
+        verificationExpiresAt: true
+      }
+    });
+
+    if (!escort) {
+      return { needsRenewal: false, error: 'Escort no encontrado' };
+    }
+
+    if (!escort.isVerified) {
+      return { 
+        needsRenewal: false, 
+        isVerified: false,
+        canInitialVerify: true
+      };
+    }
+
+    const now = new Date();
+
+    // Verificar si la verificación ha expirado
+    if (escort.verificationExpiresAt && escort.verificationExpiresAt < now) {
+      return {
+        needsRenewal: true,
+        hasExpired: true,
+        expiredAt: escort.verificationExpiresAt,
+        verifiedAt: escort.verifiedAt,
+        daysExpired: Math.floor((now - escort.verificationExpiresAt) / (1000 * 60 * 60 * 24))
+      };
+    }
+
+    // Verificar si está próximo a expirar (dentro de 7 días)
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    if (escort.verificationExpiresAt && escort.verificationExpiresAt < sevenDaysFromNow) {
+      return {
+        needsRenewal: false,
+        expiringSoon: true,
+        canRenewEarly: true,
+        expiresAt: escort.verificationExpiresAt,
+        daysUntilExpiry: Math.ceil((escort.verificationExpiresAt - now) / (1000 * 60 * 60 * 24))
+      };
+    }
+
+    return {
+      needsRenewal: false,
+      isVerified: true,
+      expiresAt: escort.verificationExpiresAt,
+      daysUntilExpiry: escort.verificationExpiresAt ? 
+        Math.ceil((escort.verificationExpiresAt - now) / (1000 * 60 * 60 * 24)) : null
+    };
+  } catch (error) {
+    logger.error('Error verificando renovación de verificación:', error);
+    return { needsRenewal: false, error: 'Error del sistema' };
+  }
+};
+
+// ✅ NUEVA: Validador para verificar verificaciones próximas a expirar en masa
+const getExpiringVerifications = async (agencyId, daysThreshold = 7) => {
+  try {
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
+
+    const expiringEscorts = await prisma.agencyMembership.findMany({
+      where: {
+        agencyId,
+        status: 'ACTIVE',
+        escort: {
+          isVerified: true,
+          verificationExpiresAt: {
+            lte: thresholdDate,
+            gte: new Date()
+          }
+        }
+      },
+      include: {
+        escort: {
+          select: {
+            id: true,
+            isVerified: true,
+            verifiedAt: true,
+            verificationExpiresAt: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                avatar: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        escort: {
+          verificationExpiresAt: 'asc'
+        }
+      }
+    });
+
+    const processedEscorts = expiringEscorts.map(membership => {
+      const escort = membership.escort;
+      const now = new Date();
+      const daysUntilExpiry = Math.ceil((escort.verificationExpiresAt - now) / (1000 * 60 * 60 * 24));
+      
+      return {
+        escortId: escort.id,
+        membershipId: membership.id,
+        name: `${escort.user.firstName} ${escort.user.lastName}`,
+        avatar: escort.user.avatar,
+        verificationExpiresAt: escort.verificationExpiresAt,
+        daysUntilExpiry,
+        isUrgent: daysUntilExpiry <= 3,
+        isExpired: daysUntilExpiry <= 0,
+        verifiedAt: escort.verifiedAt
+      };
+    });
+
+    return {
+      success: true,
+      expiringVerifications: processedEscorts,
+      summary: {
+        total: processedEscorts.length,
+        urgent: processedEscorts.filter(e => e.isUrgent).length,
+        expired: processedEscorts.filter(e => e.isExpired).length
+      }
+    };
+  } catch (error) {
+    logger.error('Error obteniendo verificaciones próximas a expirar:', error);
+    return { success: false, error: 'Error del sistema' };
+  }
+};
+
 // Función para sanitizar cadenas de texto
 const sanitizeString = (str) => {
   if (!str || typeof str !== 'string') return str;
@@ -411,6 +798,28 @@ const isValidEmail = (email) => {
   return emailRegex.test(email) && email.length <= 255;
 };
 
+// ✅ NUEVO: Función para validar montos de dinero
+const isValidAmount = (amount, min = 0.01, max = 100000) => {
+  if (typeof amount !== 'number' || isNaN(amount)) {
+    return { isValid: false, error: 'Debe ser un número válido' };
+  }
+
+  if (amount < min) {
+    return { isValid: false, error: `Monto mínimo: $${min}` };
+  }
+
+  if (amount > max) {
+    return { isValid: false, error: `Monto máximo: $${max}` };
+  }
+
+  // Verificar que tenga máximo 2 decimales
+  if (Number(amount.toFixed(2)) !== amount) {
+    return { isValid: false, error: 'Máximo 2 decimales permitidos' };
+  }
+
+  return { isValid: true };
+};
+
 module.exports = {
   // Validadores de base de datos
   isEmailUnique,
@@ -420,19 +829,26 @@ module.exports = {
   
   // Validadores de permisos
   canCreatePost,
+  canCreateAdditionalPost,
   canSendMessage,
   canBoostPost,
   canVerifyEscort,
+  canVerifyEscortRenewal, // ✅ NUEVO
   canAccessPremiumProfile,
+  canMakePayment,
   
   // Validadores de recursos
   hasEnoughPoints,
+  canAddFavorite,
   isValidImageFile,
+  needsVerificationRenewal,
+  getExpiringVerifications, // ✅ NUEVO
   
   // Validadores de formato
   isValidId,
   isValidPhoneNumber,
   isValidEmail,
+  isValidAmount,
   
   // Funciones de sanitización
   sanitizeString,

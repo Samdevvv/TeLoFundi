@@ -1,35 +1,230 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const { AppError } = require('../middleware/errorHandler');
+const { prisma } = require('../config/database');
+const logger = require('../utils/logger');
 
-// Middleware de autenticación y rate limiting
+// Middleware de autenticación
 const { authenticate } = require('../middleware/auth');
 
-// ✅ CORREGIDO: Usar validateFileUpload en lugar de validateFileTypes
-const { validateFileUpload } = require('../middleware/validation');
+// ✅ SOLO IMPORTAR VALIDACIONES QUE EXISTEN
+const { 
+  validateChatMessage,
+  validatePagination
+  // ❌ REMOVIDAS: funciones que no existen en validation middleware
+} = require('../middleware/validation');
 
-// ✅ CORREGIDO: MIDDLEWARES DE UPLOAD INTEGRADOS CON CLOUDINARY - REMOVIDOS LOS QUE NO EXISTEN
-// Solo mantener los que realmente existen en tu middleware
-const {
-  uploadChatImage, // Solo si existe
-  processAndUploadToCloud, // Solo si existe
-  cleanFileMetadata, // Solo si existe
-  addUploadInfo, // Solo si existe
-  handleMulterError // Solo si existe
-} = require('../middleware/upload');
+// ✅ MIDDLEWARES DE UPLOAD SIMPLIFICADOS - TODOS DEFINIDOS AQUÍ
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido en chat'), false);
+    }
+  }
+});
 
-// ✅ CORREGIDO: Controllers - NOMBRES CORREGIDOS PARA COINCIDIR CON EL CONTROLADOR
+// ✅ MIDDLEWARE PARA VALIDAR CAPACIDADES DE CHAT POR TIPO DE USUARIO
+const validateChatCapabilities = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const { messageType = 'TEXT', isPremiumMessage = false } = req.body;
+
+    // Verificar límites específicos por tipo de usuario
+    if (user.userType === 'CLIENT') {
+      const client = user.client;
+      if (!client) {
+        return next(new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING'));
+      }
+
+      // Verificar límites diarios
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (client.lastMessageReset < today) {
+        await prisma.client.update({
+          where: { id: client.id },
+          data: {
+            messagesUsedToday: 0,
+            lastMessageReset: today
+          }
+        });
+        client.messagesUsedToday = 0;
+      }
+
+      // Verificar límite diario
+      if (client.messagesUsedToday >= client.dailyMessageLimit && !client.isPremium) {
+        return next(new AppError(
+          `Has alcanzado tu límite diario de ${client.dailyMessageLimit} mensajes. Actualiza a premium para mensajes ilimitados.`,
+          400,
+          'DAILY_MESSAGE_LIMIT_REACHED'
+        ));
+      }
+
+      // Verificar capacidades según tipo de mensaje
+      if (messageType === 'IMAGE' && !client.canSendImages && !client.isPremium) {
+        return next(new AppError('Tu cuenta no permite enviar imágenes. Actualiza a Premium o VIP.', 403, 'IMAGES_NOT_ALLOWED'));
+      }
+
+      if (messageType === 'AUDIO' && !client.canSendVoiceMessages && client.premiumTier !== 'VIP') {
+        return next(new AppError('Los mensajes de voz requieren cuenta VIP.', 403, 'VOICE_NOT_ALLOWED'));
+      }
+
+      // Verificar mensajes premium
+      if (isPremiumMessage && client.premiumTier === 'BASIC') {
+        return next(new AppError('Los mensajes premium requieren cuenta Premium o VIP.', 403, 'PREMIUM_MESSAGE_NOT_ALLOWED'));
+      }
+
+      // Calcular costo en puntos
+      let pointsCost = 0;
+      if (isPremiumMessage) {
+        pointsCost = 5;
+      } else if (messageType === 'IMAGE') {
+        pointsCost = 2;
+      } else if (messageType === 'AUDIO' || messageType === 'VIDEO') {
+        pointsCost = 4;
+      } else if (messageType === 'FILE') {
+        pointsCost = 3;
+      } else {
+        pointsCost = 1;
+      }
+
+      // Verificar puntos suficientes
+      if (client.points < pointsCost) {
+        return next(new AppError('Puntos insuficientes para enviar mensaje', 400, 'INSUFFICIENT_POINTS'));
+      }
+
+      req.pointsCost = pointsCost;
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Error validating chat capabilities:', error);
+    next(new AppError('Error validando capacidades de chat', 500, 'CHAT_VALIDATION_ERROR'));
+  }
+};
+
+// ✅ MIDDLEWARES DE VALIDACIÓN SIMPLES (DEFINIDOS AQUÍ)
+const validateFileUpload = (options = {}) => {
+  return (req, res, next) => {
+    if (!req.file && options.required) {
+      return next(new AppError('Archivo requerido', 400, 'FILE_REQUIRED'));
+    }
+    
+    if (req.file) {
+      const { allowedTypes = [], maxSize = 5 * 1024 * 1024 } = options;
+      
+      if (allowedTypes.length > 0 && !allowedTypes.includes(req.file.mimetype)) {
+        return next(new AppError('Tipo de archivo no permitido', 400, 'INVALID_FILE_TYPE'));
+      }
+      
+      if (req.file.size > maxSize) {
+        return next(new AppError('Archivo muy grande', 400, 'FILE_TOO_LARGE'));
+      }
+    }
+    
+    next();
+  };
+};
+
+const validateDisputeMessage = (req, res, next) => {
+  const { content } = req.body;
+  
+  if (!content || content.trim().length === 0) {
+    return next(new AppError('Contenido del mensaje es requerido', 400, 'MISSING_MESSAGE_CONTENT'));
+  }
+  
+  if (content.length > 1000) {
+    return next(new AppError('Mensaje muy largo. Máximo 1000 caracteres en disputas', 400, 'MESSAGE_TOO_LONG'));
+  }
+  
+  next();
+};
+
+const validateCreateDisputeChat = (req, res, next) => {
+  const { escortId, agencyId, reason } = req.body;
+  
+  if (!escortId || !agencyId || !reason) {
+    return next(new AppError('escortId, agencyId y reason son requeridos', 400, 'MISSING_REQUIRED_FIELDS'));
+  }
+  
+  if (reason.length < 10) {
+    return next(new AppError('La razón debe tener al menos 10 caracteres', 400, 'REASON_TOO_SHORT'));
+  }
+  
+  next();
+};
+
+const validateCloseDisputeChat = (req, res, next) => {
+  const { resolution } = req.body;
+  
+  if (!resolution || resolution.trim().length === 0) {
+    return next(new AppError('Resolución es requerida', 400, 'MISSING_RESOLUTION'));
+  }
+  
+  if (resolution.length < 20) {
+    return next(new AppError('La resolución debe tener al menos 20 caracteres', 400, 'RESOLUTION_TOO_SHORT'));
+  }
+  
+  next();
+};
+
+const validateMessageSearch = (req, res, next) => {
+  const { q: query, messageType, dateFrom, dateTo } = req.query;
+  
+  if (!query && !messageType && !dateFrom && !dateTo) {
+    return next(new AppError('Al menos un criterio de búsqueda es requerido', 400, 'MISSING_SEARCH_CRITERIA'));
+  }
+  
+  if (dateFrom && isNaN(Date.parse(dateFrom))) {
+    return next(new AppError('Fecha desde inválida', 400, 'INVALID_DATE_FROM'));
+  }
+  
+  if (dateTo && isNaN(Date.parse(dateTo))) {
+    return next(new AppError('Fecha hasta inválida', 400, 'INVALID_DATE_TO'));
+  }
+  
+  next();
+};
+
+const validateChatMute = (req, res, next) => {
+  const { mutedUntil } = req.body;
+  
+  if (mutedUntil && isNaN(Date.parse(mutedUntil))) {
+    return next(new AppError('Fecha de silenciado inválida', 400, 'INVALID_MUTE_DATE'));
+  }
+  
+  next();
+};
+
+// ✅ CONTROLLERS COMPLETOS
 const {
-  createOrGetChat,    // Era createChat
+  createOrGetChat,
   getChats,
-  getChatMessages,    // Era getMessages
+  getChatMessages,
   sendMessage,
-  editMessage,        // Nueva función
-  deleteMessage,      // Nueva función
-  toggleChatArchive,  // Era archiveChat y unarchiveChat
-  toggleChatMute,     // Era muteChatForUser y unmuteChatForUser
+  editMessage,
+  deleteMessage,
+  toggleChatArchive,
+  toggleChatMute,
   searchMessages,
   getChatStats,
-  reportMessage       // Era reportChat
+  reportMessage,
+  // ✅ NUEVO: Funciones para chat tripartito
+  createDisputeChat,
+  getDisputeChats,
+  closeDisputeChat,
+  addDisputeMessage,
+  // ✅ NUEVO: Función para crear chat desde perfil
+  createChatFromProfile
 } = require('../controllers/chatController');
 
 /**
@@ -49,10 +244,15 @@ const {
  *         isGroup:
  *           type: boolean
  *           example: false
+ *         isDisputeChat:
+ *           type: boolean
+ *           example: false
+ *         disputeStatus:
+ *           type: string
+ *           enum: [ACTIVE, RESOLVED, ESCALATED, CLOSED]
  *         avatar:
  *           type: string
  *           nullable: true
- *           example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/chat/chat_group_avatar_123.webp"
  *         description:
  *           type: string
  *           nullable: true
@@ -72,139 +272,6 @@ const {
  *         createdAt:
  *           type: string
  *           format: date-time
- *     
- *     ChatMember:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *         userId:
- *           type: string
- *         user:
- *           $ref: '#/components/schemas/User'
- *         role:
- *           type: string
- *           enum: [ADMIN, MODERATOR, MEMBER]
- *         joinedAt:
- *           type: string
- *           format: date-time
- *         lastRead:
- *           type: string
- *           format: date-time
- *         isMuted:
- *           type: boolean
- *     
- *     Message:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *           example: "cm123msg456"
- *         content:
- *           type: string
- *           example: "Hola, ¿cómo estás?"
- *         messageType:
- *           type: string
- *           enum: [TEXT, IMAGE, FILE, AUDIO, VIDEO, SYSTEM, LOCATION, CONTACT]
- *         fileUrl:
- *           type: string
- *           nullable: true
- *           example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/chat/chat_user123_1234567890_abc123.webp"
- *         fileName:
- *           type: string
- *           nullable: true
- *           example: "imagen_chat.jpg"
- *         fileSize:
- *           type: integer
- *           nullable: true
- *           example: 245760
- *         mimeType:
- *           type: string
- *           nullable: true
- *           example: "image/jpeg"
- *         sender:
- *           $ref: '#/components/schemas/User'
- *         isRead:
- *           type: boolean
- *         readAt:
- *           type: string
- *           format: date-time
- *           nullable: true
- *         isEdited:
- *           type: boolean
- *         editedAt:
- *           type: string
- *           format: date-time
- *           nullable: true
- *         isPremiumMessage:
- *           type: boolean
- *         costPoints:
- *           type: integer
- *           nullable: true
- *         replyToId:
- *           type: string
- *           nullable: true
- *         createdAt:
- *           type: string
- *           format: date-time
- *         isMine:
- *           type: boolean
- *           description: Si el mensaje fue enviado por el usuario actual
- *     
- *     CreateChatRequest:
- *       type: object
- *       required:
- *         - receiverId
- *       properties:
- *         receiverId:
- *           type: string
- *           example: "cm123user456"
- *     
- *     SendMessageRequest:
- *       type: object
- *       required:
- *         - content
- *       properties:
- *         content:
- *           type: string
- *           maxLength: 5000
- *           example: "Hola, ¿cómo estás?"
- *         messageType:
- *           type: string
- *           enum: [TEXT, IMAGE, FILE, AUDIO, VIDEO, LOCATION, CONTACT]
- *           default: TEXT
- *         replyToId:
- *           type: string
- *           nullable: true
- *         isPremiumMessage:
- *           type: boolean
- *           default: false
- *           description: Mensaje premium (cuesta más puntos)
- *
- *     CloudinaryChatImageResponse:
- *       type: object
- *       properties:
- *         url:
- *           type: string
- *           example: "https://res.cloudinary.com/telofundi/image/upload/v1234567890/telofundi/chat/chat_user123_1234567890_abc123.webp"
- *         publicId:
- *           type: string
- *           example: "telofundi/chat/chat_user123_1234567890_abc123"
- *         size:
- *           type: integer
- *           example: 245760
- *         format:
- *           type: string
- *           example: "webp"
- *         width:
- *           type: integer
- *           example: 800
- *         height:
- *           type: integer
- *           example: 600
- *         optimized:
- *           type: boolean
- *           example: true
  */
 
 /**
@@ -233,28 +300,15 @@ const {
  *           type: boolean
  *           default: false
  *         description: Incluir chats archivados
+ *       - in: query
+ *         name: includeDisputes
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Incluir chats de disputa (solo para admins)
  *     responses:
  *       200:
  *         description: Lista de chats obtenida exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     chats:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Chat'
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/', authenticate, getChats);
 
@@ -271,10 +325,43 @@ router.get('/', authenticate, getChats);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateChatRequest'
+ *             type: object
+ *             required:
+ *               - receiverId
+ *             properties:
+ *               receiverId:
+ *                 type: string
+ *                 description: ID del usuario con quien chatear
  *     responses:
  *       200:
  *         description: Chat obtenido o creado exitosamente
+ *       400:
+ *         description: Datos inválidos o no puedes chatear contigo mismo
+ *       403:
+ *         description: Usuario bloqueado o no permite mensajes directos
+ *       404:
+ *         description: Usuario no encontrado
+ */
+router.post('/', authenticate, createOrGetChat);
+
+/**
+ * @swagger
+ * /api/chat/profile/{userId}:
+ *   post:
+ *     summary: Crear chat desde perfil de usuario (botón "Chat" en perfil)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del usuario del perfil
+ *     responses:
+ *       200:
+ *         description: Chat creado/encontrado y usuario redirigido
  *         content:
  *           application/json:
  *             schema:
@@ -283,21 +370,119 @@ router.get('/', authenticate, getChats);
  *                 success:
  *                   type: boolean
  *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Chat iniciado exitosamente"
  *                 data:
  *                   type: object
  *                   properties:
- *                     chat:
- *                       $ref: '#/components/schemas/Chat'
- *       400:
- *         description: Datos inválidos o no puedes chatear contigo mismo
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *                     chatId:
+ *                       type: string
+ *                       description: ID del chat para redirección
+ *                     isNewChat:
+ *                       type: boolean
+ *                       description: Si es un chat nuevo o existente
+ *                     otherUser:
+ *                       type: object
+ *                       description: Información del usuario del perfil
  *       403:
- *         description: Usuario bloqueado o no permite mensajes directos
+ *         description: No puedes chatear con este usuario
  *       404:
  *         description: Usuario no encontrado
  */
-router.post('/', authenticate,  createOrGetChat);
+router.post('/profile/:userId', authenticate, createChatFromProfile);
+
+/**
+ * @swagger
+ * /api/chat/dispute:
+ *   post:
+ *     summary: Crear chat tripartito para resolver disputa (solo admins)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - escortId
+ *               - agencyId
+ *               - reason
+ *             properties:
+ *               escortId:
+ *                 type: string
+ *                 description: ID del escort en disputa
+ *               agencyId:
+ *                 type: string
+ *                 description: ID de la agencia en disputa
+ *               reason:
+ *                 type: string
+ *                 description: Razón de la disputa
+ *     responses:
+ *       201:
+ *         description: Chat de disputa creado exitosamente
+ *       403:
+ *         description: Solo administradores pueden crear chats de disputa
+ */
+router.post('/dispute', authenticate, validateCreateDisputeChat, createDisputeChat);
+
+/**
+ * @swagger
+ * /api/chat/dispute:
+ *   get:
+ *     summary: Obtener chats de disputa (solo admins)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVE, RESOLVED, ESCALATED, CLOSED]
+ *         description: Filtrar por estado de disputa
+ *     responses:
+ *       200:
+ *         description: Lista de chats de disputa
+ */
+router.get('/dispute', authenticate, getDisputeChats);
+
+/**
+ * @swagger
+ * /api/chat/dispute/{chatId}/close:
+ *   post:
+ *     summary: Cerrar chat de disputa (solo admins)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - resolution
+ *             properties:
+ *               resolution:
+ *                 type: string
+ *                 description: Resolución de la disputa
+ *               finalDecision:
+ *                 type: string
+ *                 description: Decisión final del administrador
+ *     responses:
+ *       200:
+ *         description: Chat de disputa cerrado exitosamente
+ */
+router.post('/dispute/:chatId/close', authenticate, validateCloseDisputeChat, closeDisputeChat);
 
 /**
  * @swagger
@@ -332,37 +517,11 @@ router.post('/', authenticate,  createOrGetChat);
  *         description: Obtener mensajes antes de esta fecha
  *     responses:
  *       200:
- *         description: Mensajes obtenidos exitosamente (con URLs de Cloudinary optimizadas)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     messages:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Message'
- *                     pagination:
- *                       type: object
- *                       properties:
- *                         page:
- *                           type: integer
- *                         limit:
- *                           type: integer
- *                         hasMore:
- *                           type: boolean
+ *         description: Mensajes obtenidos exitosamente
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Chat no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/:chatId/messages', authenticate, getChatMessages);
 
@@ -385,7 +544,24 @@ router.get('/:chatId/messages', authenticate, getChatMessages);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/SendMessageRequest'
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 maxLength: 5000
+ *                 example: "Hola, ¿cómo estás?"
+ *               messageType:
+ *                 type: string
+ *                 enum: [TEXT, IMAGE, FILE, AUDIO, VIDEO, LOCATION, CONTACT]
+ *                 default: TEXT
+ *               replyToId:
+ *                 type: string
+ *                 nullable: true
+ *               isPremiumMessage:
+ *                 type: boolean
+ *                 default: false
  *         multipart/form-data:
  *           schema:
  *             type: object
@@ -393,99 +569,81 @@ router.get('/:chatId/messages', authenticate, getChatMessages);
  *               content:
  *                 type: string
  *                 maxLength: 5000
- *                 example: "Hola, mira esta imagen"
  *               messageType:
  *                 type: string
  *                 enum: [TEXT, IMAGE, FILE]
  *                 default: TEXT
- *                 example: "IMAGE"
  *               image:
  *                 type: string
  *                 format: binary
  *                 description: Imagen para mensajes de tipo IMAGE (JPG, PNG, WebP, GIF) - Máximo 5MB
  *               replyToId:
  *                 type: string
- *                 description: ID del mensaje al que se responde
  *               isPremiumMessage:
  *                 type: boolean
  *                 default: false
- *                 description: Marcar como mensaje premium (cuesta más puntos)
  *     responses:
  *       201:
- *         description: Mensaje enviado exitosamente con imagen subida a Cloudinary
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Mensaje enviado exitosamente"
- *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/Message'
- *                     - type: object
- *                       properties:
- *                         costPoints:
- *                           type: integer
- *                           example: 2
- *                           description: Puntos deducidos por el mensaje
- *                 uploadedFile:
- *                   $ref: '#/components/schemas/CloudinaryChatImageResponse'
+ *         description: Mensaje enviado exitosamente
  *       400:
  *         description: Datos inválidos, límite de mensajes alcanzado o puntos insuficientes
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   examples:
- *                     insufficient_points:
- *                       value: "Puntos insuficientes para enviar mensaje"
- *                     daily_limit:
- *                       value: "Has alcanzado tu límite diario de 50 mensajes. Actualiza tu cuenta para enviar más."
- *                     file_too_large:
- *                       value: "Archivo demasiado grande. Máximo permitido: 5MB"
- *                 errorCode:
- *                   type: string
- *                   enum: [INSUFFICIENT_POINTS, DAILY_MESSAGE_LIMIT_REACHED, FILE_TOO_LARGE]
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Chat no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  *       429:
  *         description: Límite de rate limiting excedido
- *       500:
- *         description: Error subiendo imagen a Cloudinary
  */
-
-// ✅ VERSIÓN ROBUSTA: MANEJO CONDICIONAL DE MIDDLEWARES
 router.post('/:chatId/messages', 
   authenticate,
- 
+  validateChatCapabilities,
+  upload.single('image'),
   validateFileUpload({
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'],
     maxSize: 5 * 1024 * 1024, // 5MB
     maxFiles: 1,
     required: false
   }),
-  // ✅ Solo usar middlewares que existan (condicional)
-  ...(typeof uploadChatImage === 'function' ? [uploadChatImage] : []),
-  ...(typeof processAndUploadToCloud === 'function' ? [processAndUploadToCloud] : []),
-  ...(typeof cleanFileMetadata === 'function' ? [cleanFileMetadata] : []),
-  ...(typeof addUploadInfo === 'function' ? [addUploadInfo] : []),
+  validateChatMessage,
   sendMessage
 );
+
+/**
+ * @swagger
+ * /api/chat/dispute/{chatId}/messages:
+ *   post:
+ *     summary: Enviar mensaje en chat tripartito (máximo 3 por usuario)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 description: Contenido del mensaje (máximo 1000 caracteres para disputas)
+ *     responses:
+ *       201:
+ *         description: Mensaje de disputa enviado exitosamente
+ *       400:
+ *         description: Límite de mensajes alcanzado en chat tripartito
+ *       403:
+ *         description: Sin acceso al chat de disputa
+ */
+router.post('/dispute/:chatId/messages', authenticate, validateDisputeMessage, addDisputeMessage);
 
 /**
  * @swagger
@@ -517,52 +675,10 @@ router.post('/:chatId/messages',
  *     responses:
  *       200:
  *         description: Mensaje editado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Mensaje editado exitosamente"
- *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/Message'
- *                     - type: object
- *                       properties:
- *                         isEdited:
- *                           type: boolean
- *                           example: true
- *                         editedAt:
- *                           type: string
- *                           format: date-time
  *       400:
  *         description: Mensaje muy antiguo para editar, tipo no editable o datos inválidos
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   examples:
- *                     too_old:
- *                       value: "El mensaje es muy antiguo para editar"
- *                     cannot_edit_file:
- *                       value: "Solo puedes editar mensajes de texto"
- *                 errorCode:
- *                   type: string
- *                   enum: [MESSAGE_TOO_OLD, CANNOT_EDIT_FILE_MESSAGE]
  *       404:
  *         description: Mensaje no encontrado o sin permisos
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.put('/messages/:messageId', authenticate, editMessage);
 
@@ -582,22 +698,9 @@ router.put('/messages/:messageId', authenticate, editMessage);
  *           type: string
  *     responses:
  *       200:
- *         description: Mensaje eliminado exitosamente (archivo eliminado de Cloudinary si existía)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Mensaje eliminado exitosamente"
+ *         description: Mensaje eliminado exitosamente
  *       404:
  *         description: Mensaje no encontrado o sin permisos
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.delete('/messages/:messageId', authenticate, deleteMessage);
 
@@ -618,30 +721,10 @@ router.delete('/messages/:messageId', authenticate, deleteMessage);
  *     responses:
  *       200:
  *         description: Estado de archivo del chat actualizado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Chat archivado"
- *                 data:
- *                   type: object
- *                   properties:
- *                     chatId:
- *                       type: string
- *                     isArchived:
- *                       type: boolean
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Chat no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/:chatId/archive', authenticate, toggleChatArchive);
 
@@ -670,40 +753,15 @@ router.post('/:chatId/archive', authenticate, toggleChatArchive);
  *                 format: date-time
  *                 nullable: true
  *                 description: Timestamp hasta cuando silenciar (null para desilenciar)
- *                 example: "2024-12-31T23:59:59Z"
  *     responses:
  *       200:
  *         description: Estado de silenciado del chat actualizado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Chat silenciado"
- *                 data:
- *                   type: object
- *                   properties:
- *                     chatId:
- *                       type: string
- *                     isMuted:
- *                       type: boolean
- *                     mutedUntil:
- *                       type: string
- *                       format: date-time
- *                       nullable: true
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Chat no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.post('/:chatId/mute', authenticate, toggleChatMute);
+router.post('/:chatId/mute', authenticate, validateChatMute, toggleChatMute);
 
 /**
  * @swagger
@@ -736,13 +794,11 @@ router.post('/:chatId/mute', authenticate, toggleChatMute);
  *         schema:
  *           type: string
  *           format: date
- *         description: Buscar desde esta fecha
  *       - in: query
  *         name: dateTo
  *         schema:
  *           type: string
  *           format: date
- *         description: Buscar hasta esta fecha
  *       - in: query
  *         name: page
  *         schema:
@@ -757,33 +813,12 @@ router.post('/:chatId/mute', authenticate, toggleChatMute);
  *     responses:
  *       200:
  *         description: Resultados de búsqueda obtenidos exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     messages:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Message'
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *                     filters:
- *                       type: object
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Chat no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
-router.get('/:chatId/messages/search', authenticate, searchMessages);
+router.get('/:chatId/messages/search', authenticate, validateMessageSearch, searchMessages);
 
 /**
  * @swagger
@@ -802,46 +837,10 @@ router.get('/:chatId/messages/search', authenticate, searchMessages);
  *     responses:
  *       200:
  *         description: Estadísticas del chat obtenidas exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     totalMessages:
- *                       type: integer
- *                       example: 150
- *                     messagesByType:
- *                       type: object
- *                       example: {"TEXT": 120, "IMAGE": 25, "FILE": 5}
- *                       description: Incluye estadísticas de imágenes subidas a Cloudinary
- *                     messagesByMember:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           user:
- *                             $ref: '#/components/schemas/User'
- *                           count:
- *                             type: integer
- *                     chatAge:
- *                       type: integer
- *                       description: Edad del chat en días
- *                       example: 30
- *                     averageMessagesPerDay:
- *                       type: number
- *                       example: 5.0
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Chat no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/:chatId/stats', authenticate, getChatStats);
 
@@ -871,42 +870,22 @@ router.get('/:chatId/stats', authenticate, getChatStats);
  *               reason:
  *                 type: string
  *                 enum: [SPAM, INAPPROPRIATE_CONTENT, HARASSMENT, SCAM, OTHER]
- *                 example: "HARASSMENT"
  *               description:
  *                 type: string
  *                 maxLength: 1000
- *                 example: "El mensaje contiene acoso"
  *     responses:
  *       200:
  *         description: Mensaje reportado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Mensaje reportado exitosamente"
- *                 data:
- *                   type: object
- *                   properties:
- *                     reportId:
- *                       type: string
  *       400:
  *         description: No puedes reportar tu propio mensaje
  *       403:
  *         description: Sin acceso al chat
  *       404:
  *         description: Mensaje no encontrado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/messages/:messageId/report', authenticate, reportMessage);
 
-// ✅ MIDDLEWARE DE MANEJO DE ERRORES PARA CHAT
+// ✅ MIDDLEWARE DE MANEJO DE ERRORES ESPECÍFICO PARA CHAT
 router.use((error, req, res, next) => {
   console.error('🔥 Chat route error:', error);
 
@@ -922,7 +901,7 @@ router.use((error, req, res, next) => {
   }
 
   // Error de archivo muy grande
-  if (error.message && error.message.includes('Archivo muy grande')) {
+  if (error.message && error.message.includes('File too large')) {
     return res.status(400).json({
       success: false,
       message: 'Archivo muy grande para chat',
@@ -931,10 +910,40 @@ router.use((error, req, res, next) => {
     });
   }
 
+  // Error de límite de mensajes en chat tripartito
+  if (error.message && error.message.includes('Límite de mensajes')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Límite de mensajes alcanzado en chat tripartito',
+      errorCode: 'DISPUTE_MESSAGE_LIMIT',
+      details: 'Máximo 3 mensajes por usuario en chats de disputa'
+    });
+  }
+
+  // Error de puntos insuficientes
+  if (error.code === 'INSUFFICIENT_POINTS') {
+    return res.status(400).json({
+      success: false,
+      message: 'Puntos insuficientes para enviar mensaje',
+      errorCode: 'INSUFFICIENT_POINTS',
+      details: 'Compra más puntos o espera hasta mañana para obtener puntos gratuitos'
+    });
+  }
+
+  // Error de límite diario alcanzado
+  if (error.code === 'DAILY_MESSAGE_LIMIT_REACHED') {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      errorCode: 'DAILY_MESSAGE_LIMIT_REACHED',
+      details: 'Actualiza a premium para mensajes ilimitados'
+    });
+  }
+
   // Otros errores
   next(error);
 });
 
-console.log('✅ Chat routes configured with robust middleware handling');
+console.log('✅ Chat routes configured with complete features and profile chat integration');
 
 module.exports = router;

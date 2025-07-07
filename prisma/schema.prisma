@@ -10,14 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Sistema de localización
+// Sistema de localización (simplificado - solo para referencia, no geolocalización)
 model Location {
   id        String @id @default(cuid())
   country   String
   state     String?
   city      String
-  latitude  Float?
-  longitude Float?
   
   // Relations
   users     User[]
@@ -28,7 +26,7 @@ model Location {
   @@map("locations")
 }
 
-// Tabla principal de usuarios
+// Tabla principal de usuarios - CORREGIDA CON googleId
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -41,10 +39,17 @@ model User {
   bio         String?
   website     String? // Para agencias
   userType    UserType
-  isActive    Boolean  @default(true)
-  isBanned    Boolean  @default(false)
-  banReason   String?
-  profileViews Int     @default(0)
+  
+  // ✅ CAMPO AGREGADO: Para Google OAuth
+  googleId    String?  @unique
+  
+  // Control de acceso mejorado para agencias
+  accountStatus       AccountStatus @default(ACTIVE)
+  canLogin           Boolean       @default(true)
+  isActive           Boolean       @default(true)
+  isBanned           Boolean       @default(false)
+  banReason          String?
+  profileViews       Int          @default(0)
   
   // Campos de autenticación y verificación
   passwordResetToken      String?
@@ -53,7 +58,7 @@ model User {
   emailVerified          Boolean  @default(false)
   emailVerifiedAt        DateTime?
   
-  // Localización
+  // Localización (opcional)
   locationId  String?
   location    Location? @relation(fields: [locationId], references: [id])
   
@@ -61,6 +66,9 @@ model User {
   timezone    String? @default("UTC")
   language    String? @default("en")
   lastLoginIP String?
+  
+  // Control de límites diarios
+  lastDailyReset DateTime @default(now())
   
   // Timestamps
   createdAt   DateTime @default(now())
@@ -100,9 +108,15 @@ model User {
   subscriptions   Subscription[]
   identityVerification IdentityVerification?
   
+  // ✅ NUEVO: Relaciones para AgencyRegistrationRequest
+  agencyRegistrationRequest AgencyRegistrationRequest?
+  reviewedAgencyRequests    AgencyRegistrationRequest[] @relation("AgencyRequestReviewer")
+  
   @@index([userType, isActive, createdAt])
   @@index([userType, isActive, lastLogin])
   @@index([userType, isActive, lastActiveAt])
+  @@index([accountStatus])
+  @@index([canLogin, userType])
   @@index([createdAt])
   @@index([lastLogin])
   @@index([isActive, userType])
@@ -111,7 +125,42 @@ model User {
   @@index([emailVerificationToken])
   @@index([passwordResetToken])
   @@index([emailVerified])
+  @@index([lastDailyReset])
+  @@index([googleId])  // ✅ ÍNDICE AGREGADO para googleId
   @@map("users")
+}
+
+// ✅ NUEVO: Solicitudes de registro de agencias (Reemplaza la versión anterior)
+model AgencyRegistrationRequest {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Datos del formulario adicional (según especificaciones)
+  fullName          String   // Nombre completo
+  documentNumber    String   // Número de cédula/DNI
+  businessPhone     String   // Teléfono de la agencia
+  businessEmail     String   // Email de la agencia
+  
+  // Documentación (fotos de cédula/DNI)
+  documentFrontImage String  // URL foto frontal de cédula
+  documentBackImage  String  // URL foto trasera de cédula
+  
+  // Estado de la solicitud
+  status            AgencyRequestStatus @default(PENDING)
+  reviewNotes       String?  // Notas del admin
+  rejectionReason   String?
+  
+  // Auditoría
+  submittedAt       DateTime @default(now())
+  reviewedAt        DateTime?
+  reviewedBy        String?  // ID del admin que revisó
+  reviewer          User?    @relation("AgencyRequestReviewer", fields: [reviewedBy], references: [id])
+  
+  @@index([status])
+  @@index([submittedAt])
+  @@index([reviewedBy])
+  @@map("agency_registration_requests")
 }
 
 // Configuraciones de usuario
@@ -126,6 +175,8 @@ model UserSettings {
   messageNotifications  Boolean @default(true)
   likeNotifications     Boolean @default(true)
   boostNotifications    Boolean @default(true)
+  profileReminders      Boolean @default(true) // Recordatorios completar perfil
+  verificationReminders Boolean @default(true) // Recordatorios verificación
   
   // Privacidad
   showOnline            Boolean @default(true)
@@ -283,7 +334,7 @@ model Subscription {
   @@map("subscriptions")
 }
 
-// Sistema de tags
+// Sistema de tags (simplificado - sin tags personalizados)
 model Tag {
   id          String    @id @default(cuid())
   name        String    @unique
@@ -336,12 +387,14 @@ model Admin {
   totalBans   Int      @default(0)
   totalReports Int     @default(0)
   totalVerifications Int @default(0)
+  totalAgencyApprovals Int @default(0) // NUEVO
   
   // Configuraciones de admin
   canDeletePosts   Boolean @default(false)
   canBanUsers      Boolean @default(false)
   canModifyPrices  Boolean @default(false)
   canAccessMetrics Boolean @default(false)
+  canApproveAgencies Boolean @default(true) // NUEVO
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -396,6 +449,7 @@ model Escort {
   isVerified  Boolean  @default(false)
   verifiedAt  DateTime?
   verifiedBy  String?  // ID de la agencia que verificó
+  verificationExpiresAt DateTime? // NUEVO: Para control de renovación mensual
   rating      Float    @default(0.0)
   totalRatings Int     @default(0)
   
@@ -408,14 +462,14 @@ model Escort {
   hairColor   String?
   eyeColor    String?
   
-  // Información profesional
-  services    String[] @default([])
+  // Información profesional (servicios ahora es string libre)
+  services    String?  // CAMBIADO: String libre en lugar de array
   rates       Json?    // Tarifas por tiempo {"1h": 100, "2h": 180}
   availability Json?   // Horarios {"mon": ["9-17"], "tue": ["10-18"]}
   languages   String[] @default([])
   
-  // Límites específicos de escorts
-  maxPosts    Int      @default(5) // Límite explícito para escorts
+  // Límites específicos de escorts (ACTUALIZADO según especificaciones)
+  maxPosts    Int      @default(3) // CORREGIDO: 3 publicaciones gratuitas
   currentPosts Int     @default(0) // Contador actual de posts activos
   
   // Estadísticas específicas
@@ -434,10 +488,11 @@ model Escort {
   @@index([rating, totalRatings])
   @@index([currentPosts, maxPosts])
   @@index([age])
+  @@index([verificationExpiresAt])
   @@map("escorts")
 }
 
-// Tabla específica para agencias
+// Tabla específica para agencias - CORREGIDA
 model Agency {
   id          String   @id @default(cuid())
   userId      String   @unique
@@ -445,8 +500,20 @@ model Agency {
   isVerified  Boolean  @default(false)
   verifiedAt  DateTime?
   
-  // Información adicional
-  businessLicense String?
+  // ✅ CAMPOS AGREGADOS - Información de registro requerida
+  companyName     String   // ← AGREGADO: Nombre de la empresa
+  businessLicense String?  // Ya existía
+  contactPerson   String   // ← AGREGADO: Persona de contacto
+  address         String   // ← AGREGADO: Dirección de la empresa
+  
+  // ✅ CAMPOS AGREGADOS - URLs de cédula
+  cedulaFrente    String?  // ← AGREGADO: URL foto frontal cédula
+  cedulaTrasera   String?  // ← AGREGADO: URL foto trasera cédula
+  
+  // ✅ CAMPO AGREGADO - Estado de verificación
+  verificationStatus VerificationStatus @default(PENDING) // ← AGREGADO
+  
+  // Información adicional existente
   taxId          String?
   
   // Configuración de límites (ilimitado para agencias)
@@ -469,21 +536,37 @@ model Agency {
   @@index([isVerified])
   @@index([totalEscorts])
   @@index([activeEscorts])
+  @@index([verificationStatus]) // ← AGREGADO: Índice para estado
   @@map("agencies")
 }
 
-// Tabla específica para clientes
+// Tabla específica para clientes - ACTUALIZADA COMPLETAMENTE
 model Client {
   id          String   @id @default(cuid())
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  points      Int      @default(0)
+  points      Int      @default(10) // Empiezan con 10 puntos del registro
   isPremium   Boolean  @default(false)
   premiumUntil DateTime?
   premiumTier PremiumTier @default(BASIC)
   
+  // ✅ NUEVO: Tracking de login diario
+  lastDailyPointsClaim DateTime? // Última vez que reclamó puntos diarios
+  dailyLoginStreak     Int       @default(0) // Racha de días consecutivos
+  totalDailyPointsEarned Int     @default(0) // Total puntos ganados por login
+  
+  // ✅ NUEVO: Histórico de puntos
+  totalPointsEarned    Int       @default(10) // Total ganado (inicia con bonus registro)
+  totalPointsSpent     Int       @default(0)  // Total gastado
+  pointsLastUpdated    DateTime  @default(now()) // Última actualización
+  
+  // Límites específicos para clientes gratuitos
+  maxFavorites    Int @default(5)   // Máximo 5 favoritos para gratuitos
+  currentFavorites Int @default(0)  // Contador actual de favoritos
+  
   // Configuraciones de cliente por tier
-  dailyMessageLimit Int @default(10) // BASIC: 10, PREMIUM: 50, VIP: ilimitado
+  dailyMessageLimit Int @default(5) // ACTUALIZADO: 5 mensajes diarios para básicos
+  messagesUsedToday Int @default(0) // NUEVO: Contador diario
   canViewPhoneNumbers Boolean @default(false) // Solo PREMIUM y VIP
   canSendImages Boolean @default(false) // Solo PREMIUM y VIP
   canSendVoiceMessages Boolean @default(false) // Solo VIP
@@ -493,9 +576,7 @@ model Client {
   
   // Estadísticas de uso
   totalMessagesUsed Int @default(0)
-  messagesUsedToday Int @default(0)
   lastMessageReset DateTime @default(now())
-  totalPointsSpent Int @default(0)
   totalPointsPurchased Int @default(0)
   
   // Preferencias
@@ -503,16 +584,156 @@ model Client {
   agePreferenceMax Int?
   locationPreference String?
   
-  // Relations
+  // ✅ NUEVO: Relaciones con sistema de puntos
   payments    Payment[]
   pointTransactions PointTransaction[]
+  pointsPurchases   PointsPurchase[]
+  pointsHistory     PointsHistory[]
+  premiumActivations PremiumActivation[]
   clientReviews ClientReview[] @relation("ClientReviewer")
   
   @@index([isPremium, premiumTier])
   @@index([points])
   @@index([premiumUntil])
   @@index([totalPointsSpent])
+  @@index([maxFavorites, currentFavorites])
+  @@index([dailyMessageLimit, messagesUsedToday])
+  @@index([lastDailyPointsClaim])
+  @@index([dailyLoginStreak])
   @@map("clients")
+}
+
+// ✅ NUEVO: Paquetes de puntos para comprar - ACTUALIZADO
+model PointsPackage {
+  id          String  @id @default(cuid())
+  name        String  @unique // "Starter", "Basic", etc.
+  points      Int     // Cantidad base de puntos
+  price       Float   // Precio en USD
+  bonus       Int     @default(0) // Puntos bonus adicionales
+  isActive    Boolean @default(true)
+  isPopular   Boolean @default(false)
+  description String?
+  
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  purchases   PointsPurchase[]
+  
+  @@index([isActive, isPopular])
+  @@index([price])
+  @@map("points_packages")
+}
+
+// ✅ NUEVO: Compras de puntos
+model PointsPurchase {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  packageId   String
+  package     PointsPackage @relation(fields: [packageId], references: [id])
+  
+  // Detalles de la compra
+  pointsPurchased Int    // Puntos base comprados
+  bonusPoints     Int    @default(0) // Puntos bonus recibidos
+  totalPoints     Int    // Total (base + bonus)
+  amountPaid      Float  // Cantidad pagada en USD
+  
+  // Estado del pago
+  status          PaymentStatus @default(PENDING)
+  stripePaymentId String?
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+  
+  @@index([clientId, status])
+  @@index([status, createdAt])
+  @@map("points_purchases")
+}
+
+// ✅ ACTUALIZADO: PointTransaction con más tipos
+model PointTransaction {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount      Int      // Positivo para ganancia, negativo para uso
+  type        PointTransactionType
+  description String?
+  cost        Float?   // Costo en dinero real (para compras)
+  
+  // Referencias opcionales
+  postId      String?  // Si fue usado en un post específico
+  messageId   String?  // Si fue usado para enviar mensaje
+  paymentId   String?  // Referencia al pago relacionado
+  purchaseId  String?  // Si viene de una compra
+  actionId    String?  // Si es por usar puntos en acción específica
+  
+  // Información adicional
+  balanceBefore Int    // Saldo antes de la transacción
+  balanceAfter  Int    // Saldo después de la transacción
+  metadata      Json?  // Datos extra (ej: streak day, purchase details)
+  source        String? // "purchase", "daily_login", "premium_activation"
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([clientId, createdAt])
+  @@index([type, createdAt])
+  @@index([amount, type])
+  @@map("point_transactions")
+}
+
+// ✅ NUEVO: Historial detallado de puntos
+model PointsHistory {
+  id          String  @id @default(cuid())
+  clientId    String
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  type        PointTransactionType
+  amount      Int     // Positivo = ganancia, Negativo = gasto
+  description String
+  
+  // Balances
+  balanceBefore Int   // Balance antes de la transacción
+  balanceAfter  Int   // Balance después de la transacción
+  
+  // Metadata adicional
+  metadata    Json?   // Datos extra (ej: streak day, purchase details)
+  source      String? // "purchase", "daily_login", "premium_activation"
+  
+  // Referencias opcionales
+  purchaseId  String? // Si viene de una compra
+  actionId    String? // Si es por usar puntos en acción específica
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([clientId, createdAt])
+  @@index([type, createdAt])
+  @@index([createdAt])
+  @@map("points_history")
+}
+
+// ✅ NUEVO: Activaciones de premium por puntos
+model PremiumActivation {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  tier        PremiumTier // PREMIUM o VIP
+  duration    Int       // Duración en horas (24 para 1 día)
+  pointsCost  Int       // Puntos gastados
+  
+  activatedAt DateTime  @default(now())
+  expiresAt   DateTime  // Cuándo expira
+  isActive    Boolean   @default(true)
+  
+  // Metadata
+  activatedBy String    @default("points") // "points", "purchase", "admin"
+  
+  @@index([clientId, isActive])
+  @@index([expiresAt, isActive])
+  @@map("premium_activations")
 }
 
 // Sistema de reseñas de clientes a escorts
@@ -596,33 +817,6 @@ model BanAppeal {
   @@map("ban_appeals")
 }
 
-// Sistema de transacciones de puntos mejorado
-model PointTransaction {
-  id          String   @id @default(cuid())
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  amount      Int      // Positivo para compra, negativo para uso
-  type        PointTransactionType
-  description String?
-  cost        Float?   // Costo en dinero real (para compras)
-  
-  // Referencias opcionales
-  postId      String?  // Si fue usado en un post específico
-  messageId   String?  // Si fue usado para enviar mensaje
-  paymentId   String?  // Referencia al pago relacionado
-  
-  // Información adicional
-  balanceBefore Int    // Saldo antes de la transacción
-  balanceAfter  Int    // Saldo después de la transacción
-  
-  createdAt   DateTime @default(now())
-  
-  @@index([clientId, createdAt])
-  @@index([type, createdAt])
-  @@index([amount, type])
-  @@map("point_transactions")
-}
-
 // Sistema de interacciones para algoritmos mejorado
 model UserInteraction {
   id          String   @id @default(cuid())
@@ -635,6 +829,9 @@ model UserInteraction {
   type        InteractionType
   weight      Float    @default(1)
   duration    Int?     // Duración en segundos (para views)
+  
+  // NUEVO: Tracking mejorado para WhatsApp
+  whatsappOpened Boolean @default(false) // Si realmente se abrió WhatsApp
   
   // Contexto adicional para algoritmos
   deviceType  String?  // mobile, desktop, tablet
@@ -653,6 +850,7 @@ model UserInteraction {
   @@index([type, createdAt])
   @@index([type, weight, createdAt])
   @@index([source, type])
+  @@index([whatsappOpened])
   @@map("user_interactions")
 }
 
@@ -749,6 +947,12 @@ model EscortVerification {
   // Restricción: solo escorts miembros pueden ser verificados
   membershipId String? // Referencia a AgencyMembership
   
+  // NUEVO: Control de renovación mensual
+  startsAt        DateTime @default(now())
+  expiresAt       DateTime // 30 días después del pago
+  isAutoRenewal   Boolean  @default(false) // Para futuras implementaciones
+  reminderSent    Boolean  @default(false) // Si ya se envió recordatorio
+  
   // Documentos requeridos
   documentsSubmitted Json? // Array de URLs de documentos
   verificationNotes String?
@@ -756,7 +960,6 @@ model EscortVerification {
   
   // Información del proceso
   verificationSteps Json? // Pasos completados en el proceso
-  expiresAt        DateTime? // Algunas verificaciones expiran
   
   // Auditoría
   verifiedBy  String?  // ID del usuario de la agencia que verificó
@@ -769,20 +972,21 @@ model EscortVerification {
   @@index([escortId, status])
   @@index([agencyId, status])
   @@index([status, createdAt])
+  @@index([expiresAt, reminderSent])
   @@map("escort_verifications")
 }
 
-// Precios de verificación - AGREGADO PARA COMPATIBILIDAD CON CONTROLADORES
+// Precios de verificación
 model VerificationPricing {
   id          String @id @default(cuid())
   name        String // "Basic", "Premium", "Gold"
-  cost        Float  // Precio en USD
+  cost        Float  @default(10.0) // $10 según especificaciones
   description String
   isActive    Boolean @default(true)
   
   // Beneficios incluidos
   features    Json? // Array de features incluidos
-  duration    Int?  // Duración de la verificación en días
+  duration    Int   @default(30) // 30 días por defecto
   
   // Relations
   verifications EscortVerification[]
@@ -806,7 +1010,7 @@ model BoostPricing {
   // Beneficios del boost
   multiplier Float    @default(1.5) // Multiplicador de visibilidad
   features   Json?    // Features adicionales
-  maxBoosts  Int?     // Máximo de boosts por usuario por día
+  maxBoosts  Int?     // Máximo de boosts por usuario por día (null = ilimitado)
   
   // Relations
   boosts    Boost[]
@@ -840,8 +1044,8 @@ model Post {
   locationId  String?
   location    Location? @relation(fields: [locationId], references: [id])
   
-  // Información adicional para escorts
-  services    String[] @default([])
+  // Información adicional para escorts (servicios ahora string libre)
+  services    String?  // CAMBIADO: String libre según especificaciones
   rates       Json?    // Tarifas específicas para este post
   availability Json?   // Disponibilidad específica
   
@@ -863,6 +1067,11 @@ model Post {
   uniqueViews    Int @default(0) // Vistas únicas
   totalTime      Int @default(0) // Tiempo total de visualización en segundos
   bounceRate     Float @default(0) // Tasa de rebote
+  whatsappClicks Int @default(0) // NUEVO: Clicks específicos en WhatsApp
+  
+  // NUEVO: Control de boost activo
+  hasActiveBoost Boolean @default(false)
+  boostEndsAt    DateTime? // Cuándo termina el boost actual
   
   // Timestamps
   createdAt   DateTime @default(now())
@@ -893,6 +1102,8 @@ model Post {
   @@index([locationId, isActive])
   @@index([isFeatured, isActive])
   @@index([premiumOnly, isActive])
+  @@index([hasActiveBoost, boostEndsAt])
+  @@index([whatsappClicks, isActive])
   @@map("posts")
 }
 
@@ -921,6 +1132,11 @@ model Chat {
   description String?
   avatar      String?
   
+  // NUEVO: Para chat tripartito admin-escort-agencia
+  isDisputeChat Boolean @default(false)
+  disputeStatus DisputeStatus @default(ACTIVE)
+  disputeReason String?
+  
   // Configuraciones del chat
   isArchived  Boolean  @default(false)
   mutedUntil  DateTime?
@@ -947,6 +1163,7 @@ model Chat {
   
   @@index([isGroup, isArchived])
   @@index([lastActivity])
+  @@index([isDisputeChat, disputeStatus])
   @@map("chats")
 }
 
@@ -963,6 +1180,10 @@ model ChatMember {
   isMuted     Boolean  @default(false)
   role        ChatRole @default(MEMBER)
   
+  // NUEVO: Para chats de disputa
+  messageCount Int @default(0) // Contador de mensajes en chat tripartito
+  maxMessages  Int @default(3) // Máximo de mensajes permitidos en disputa
+  
   // Permisos específicos
   canAddMembers    Boolean @default(false)
   canDeleteMessages Boolean @default(false)
@@ -975,6 +1196,7 @@ model ChatMember {
   @@index([chatId])
   @@index([userId])
   @@index([lastRead])
+  @@index([messageCount, maxMessages])
   @@map("chat_members")
 }
 
@@ -1022,6 +1244,7 @@ model Message {
   @@index([isPremiumMessage])
   @@index([isRead, chatId])
   @@index([replyToId])
+  @@index([costPoints])
   @@map("messages")
 }
 
@@ -1150,6 +1373,8 @@ model Notification {
   isSent      Boolean  @default(false)
   sentAt      DateTime?
   deliveryMethod String[] @default([]) // ["push", "email", "sms"]
+  isEmailSent Boolean  @default(false) // NUEVO: Para tracking email
+  emailSentAt DateTime? // NUEVO: Cuándo se envió email
   
   // Configuraciones de acción
   actionUrl   String?  // URL a la que redirigir al hacer click
@@ -1166,10 +1391,11 @@ model Notification {
   @@index([expiresAt])
   @@index([createdAt])
   @@index([type, isRead])
+  @@index([isEmailSent, emailSentAt])
   @@map("notifications")
 }
 
-// Sistema de pagos
+// Sistema de pagos - ACTUALIZADO
 model Payment {
   id          String   @id @default(cuid())
   amount      Float
@@ -1192,8 +1418,11 @@ model Payment {
   taxAmount   Float?   // Impuestos aplicados
   taxRate     Float?   // Tasa de impuesto
   
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // NUEVO: Referencias mejoradas según tipo de pago
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  escortId    String?   // Para pagos de escorts (publicaciones, boosts)
+  agencyId    String?   // Para pagos de agencias (verificaciones)
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1201,6 +1430,8 @@ model Payment {
   completedAt DateTime? // Cuándo se completó el pago
   
   @@index([clientId, status])
+  @@index([escortId, status])
+  @@index([agencyId, status])
   @@index([status, createdAt])
   @@index([type, status])
   @@index([amount, type])
@@ -1235,6 +1466,10 @@ model Boost {
   targetAudience   Json? // Audiencia objetivo
   geography        String? // Geografía específica
   
+  // NUEVO: Control de stack infinito
+  stackLevel      Int @default(1) // Nivel en el stack de boosts
+  isStackBoost    Boolean @default(false) // Si es boost apilado
+  
   createdAt   DateTime @default(now())
   expiresAt   DateTime
   deletedAt   DateTime? // Soft delete
@@ -1243,10 +1478,11 @@ model Boost {
   @@index([postId, isActive])
   @@index([userId])
   @@index([expiresAt])
+  @@index([stackLevel, isStackBoost])
   @@map("boosts")
 }
 
-// Métricas globales de la aplicación para admin
+// Métricas globales de la aplicación para admin - ACTUALIZADO
 model AppMetrics {
   id              String   @id @default(cuid())
   totalUsers      Int      @default(0)
@@ -1262,9 +1498,18 @@ model AppMetrics {
   verifiedEscorts Int      @default(0)
   premiumClients  Int      @default(0)
   
+  // ✅ NUEVO: Métricas específicas del negocio TeloPoints
+  pendingAgencies Int      @default(0) // Agencias esperando aprobación
+  totalVerifications Int   @default(0) // Verificaciones activas
+  expiredVerifications Int @default(0) // Verificaciones vencidas
+  totalPointsSold Int      @default(0) // Puntos vendidos
+  totalPointsSpent Int     @default(0) // Puntos gastados
+  totalBoosts     Int      @default(0)
+  pointsRevenue   Float    @default(0) // Ingresos por puntos
+  dailyLoginStreaks Int    @default(0) // Usuarios con racha activa
+  
   // Métricas adicionales
   totalMessages   Int      @default(0)
-  totalBoosts     Int      @default(0)
   averageSessionTime Float @default(0)
   conversionRate  Float    @default(0) // Visitors to registered users
   churnRate       Float    @default(0) // Tasa de abandono
@@ -1292,12 +1537,37 @@ model AppMetrics {
   @@map("app_metrics")
 }
 
-// Enums existentes + nuevos
+// ============================================================================
+// ENUMS - ACTUALIZADOS Y NUEVOS
+// ============================================================================
+
 enum UserType {
   ESCORT
   AGENCY
   CLIENT
   ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE           // Usuario normal activo
+  PENDING_APPROVAL // Agencia esperando aprobación
+  SUSPENDED        // Cuenta suspendida
+  BANNED           // Cuenta baneada
+}
+
+// ✅ NUEVO: Estado para solicitudes de registro de agencias
+enum AgencyRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  UNDER_REVIEW
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  UNDER_REVIEW
 }
 
 enum AdminRole {
@@ -1310,6 +1580,16 @@ enum PremiumTier {
   BASIC      // Gratuito
   PREMIUM    // Tier medio
   VIP        // Tier alto
+}
+
+// ✅ NUEVO: Acciones que se pueden pagar con puntos
+enum PointAction {
+  PREMIUM_DAY        // Activar premium por 1 día
+  CHAT_PRIORITY      // Aparecer primero en chats
+  EXTRA_FAVORITE     // Favorito adicional
+  PROFILE_BOOST      // Boost de perfil
+  PHONE_ACCESS       // Acceso a número de teléfono
+  IMAGE_MESSAGE      // Enviar mensaje con imagen
 }
 
 enum RateLimitType {
@@ -1356,6 +1636,13 @@ enum ChatRole {
   ADMIN
   MODERATOR
   MEMBER
+}
+
+enum DisputeStatus {
+  ACTIVE
+  RESOLVED
+  ESCALATED
+  CLOSED
 }
 
 enum MessageType {
@@ -1416,6 +1703,7 @@ enum NotificationType {
   PAYMENT_FAILED
   AGENCY_INVITE
   VERIFICATION_COMPLETED
+  VERIFICATION_EXPIRING    // NUEVO
   MEMBERSHIP_REQUEST
   SYSTEM
   TRENDING
@@ -1425,6 +1713,12 @@ enum NotificationType {
   NEW_FOLLOWER
   POST_APPROVED
   POST_REJECTED
+  PROFILE_INCOMPLETE      // NUEVO
+  AGENCY_APPROVED         // NUEVO
+  AGENCY_REJECTED         // NUEVO
+  POINTS_LOW              // NUEVO: Cuando quedan pocos puntos
+  DAILY_POINTS_AVAILABLE  // NUEVO: Puntos diarios disponibles
+  PREMIUM_EXPIRED         // NUEVO: Premium temporal expirado
 }
 
 enum NotificationPriority {
@@ -1444,38 +1738,51 @@ enum PaymentStatus {
   PROCESSING
 }
 
+// ✅ ACTUALIZADO: PaymentType para incluir puntos
 enum PaymentType {
   BOOST
   PREMIUM
-  POINTS
+  POINTS            // ✅ NUEVO: Para compra de puntos
   VERIFICATION
   SUBSCRIPTION
   TIP
   COMMISSION
+  POST_ADDITIONAL    // NUEVO: Para publicaciones adicionales de escorts
+  STACK_BOOST        // NUEVO: Para boosts apilados
 }
 
 enum BoostType {
-  BASIC      // 24 horas
-  PREMIUM    // 48 horas  
-  FEATURED   // 72 horas
+  BASIC      // 24 horas - $10
+  PREMIUM    // 48 horas - $30
+  FEATURED   // 72 horas - $55
   SUPER      // 7 días
   MEGA       // 30 días
 }
 
+// ✅ ACTUALIZADO: PointTransactionType con más tipos
 enum PointTransactionType {
+  // Compras
   PURCHASE
-  CHAT_MESSAGE
-  PROFILE_VIEW
-  PREMIUM_FEATURE
-  BOOST_PURCHASE
-  VERIFICATION_FEE
-  PHONE_NUMBER_ACCESS
-  IMAGE_MESSAGE
-  PRIORITY_SUPPORT
-  TIP
-  REFUND
-  BONUS
+  BONUS_POINTS
+  
+  // Ganancias gratuitas
+  DAILY_LOGIN
+  REGISTRATION_BONUS
   REFERRAL_REWARD
+  STREAK_BONUS
+  
+  // Gastos en funciones
+  PREMIUM_DAY
+  CHAT_PRIORITY
+  EXTRA_FAVORITE
+  PROFILE_BOOST
+  PHONE_ACCESS
+  IMAGE_MESSAGE
+  
+  // Sistema
+  REFUND
+  ADMIN_ADJUSTMENT
+  EXPIRED_PREMIUM
 }
 
 enum InteractionType {
@@ -1492,6 +1799,9 @@ enum InteractionType {
   IMAGE_VIEW
   PHONE_VIEW
   LOCATION_VIEW
+  WHATSAPP_CLICK     // NUEVO: Click en WhatsApp
+  WHATSAPP_OPEN      // NUEVO: WhatsApp realmente abierto
+  TIME_SPENT         // NUEVO: Tiempo real en perfil
 }
 
 enum BanSeverity {

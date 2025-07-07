@@ -4,7 +4,9 @@ const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const { prisma } = require('./database');
 const logger = require('../utils/logger');
-
+// ====================================================================
+// Auth del config
+// ====================================================================
 // Configurar estrategia JWT
 const configureJwtStrategy = () => {
   const jwtOptions = {

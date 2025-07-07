@@ -7,19 +7,24 @@ const {
   validateBoostPayment,
   validatePointsPayment,
   validatePremiumPayment,
-  validateVerificationPayment // ✅ NUEVO
+  validateVerificationPayment,
+  validatePointsPurchase // ✅ AGREGADO para las nuevas rutas de puntos
 } = require('../middleware/validation');
 
-// Controllers - ✅ AGREGADAS FUNCIONES FALTANTES
+// Controllers - ✅ IMPORTACIÓN COMPLETA CON TODAS LAS FUNCIONES
 const {
   getBoostPricing,
-  getVerificationPricing, // ✅ NUEVO
+  getVerificationPricing,
+  createAdditionalPostPaymentIntent,
+  confirmAdditionalPostPayment,
   createBoostPaymentIntent,
-  createVerificationPaymentIntent, // ✅ NUEVO
+  createVerificationPaymentIntent,
   confirmBoostPayment,
-  confirmVerificationPayment, // ✅ NUEVO
+  confirmVerificationPayment,
   createPointsPaymentIntent,
   confirmPointsPayment,
+  getPointsPurchaseHistory,      // ✅ AGREGADA
+  handlePointsWebhook,           // ✅ AGREGADA
   createPremiumPaymentIntent,
   confirmPremiumPayment,
   getPaymentHistory,
@@ -99,6 +104,66 @@ const {
  *           type: number
  *           example: 19.99
  *     
+ *     AdditionalPostPaymentRequest:
+ *       type: object
+ *       required:
+ *         - postData
+ *       properties:
+ *         postData:
+ *           type: object
+ *           required:
+ *             - title
+ *             - description
+ *             - phone
+ *           properties:
+ *             title:
+ *               type: string
+ *               minLength: 3
+ *               maxLength: 100
+ *               example: "Hermosa escort en zona norte"
+ *             description:
+ *               type: string
+ *               minLength: 10
+ *               maxLength: 2000
+ *               example: "Descripción detallada del servicio..."
+ *             phone:
+ *               type: string
+ *               pattern: "^\\+?[1-9]\\d{7,14}$"
+ *               example: "+1234567890"
+ *             images:
+ *               type: array
+ *               items:
+ *                 type: string
+ *                 format: uri
+ *               maxItems: 10
+ *               example: ["https://example.com/image1.jpg"]
+ *             locationId:
+ *               type: string
+ *               nullable: true
+ *               example: "cm123location456"
+ *             services:
+ *               type: string
+ *               maxLength: 1000
+ *               example: "Masajes, compañía, etc."
+ *             rates:
+ *               type: object
+ *               additionalProperties:
+ *                 type: number
+ *                 minimum: 0
+ *               example: {"1h": 150, "2h": 280}
+ *             availability:
+ *               type: object
+ *               example: {"monday": ["9:00-17:00"], "tuesday": ["10:00-18:00"]}
+ *             premiumOnly:
+ *               type: boolean
+ *               default: false
+ *             tags:
+ *               type: array
+ *               items:
+ *                 type: string
+ *               maxItems: 10
+ *               example: ["vip", "outcall", "incall"]
+ *     
  *     BoostPaymentRequest:
  *       type: object
  *       required:
@@ -128,12 +193,20 @@ const {
  *     PointsPaymentRequest:
  *       type: object
  *       required:
- *         - pointsPackage
+ *         - packageId
  *       properties:
- *         pointsPackage:
+ *         packageId:
  *           type: string
- *           enum: [small, medium, large, premium]
- *           example: "medium"
+ *           example: "cm123package456"
+ *           description: "ID del paquete de puntos a comprar"
+ *         paymentMethod:
+ *           type: string
+ *           enum: [card, paypal]
+ *           example: "card"
+ *         couponCode:
+ *           type: string
+ *           maxLength: 20
+ *           example: "DISCOUNT10"
  *     
  *     PremiumPaymentRequest:
  *       type: object
@@ -149,6 +222,11 @@ const {
  *           type: integer
  *           enum: [1, 3, 6, 12]
  *           example: 3
+ *         paymentMethod:
+ *           type: string
+ *           enum: [stripe, points]
+ *           default: "stripe"
+ *           example: "stripe"
  *     
  *     Payment:
  *       type: object
@@ -168,7 +246,7 @@ const {
  *           example: "COMPLETED"
  *         type:
  *           type: string
- *           enum: [BOOST, PREMIUM, POINTS, VERIFICATION, SUBSCRIPTION, TIP, COMMISSION]
+ *           enum: [BOOST, PREMIUM, POINTS, VERIFICATION, SUBSCRIPTION, TIP, COMMISSION, POST_ADDITIONAL]
  *           example: "BOOST"
  *         description:
  *           type: string
@@ -180,7 +258,50 @@ const {
  *           type: string
  *           format: date-time
  *           nullable: true
+ *     
+ *     PointsPurchase:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           example: "cm123purchase456"
+ *         amount:
+ *           type: number
+ *           example: 39.99
+ *         currency:
+ *           type: string
+ *           example: "USD"
+ *         status:
+ *           type: string
+ *           enum: [PENDING, COMPLETED, FAILED, REFUNDED]
+ *           example: "COMPLETED"
+ *         description:
+ *           type: string
+ *           example: "Paquete Medium - 500 puntos + 50 bonus"
+ *         packageName:
+ *           type: string
+ *           example: "Medium"
+ *         totalPoints:
+ *           type: integer
+ *           example: 550
+ *         basePoints:
+ *           type: integer
+ *           example: 500
+ *         bonusPoints:
+ *           type: integer
+ *           example: 50
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         completedAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
  */
+
+// ============================================================================
+// 🎯 RUTAS DE PRICING (PÚBLICAS Y PRIVADAS)
+// ============================================================================
 
 /**
  * @swagger
@@ -234,6 +355,97 @@ router.get('/boost/pricing', getBoostPricing);
  */
 router.get('/verification/pricing', authenticate, getVerificationPricing);
 
+// ============================================================================
+// 📝 RUTAS PARA POSTS ADICIONALES (ESCORTS)
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/payments/additional-post/create-intent:
+ *   post:
+ *     summary: Crear intención de pago para post adicional (escorts)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdditionalPostPaymentRequest'
+ *     responses:
+ *       200:
+ *         description: Intención de pago creada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/PaymentIntent'
+ *                     - type: object
+ *                       properties:
+ *                         postTitle:
+ *                           type: string
+ *                           example: "Hermosa escort en zona norte"
+ *                         currentPosts:
+ *                           type: integer
+ *                           example: 4
+ *                         postNumber:
+ *                           type: integer
+ *                           example: 5
+ *                         description:
+ *                           type: string
+ *                           example: "Pago por post adicional #5"
+ *       400:
+ *         description: Error de validación o límites alcanzados
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo escorts pueden crear posts adicionales
+ */
+router.post('/additional-post/create-intent', 
+  authenticate, 
+  createAdditionalPostPaymentIntent
+);
+
+/**
+ * @swagger
+ * /api/payments/additional-post/confirm/{paymentId}:
+ *   post:
+ *     summary: Confirmar pago y crear post adicional
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del pago a confirmar
+ *     responses:
+ *       200:
+ *         description: Post adicional creado exitosamente
+ *       400:
+ *         description: Pago no completado o datos inválidos
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo escorts pueden confirmar pagos de posts
+ *       404:
+ *         description: Pago no encontrado
+ */
+router.post('/additional-post/confirm/:paymentId', authenticate, confirmAdditionalPostPayment);
+
+// ============================================================================
+// 🚀 RUTAS PARA BOOSTS
+// ============================================================================
+
 /**
  * @swagger
  * /api/payments/boost/create-intent:
@@ -251,25 +463,6 @@ router.get('/verification/pricing', authenticate, getVerificationPricing);
  *     responses:
  *       200:
  *         description: Intención de pago creada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/PaymentIntent'
- *                     - type: object
- *                       properties:
- *                         boostType:
- *                           type: string
- *                           example: "PREMIUM"
- *                         duration:
- *                           type: integer
- *                           example: 48
  *       400:
  *         description: Post no encontrado o datos inválidos
  *       401:
@@ -283,63 +476,6 @@ router.post('/boost/create-intent',
   authenticate, 
   validateBoostPayment, 
   createBoostPaymentIntent
-);
-
-/**
- * @swagger
- * /api/payments/verification/create-intent:
- *   post:
- *     summary: Crear intención de pago para verificación (agencias)
- *     tags: [Payments]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/VerificationPaymentRequest'
- *     responses:
- *       200:
- *         description: Intención de pago para verificación creada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/PaymentIntent'
- *                     - type: object
- *                       properties:
- *                         verificationType:
- *                           type: string
- *                           example: "Premium Verification"
- *                         escort:
- *                           type: object
- *                           properties:
- *                             id:
- *                               type: string
- *                             name:
- *                               type: string
- *       400:
- *         description: Datos inválidos o escort ya verificado
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
- *       403:
- *         description: Solo agencias pueden pagar verificaciones
- *       404:
- *         description: Escort no es miembro activo o pricing no encontrado
- *       409:
- *         description: Ya existe una verificación para este escort
- */
-router.post('/verification/create-intent', 
-  authenticate, 
-  validateVerificationPayment, 
-  createVerificationPaymentIntent
 );
 
 /**
@@ -360,43 +496,6 @@ router.post('/verification/create-intent',
  *     responses:
  *       200:
  *         description: Boost activado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Boost activado exitosamente"
- *                 data:
- *                   type: object
- *                   properties:
- *                     boost:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         type:
- *                           type: string
- *                         duration:
- *                           type: integer
- *                         expiresAt:
- *                           type: string
- *                           format: date-time
- *                         multiplier:
- *                           type: number
- *                     post:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         title:
- *                           type: string
- *                         isFeatured:
- *                           type: boolean
  *       400:
  *         description: Pago no completado
  *       404:
@@ -405,6 +504,44 @@ router.post('/verification/create-intent',
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/boost/confirm/:paymentId', authenticate, confirmBoostPayment);
+
+// ============================================================================
+// ✅ RUTAS PARA VERIFICACIONES (AGENCIAS)
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/payments/verification/create-intent:
+ *   post:
+ *     summary: Crear intención de pago para verificación (agencias)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VerificationPaymentRequest'
+ *     responses:
+ *       200:
+ *         description: Intención de pago para verificación creada exitosamente
+ *       400:
+ *         description: Datos inválidos o escort ya verificado
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo agencias pueden pagar verificaciones
+ *       404:
+ *         description: Escort no es miembro activo o pricing no encontrado
+ *       409:
+ *         description: Ya existe una verificación para este escort
+ */
+router.post('/verification/create-intent', 
+  authenticate, 
+  validateVerificationPayment, 
+  createVerificationPaymentIntent
+);
 
 /**
  * @swagger
@@ -424,52 +561,6 @@ router.post('/boost/confirm/:paymentId', authenticate, confirmBoostPayment);
  *     responses:
  *       200:
  *         description: Verificación completada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Verificación completada exitosamente"
- *                 data:
- *                   type: object
- *                   properties:
- *                     verification:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         status:
- *                           type: string
- *                           example: "COMPLETED"
- *                         completedAt:
- *                           type: string
- *                           format: date-time
- *                         pricing:
- *                           type: object
- *                           properties:
- *                             name:
- *                               type: string
- *                             cost:
- *                               type: number
- *                             features:
- *                               type: array
- *                               items:
- *                                 type: string
- *                         escort:
- *                           type: object
- *                           properties:
- *                             id:
- *                               type: string
- *                             name:
- *                               type: string
- *                             isVerified:
- *                               type: boolean
- *                               example: true
  *       400:
  *         description: Pago no completado
  *       403:
@@ -481,11 +572,15 @@ router.post('/boost/confirm/:paymentId', authenticate, confirmBoostPayment);
  */
 router.post('/verification/confirm/:paymentId', authenticate, confirmVerificationPayment);
 
+// ============================================================================
+// 💰 RUTAS PARA PUNTOS TELOFUNDI (CLIENTES)
+// ============================================================================
+
 /**
  * @swagger
  * /api/payments/points/create-intent:
  *   post:
- *     summary: Crear intención de pago para puntos
+ *     summary: Crear intención de pago para compra de puntos
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -506,29 +601,38 @@ router.post('/verification/confirm/:paymentId', authenticate, confirmVerificatio
  *                 success:
  *                   type: boolean
  *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "PaymentIntent para puntos creado"
  *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/PaymentIntent'
- *                     - type: object
+ *                   type: object
+ *                   properties:
+ *                     clientSecret:
+ *                       type: string
+ *                       example: "pi_1234567890_secret_abcdef"
+ *                     paymentId:
+ *                       type: string
+ *                       example: "cm123payment456"
+ *                     package:
+ *                       type: object
  *                       properties:
- *                         package:
- *                           type: object
- *                           properties:
- *                             name:
- *                               type: string
- *                               example: "medium"
- *                             basePoints:
- *                               type: integer
- *                               example: 500
- *                             bonusPoints:
- *                               type: integer
- *                               example: 50
- *                             totalPoints:
- *                               type: integer
- *                               example: 550
- *                             price:
- *                               type: number
- *                               example: 39.99
+ *                         id:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                           example: "Medium"
+ *                         basePoints:
+ *                           type: integer
+ *                           example: 500
+ *                         bonusPoints:
+ *                           type: integer
+ *                           example: 50
+ *                         totalPoints:
+ *                           type: integer
+ *                           example: 550
+ *                         price:
+ *                           type: number
+ *                           example: 39.99
  *       400:
  *         description: Paquete de puntos inválido
  *       401:
@@ -538,7 +642,7 @@ router.post('/verification/confirm/:paymentId', authenticate, confirmVerificatio
  */
 router.post('/points/create-intent', 
   authenticate, 
-  validatePointsPayment, 
+  validatePointsPurchase, 
   createPointsPaymentIntent
 );
 
@@ -570,7 +674,7 @@ router.post('/points/create-intent',
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Puntos agregados exitosamente"
+ *                   example: "Compra de puntos confirmada exitosamente"
  *                 data:
  *                   type: object
  *                   properties:
@@ -580,15 +684,15 @@ router.post('/points/create-intent',
  *                     newBalance:
  *                       type: integer
  *                       example: 610
- *                     transaction:
+ *                     package:
  *                       type: object
  *                       properties:
- *                         id:
+ *                         name:
  *                           type: string
- *                         amount:
- *                           type: number
- *                         package:
- *                           type: string
+ *                         basePoints:
+ *                           type: integer
+ *                         bonusPoints:
+ *                           type: integer
  *       400:
  *         description: Pago no completado
  *       404:
@@ -599,6 +703,90 @@ router.post('/points/create-intent',
  *         description: Solo clientes pueden confirmar pagos de puntos
  */
 router.post('/points/confirm/:paymentId', authenticate, confirmPointsPayment);
+
+/**
+ * @swagger
+ * /api/payments/points/history:
+ *   get:
+ *     summary: Obtener historial de compras de puntos
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           maximum: 100
+ *         description: Elementos por página
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PENDING, COMPLETED, FAILED, REFUNDED]
+ *         description: Filtrar por estado de la compra
+ *     responses:
+ *       200:
+ *         description: Historial de compras obtenido exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     purchases:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/PointsPurchase'
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         page:
+ *                           type: integer
+ *                           example: 1
+ *                         limit:
+ *                           type: integer
+ *                           example: 20
+ *                         total:
+ *                           type: integer
+ *                           example: 15
+ *                         pages:
+ *                           type: integer
+ *                           example: 1
+ *                         hasNext:
+ *                           type: boolean
+ *                           example: false
+ *                         hasPrev:
+ *                           type: boolean
+ *                           example: false
+ *                     filters:
+ *                       type: object
+ *                       properties:
+ *                         status:
+ *                           type: string
+ *                           nullable: true
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo clientes pueden ver historial de compras de puntos
+ */
+router.get('/points/history', authenticate, getPointsPurchaseHistory);
+
+// ============================================================================
+// ⭐ RUTAS PARA PREMIUM (CLIENTES)
+// ============================================================================
 
 /**
  * @swagger
@@ -617,32 +805,6 @@ router.post('/points/confirm/:paymentId', authenticate, confirmPointsPayment);
  *     responses:
  *       200:
  *         description: Intención de pago creada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   allOf:
- *                     - $ref: '#/components/schemas/PaymentIntent'
- *                     - type: object
- *                       properties:
- *                         tier:
- *                           type: string
- *                           example: "PREMIUM"
- *                         duration:
- *                           type: integer
- *                           example: 3
- *                         price:
- *                           type: number
- *                           example: 49.99
- *                         type:
- *                           type: string
- *                           enum: [new_subscription, extension]
- *                           example: "new_subscription"
  *       400:
  *         description: Plan premium inválido
  *       401:
@@ -651,7 +813,7 @@ router.post('/points/confirm/:paymentId', authenticate, confirmPointsPayment);
  *         description: Solo clientes pueden comprar premium
  */
 router.post('/premium/create-intent', 
-
+  authenticate,
   validatePremiumPayment, 
   createPremiumPaymentIntent
 );
@@ -674,52 +836,6 @@ router.post('/premium/create-intent',
  *     responses:
  *       200:
  *         description: Suscripción premium activada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Suscripción PREMIUM activada exitosamente"
- *                 data:
- *                   type: object
- *                   properties:
- *                     tier:
- *                       type: string
- *                       example: "PREMIUM"
- *                     expiresAt:
- *                       type: string
- *                       format: date-time
- *                     benefits:
- *                       type: object
- *                       properties:
- *                         dailyMessageLimit:
- *                           type: integer
- *                         canViewPhoneNumbers:
- *                           type: boolean
- *                         canSendImages:
- *                           type: boolean
- *                         canSendVoiceMessages:
- *                           type: boolean
- *                         canAccessPremiumProfiles:
- *                           type: boolean
- *                         prioritySupport:
- *                           type: boolean
- *                         canSeeOnlineStatus:
- *                           type: boolean
- *                     transaction:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         amount:
- *                           type: number
- *                         duration:
- *                           type: integer
  *       400:
  *         description: Pago no completado
  *       404:
@@ -731,11 +847,15 @@ router.post('/premium/create-intent',
  */
 router.post('/premium/confirm/:paymentId', authenticate, confirmPremiumPayment);
 
+// ============================================================================
+// 📊 RUTAS DE HISTORIAL Y ESTADÍSTICAS
+// ============================================================================
+
 /**
  * @swagger
  * /api/payments/history:
  *   get:
- *     summary: Obtener historial de pagos
+ *     summary: Obtener historial general de pagos
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -757,7 +877,7 @@ router.post('/premium/confirm/:paymentId', authenticate, confirmPremiumPayment);
  *         name: type
  *         schema:
  *           type: string
- *           enum: [BOOST, PREMIUM, POINTS, VERIFICATION, SUBSCRIPTION, TIP, COMMISSION]
+ *           enum: [BOOST, PREMIUM, POINTS, VERIFICATION, SUBSCRIPTION, TIP, COMMISSION, POST_ADDITIONAL]
  *         description: Filtrar por tipo de pago
  *       - in: query
  *         name: status
@@ -784,7 +904,26 @@ router.post('/premium/confirm/:paymentId', authenticate, confirmPremiumPayment);
  *                       items:
  *                         $ref: '#/components/schemas/Payment'
  *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
+ *                       type: object
+ *                       properties:
+ *                         page:
+ *                           type: integer
+ *                           example: 1
+ *                         limit:
+ *                           type: integer
+ *                           example: 20
+ *                         total:
+ *                           type: integer
+ *                           example: 45
+ *                         pages:
+ *                           type: integer
+ *                           example: 3
+ *                         hasNext:
+ *                           type: boolean
+ *                           example: true
+ *                         hasPrev:
+ *                           type: boolean
+ *                           example: false
  *                     filters:
  *                       type: object
  *                       properties:
@@ -797,15 +936,19 @@ router.post('/premium/confirm/:paymentId', authenticate, confirmPremiumPayment);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
- *         description: Solo clientes pueden ver historial de pagos
+ *         description: Tipo de usuario no válido para historial de pagos
  */
 router.get('/history', authenticate, getPaymentHistory);
+
+// ============================================================================
+// 🔗 WEBHOOKS DE STRIPE
+// ============================================================================
 
 /**
  * @swagger
  * /api/payments/webhook/stripe:
  *   post:
- *     summary: Webhook de Stripe para procesar eventos
+ *     summary: Webhook general de Stripe para procesar eventos
  *     tags: [Payments]
  *     description: Endpoint interno para webhooks de Stripe. No requiere autenticación pero verifica la firma.
  *     requestBody:
@@ -830,5 +973,37 @@ router.get('/history', authenticate, getPaymentHistory);
  *         description: Error de verificación de firma o formato del webhook
  */
 router.post('/webhook/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
+
+/**
+ * @swagger
+ * /api/payments/webhook/points:
+ *   post:
+ *     summary: Webhook específico para puntos TeloFundi
+ *     tags: [Payments]
+ *     description: Endpoint interno para webhooks específicos de puntos. No requiere autenticación pero verifica la firma.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Evento de Stripe específico para puntos
+ *     responses:
+ *       200:
+ *         description: Evento de puntos procesado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 received:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Error de verificación de firma o formato del webhook
+ *       500:
+ *         description: Error procesando webhook de puntos
+ */
+router.post('/webhook/points', express.raw({ type: 'application/json' }), handlePointsWebhook);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { prisma } = require('../config/database');
 const { AppError, catchAsync } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
+const paymentService = require('../services/paymentService'); // ✅ NUEVO: Importar servicio actualizado
 
 // Obtener precios de boosts disponibles
 const getBoostPricing = catchAsync(async (req, res) => {
@@ -20,7 +21,7 @@ const getBoostPricing = catchAsync(async (req, res) => {
   });
 });
 
-// ✅ NUEVO: Obtener precios de verificación disponibles
+// ✅ Obtener precios de verificación disponibles
 const getVerificationPricing = catchAsync(async (req, res) => {
   const pricing = await prisma.verificationPricing.findMany({
     where: { isActive: true },
@@ -34,12 +35,341 @@ const getVerificationPricing = catchAsync(async (req, res) => {
   });
 });
 
+// ✅ Crear intención de pago para posts adicionales
+const createAdditionalPostPaymentIntent = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { postData } = req.body;
+
+  console.log('💰 === CREATE ADDITIONAL POST PAYMENT ===');
+  console.log('💰 User ID:', userId);
+  console.log('💰 User Type:', req.user.userType);
+
+  // ✅ VALIDAR QUE ES ESCORT
+  if (req.user.userType !== 'ESCORT') {
+    throw new AppError('Solo escorts pueden pagar por posts adicionales', 403, 'ESCORT_ONLY');
+  }
+
+  // ✅ VERIFICAR QUE TIENE DATOS DE ESCORT
+  if (!req.user.escort) {
+    throw new AppError('Datos de escort no encontrados', 500, 'ESCORT_DATA_MISSING');
+  }
+
+  // ✅ VALIDAR QUE TIENE DATOS DEL POST
+  if (!postData) {
+    throw new AppError('Datos del post son requeridos', 400, 'POST_DATA_REQUIRED');
+  }
+
+  // ✅ VALIDAR CAMPOS BÁSICOS DEL POST
+  const { title, description, phone } = postData;
+  if (!title?.trim() || !description?.trim() || !phone?.trim()) {
+    throw new AppError('Título, descripción y teléfono son obligatorios', 400, 'MISSING_POST_FIELDS');
+  }
+
+  // ✅ VERIFICAR QUE EFECTIVAMENTE NECESITA PAGAR
+  const currentPosts = await prisma.post.count({
+    where: {
+      authorId: userId,
+      isActive: true
+    }
+  });
+
+  const freePostsLimit = 3;
+  if (currentPosts < freePostsLimit) {
+    throw new AppError('Aún tienes posts gratuitos disponibles', 400, 'FREE_POSTS_AVAILABLE');
+  }
+
+  // ✅ VERIFICAR LÍMITE MÁXIMO ABSOLUTO
+  const maxPostsAbsolute = 20;
+  if (currentPosts >= maxPostsAbsolute) {
+    throw new AppError(`Has alcanzado el límite máximo de ${maxPostsAbsolute} posts`, 400, 'MAX_POSTS_REACHED');
+  }
+
+  // ✅ CONFIGURACIÓN DEL PRECIO
+  const additionalPostCost = 3.00; // $3 por post adicional
+
+  // ✅ CREAR PAYMENTINTENT CON STRIPE
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(additionalPostCost * 100), // $3.00 en centavos
+    currency: 'usd',
+    metadata: {
+      type: 'additional_post',
+      userId,
+      userType: req.user.userType,
+      currentPosts: currentPosts.toString(),
+      postTitle: title.substring(0, 100)
+    },
+    description: `Post adicional: "${title.substring(0, 50)}..."`,
+    automatic_payment_methods: {
+      enabled: true
+    }
+  });
+
+  // ✅ CREAR REGISTRO DE PAGO CON MANEJO CORRECTO
+  const paymentData = {
+    amount: additionalPostCost,
+    currency: 'USD',
+    status: 'PENDING',
+    type: 'POST_ADDITIONAL',
+    description: `Post adicional - "${title.substring(0, 50)}..."`,
+    stripePaymentId: paymentIntent.id,
+    escortId: req.user.escort.id, // ✅ CORRECTO para escorts
+    metadata: {
+      postData: JSON.stringify(postData),
+      currentPosts,
+      freePostsLimit,
+      isAdditionalPost: true,
+      userId,
+      userType: req.user.userType
+    }
+  };
+
+  const payment = await prisma.payment.create({
+    data: paymentData
+  });
+
+  logger.info('Additional post payment intent created', {
+    paymentIntentId: paymentIntent.id,
+    paymentId: payment.id,
+    userId,
+    currentPosts,
+    amount: additionalPostCost,
+    postTitle: title.substring(0, 50)
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      clientSecret: paymentIntent.client_secret,
+      paymentId: payment.id,
+      amount: additionalPostCost,
+      currency: 'USD',
+      postTitle: title,
+      currentPosts,
+      postNumber: currentPosts + 1,
+      description: `Pago por post adicional #${currentPosts + 1}`
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Confirmar pago y crear post adicional
+const confirmAdditionalPostPayment = catchAsync(async (req, res) => {
+  const { paymentId } = req.params;
+  const userId = req.user.id;
+
+  console.log('✅ === CONFIRM ADDITIONAL POST PAYMENT ===');
+  console.log('✅ Payment ID:', paymentId);
+  console.log('✅ User ID:', userId);
+
+  // ✅ VALIDAR QUE ES ESCORT
+  if (req.user.userType !== 'ESCORT') {
+    throw new AppError('Solo escorts pueden confirmar pagos de posts', 403, 'ESCORT_ONLY');
+  }
+
+  if (!req.user.escort) {
+    throw new AppError('Datos de escort no encontrados', 500, 'ESCORT_DATA_MISSING');
+  }
+
+  // ✅ BUSCAR PAGO
+  const payment = await prisma.payment.findFirst({
+    where: {
+      id: paymentId,
+      escortId: req.user.escort.id,
+      status: 'PENDING',
+      type: 'POST_ADDITIONAL'
+    }
+  });
+
+  if (!payment) {
+    throw new AppError('Pago no encontrado', 404, 'PAYMENT_NOT_FOUND');
+  }
+
+  // ✅ VERIFICAR ESTADO EN STRIPE
+  const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripePaymentId);
+
+  if (paymentIntent.status !== 'succeeded') {
+    throw new AppError('El pago no ha sido completado', 400, 'PAYMENT_NOT_COMPLETED');
+  }
+
+  // ✅ EXTRAER DATOS DEL POST
+  let postData;
+  try {
+    postData = JSON.parse(payment.metadata.postData);
+  } catch (error) {
+    logger.error('Error parsing post data from payment:', error);
+    throw new AppError('Error en los datos del post guardados', 500, 'INVALID_POST_DATA');
+  }
+
+  // ✅ TRANSACCIÓN PARA CREAR POST Y ACTUALIZAR PAGO
+  const result = await prisma.$transaction(async (tx) => {
+    // ✅ CREAR EL POST COMO PAGADO
+    const newPost = await tx.post.create({
+      data: {
+        title: postData.title?.trim(),
+        description: postData.description?.trim(),
+        phone: postData.phone?.trim(),
+        images: postData.images || [],
+        locationId: postData.locationId || req.user.locationId,
+        services: postData.services || '',
+        rates: postData.rates || null,
+        availability: postData.availability || null,
+        premiumOnly: postData.premiumOnly === 'true' && req.user.userType !== 'CLIENT',
+        authorId: userId,
+        score: 15.0, // Score más alto por ser post pagado
+        discoveryScore: 20.0,
+        qualityScore: 60
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            userType: true
+          }
+        },
+        location: true,
+        _count: {
+          select: {
+            likes: true,
+            favorites: true
+          }
+        }
+      }
+    });
+
+    // ✅ ACTUALIZAR CONTADOR DE POSTS DEL ESCORT
+    await tx.escort.update({
+      where: { userId },
+      data: { currentPosts: { increment: 1 } }
+    });
+
+    // ✅ ACTUALIZAR PAGO COMO COMPLETADO
+    await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        processorFee: paymentIntent.application_fee_amount ? 
+          paymentIntent.application_fee_amount / 100 : null,
+        netAmount: (paymentIntent.amount - (paymentIntent.application_fee_amount || 0)) / 100,
+        metadata: {
+          ...payment.metadata,
+          postId: newPost.id,
+          postCreated: true,
+          completedAt: new Date().toISOString()
+        }
+      }
+    });
+
+    // ✅ PROCESAR TAGS SI LOS HAY
+    if (postData.tags && Array.isArray(postData.tags) && postData.tags.length > 0) {
+      await Promise.all(
+        postData.tags.map(async (tagName) => {
+          const tag = await tx.tag.upsert({
+            where: { name: tagName.toLowerCase() },
+            update: { usageCount: { increment: 1 } },
+            create: {
+              name: tagName.toLowerCase(),
+              slug: tagName.toLowerCase().replace(/\s+/g, '-'),
+              usageCount: 1
+            }
+          });
+
+          return tx.postTag.create({
+            data: {
+              postId: newPost.id,
+              tagId: tag.id
+            }
+          });
+        })
+      );
+    }
+
+    // ✅ ACTUALIZAR MÉTRICAS DE REPUTACIÓN
+    await tx.userReputation.upsert({
+      where: { userId },
+      update: {
+        qualityScore: { increment: 10 },
+        lastScoreUpdate: new Date()
+      },
+      create: {
+        userId,
+        overallScore: 10,
+        responseRate: 0,
+        profileCompleteness: 0,
+        trustScore: 0,
+        discoveryScore: 0,
+        trendingScore: 0,
+        qualityScore: 10,
+        spamScore: 0,
+        reportScore: 0,
+        lastScoreUpdate: new Date()
+      }
+    });
+
+    return { newPost, payment };
+  });
+
+  // ✅ CREAR NOTIFICACIÓN
+  try {
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'PAYMENT_SUCCESS',
+        title: 'Post adicional creado',
+        message: `Tu post "${result.newPost.title}" ha sido creado exitosamente`,
+        data: {
+          paymentId: payment.id,
+          postId: result.newPost.id,
+          amount: payment.amount,
+          postNumber: result.newPost.id
+        }
+      }
+    });
+  } catch (error) {
+    logger.warn('Failed to create additional post notification:', error);
+  }
+
+  logger.info('Additional post payment confirmed and post created', {
+    paymentId,
+    postId: result.newPost.id,
+    userId,
+    amount: payment.amount,
+    postTitle: result.newPost.title
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Post adicional creado exitosamente',
+    data: {
+      post: {
+        ...result.newPost,
+        likesCount: result.newPost._count.likes,
+        favoritesCount: result.newPost._count.favorites,
+        isLiked: false,
+        isFavorited: false,
+        isPaidPost: true
+      },
+      payment: {
+        id: payment.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        completedAt: new Date().toISOString()
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Crear intención de pago para boost
 const createBoostPaymentIntent = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { postId, pricingId } = req.body;
 
-  // ✅ CORREGIDO: Validación de inputs
+  // ✅ VALIDACIÓN DE INPUTS
   if (!postId || !pricingId) {
     throw new AppError('PostId y pricingId son requeridos', 400, 'MISSING_REQUIRED_FIELDS');
   }
@@ -86,7 +416,7 @@ const createBoostPaymentIntent = catchAsync(async (req, res) => {
     }
   }
 
-  // ✅ CORREGIDO: Validación de precio
+  // ✅ VALIDACIÓN DE PRECIO
   if (!pricing.price || pricing.price <= 0) {
     throw new AppError('Precio de boost inválido', 400, 'INVALID_BOOST_PRICE');
   }
@@ -108,7 +438,7 @@ const createBoostPaymentIntent = catchAsync(async (req, res) => {
     }
   });
 
-  // ✅ CORREGIDO: Crear registro de pago con mejor manejo de clientId
+  // ✅ CREAR REGISTRO DE PAGO CON MANEJO CORRECTO DE IDs
   const paymentData = {
     amount: pricing.price,
     currency: 'USD',
@@ -120,13 +450,19 @@ const createBoostPaymentIntent = catchAsync(async (req, res) => {
       postId,
       pricingId,
       boostType: pricing.type,
-      duration: pricing.duration
+      duration: pricing.duration,
+      userId,
+      userType: req.user.userType
     }
   };
 
-  // Solo agregar clientId si el usuario es CLIENT
+  // ✅ MANEJO CORRECTO SEGÚN TIPO DE USUARIO
   if (req.user.userType === 'CLIENT' && req.user.client?.id) {
     paymentData.clientId = req.user.client.id;
+  } else if (req.user.userType === 'ESCORT' && req.user.escort?.id) {
+    paymentData.escortId = req.user.escort.id;
+  } else if (req.user.userType === 'AGENCY' && req.user.agency?.id) {
+    paymentData.agencyId = req.user.agency.id;
   }
 
   const payment = await prisma.payment.create({
@@ -155,7 +491,7 @@ const createBoostPaymentIntent = catchAsync(async (req, res) => {
   });
 });
 
-// ✅ NUEVO: Crear intención de pago para verificación
+// ✅ Crear intención de pago para verificación
 const createVerificationPaymentIntent = catchAsync(async (req, res) => {
   const { escortId, pricingId } = req.body;
   const agencyUserId = req.user.id;
@@ -165,7 +501,7 @@ const createVerificationPaymentIntent = catchAsync(async (req, res) => {
     throw new AppError('Solo agencias pueden pagar verificaciones', 403, 'AGENCY_ONLY');
   }
 
-  // ✅ Verificación consistente de que la agencia existe
+  // ✅ Verificación de que la agencia existe
   if (!req.user.agency) {
     throw new AppError('Datos de agencia no encontrados', 500, 'AGENCY_DATA_MISSING');
   }
@@ -263,13 +599,15 @@ const createVerificationPaymentIntent = catchAsync(async (req, res) => {
       type: 'VERIFICATION',
       description: `Verificación ${pricing.name}`,
       stripePaymentId: paymentIntent.id,
-      // Los pagos de verificación no tienen clientId porque los hace la agencia
+      agencyId: req.user.agency.id, // ✅ CORRECTO para agencias
       metadata: {
         escortId,
         pricingId,
         agencyId: req.user.agency.id,
         verificationType: pricing.name,
-        membershipId: membership.id
+        membershipId: membership.id,
+        userId: agencyUserId,
+        userType: req.user.userType
       }
     }
   });
@@ -317,7 +655,7 @@ const confirmBoostPayment = catchAsync(async (req, res) => {
     throw new AppError('Pago no encontrado', 404, 'PAYMENT_NOT_FOUND');
   }
 
-  // ✅ CORREGIDO: Verificar que el pago pertenece al usuario
+  // ✅ VERIFICAR PERMISOS usando userId del metadata
   if (payment.metadata.userId !== userId) {
     throw new AppError('No tienes permisos para este pago', 403, 'PAYMENT_ACCESS_DENIED');
   }
@@ -346,7 +684,7 @@ const confirmBoostPayment = catchAsync(async (req, res) => {
     throw new AppError('Post no encontrado', 404, 'POST_NOT_FOUND');
   }
 
-  // ✅ CORREGIDO: Transacción para operaciones críticas
+  // ✅ TRANSACCIÓN para operaciones críticas
   const result = await prisma.$transaction(async (tx) => {
     // Calcular métricas antes del boost
     const metricsBefore = {
@@ -364,7 +702,7 @@ const confirmBoostPayment = catchAsync(async (req, res) => {
         viewsBefore: metricsBefore.views,
         clicksBefore: metricsBefore.clicks,
         engagementBefore: metricsBefore.engagement,
-        expiresAt: new Date(Date.now() + pricing.duration * 60 * 60 * 1000) // horas a milisegundos
+        expiresAt: new Date(Date.now() + pricing.duration * 60 * 60 * 1000)
       }
     });
 
@@ -375,7 +713,9 @@ const confirmBoostPayment = catchAsync(async (req, res) => {
         lastBoosted: new Date(),
         score: { increment: pricing.multiplier * 10 },
         trendingScore: { increment: pricing.multiplier * 5 },
-        isFeatured: pricing.type === 'FEATURED' || pricing.type === 'SUPER' || pricing.type === 'MEGA'
+        isFeatured: ['FEATURED', 'SUPER', 'MEGA'].includes(pricing.type),
+        hasActiveBoost: true,
+        boostEndsAt: boost.expiresAt
       }
     });
 
@@ -394,7 +734,7 @@ const confirmBoostPayment = catchAsync(async (req, res) => {
     return boost;
   });
 
-  // Crear notificación (manejo de errores)
+  // Crear notificación
   try {
     await prisma.notification.create({
       data: {
@@ -439,14 +779,14 @@ const confirmBoostPayment = catchAsync(async (req, res) => {
       post: {
         id: post.id,
         title: post.title,
-        isFeatured: pricing.type === 'FEATURED' || pricing.type === 'SUPER' || pricing.type === 'MEGA'
+        isFeatured: ['FEATURED', 'SUPER', 'MEGA'].includes(pricing.type)
       }
     },
     timestamp: new Date().toISOString()
   });
 });
 
-// ✅ NUEVO: Confirmar pago de verificación
+// ✅ Confirmar pago de verificación
 const confirmVerificationPayment = catchAsync(async (req, res) => {
   const { paymentId } = req.params;
   const agencyUserId = req.user.id;
@@ -464,6 +804,7 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
   const payment = await prisma.payment.findFirst({
     where: {
       id: paymentId,
+      agencyId: req.user.agency.id,
       status: 'PENDING',
       type: 'VERIFICATION'
     }
@@ -471,11 +812,6 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
 
   if (!payment) {
     throw new AppError('Pago no encontrado', 404, 'PAYMENT_NOT_FOUND');
-  }
-
-  // ✅ Verificar que el pago pertenece a la agencia
-  if (payment.metadata.agencyId !== req.user.agency.id) {
-    throw new AppError('No tienes permisos para este pago', 403, 'PAYMENT_ACCESS_DENIED');
   }
 
   // Verificar estado en Stripe
@@ -516,7 +852,7 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
     throw new AppError('Membresía no encontrada', 404, 'MEMBERSHIP_NOT_FOUND');
   }
 
-  // ✅ CORREGIDO: Transacción para operaciones críticas
+  // ✅ TRANSACCIÓN para operaciones críticas
   const result = await prisma.$transaction(async (tx) => {
     // Crear verificación
     const verification = await tx.escortVerification.create({
@@ -527,7 +863,9 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
         membershipId: membership.id,
         status: 'COMPLETED',
         verifiedBy: agencyUserId,
-        completedAt: new Date()
+        completedAt: new Date(),
+        startsAt: new Date(),
+        expiresAt: new Date(Date.now() + (pricing.duration || 30) * 24 * 60 * 60 * 1000) // 30 días por defecto
       }
     });
 
@@ -537,7 +875,8 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
       data: {
         isVerified: true,
         verifiedAt: new Date(),
-        verifiedBy: req.user.agency.id.toString()
+        verifiedBy: req.user.agency.id.toString(),
+        verificationExpiresAt: verification.expiresAt
       }
     });
 
@@ -600,7 +939,8 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
           verificationId: result.id,
           agencyId: req.user.agency.id,
           agencyName: `${req.user.firstName} ${req.user.lastName}`,
-          pricingName: pricing.name
+          pricingName: pricing.name,
+          expiresAt: result.expiresAt.toISOString()
         }
       }
     });
@@ -625,6 +965,7 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
         id: result.id,
         status: result.status,
         completedAt: result.completedAt,
+        expiresAt: result.expiresAt,
         pricing: {
           name: pricing.name,
           cost: pricing.cost,
@@ -641,102 +982,50 @@ const confirmVerificationPayment = catchAsync(async (req, res) => {
   });
 });
 
-// Crear intención de pago para puntos (clientes)
+// ✅ NUEVAS FUNCIONES PARA PUNTOS usando servicio actualizado
+
+// Crear intención de pago para puntos
 const createPointsPaymentIntent = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { pointsPackage } = req.body; // 'small', 'medium', 'large', 'premium'
+  const { packageId } = req.body;
 
   // Verificar que el usuario es cliente
   if (req.user.userType !== 'CLIENT') {
     throw new AppError('Solo clientes pueden comprar puntos', 403, 'CLIENT_ONLY');
   }
 
-  // ✅ CORREGIDO: Verificación consistente de que el cliente existe
   if (!req.user.client) {
     throw new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING');
   }
 
-  // ✅ CORREGIDO: Validación de input
-  if (!pointsPackage) {
-    throw new AppError('Paquete de puntos es requerido', 400, 'MISSING_POINTS_PACKAGE');
+  if (!packageId) {
+    throw new AppError('ID del paquete es requerido', 400, 'MISSING_PACKAGE_ID');
   }
 
-  // Configuración de paquetes de puntos
-  const pointsPackages = {
-    small: { points: 100, price: 9.99, bonus: 0 },
-    medium: { points: 500, price: 39.99, bonus: 50 },
-    large: { points: 1000, price: 69.99, bonus: 150 },
-    premium: { points: 2500, price: 149.99, bonus: 500 }
-  };
+  // Usar el servicio actualizado de pagos
+  const result = await paymentService.createPointsPaymentIntent(req.user.client.id, packageId);
 
-  const selectedPackage = pointsPackages[pointsPackage];
-  if (!selectedPackage) {
-    throw new AppError('Paquete de puntos no válido', 400, 'INVALID_POINTS_PACKAGE');
-  }
-
-  const totalPoints = selectedPackage.points + selectedPackage.bonus;
-
-  // ✅ CORREGIDO: Validación de precio
-  if (!selectedPackage.price || selectedPackage.price <= 0) {
-    throw new AppError('Precio de paquete inválido', 400, 'INVALID_PACKAGE_PRICE');
-  }
-
-  // Crear PaymentIntent
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(selectedPackage.price * 100),
-    currency: 'usd',
-    metadata: {
-      type: 'points',
-      userId,
-      pointsPackage,
-      points: totalPoints.toString(),
-      userType: req.user.userType
-    },
-    description: `Compra de ${totalPoints} puntos (${selectedPackage.points} + ${selectedPackage.bonus} bonus)`,
-    automatic_payment_methods: {
-      enabled: true
-    }
-  });
-
-  // Crear registro de pago
-  const payment = await prisma.payment.create({
-    data: {
-      amount: selectedPackage.price,
-      currency: 'USD',
-      status: 'PENDING',
-      type: 'POINTS',
-      description: `${totalPoints} puntos - ${pointsPackage}`,
-      stripePaymentId: paymentIntent.id,
-      clientId: req.user.client.id,
-      metadata: {
-        pointsPackage,
-        basePoints: selectedPackage.points,
-        bonusPoints: selectedPackage.bonus,
-        totalPoints
-      }
-    }
-  });
-
-  logger.info('Points payment intent created', {
-    paymentIntentId: paymentIntent.id,
-    paymentId: payment.id,
+  logger.info('Points payment intent created via payment controller', {
     userId,
-    pointsPackage,
-    totalPoints,
-    amount: selectedPackage.price
+    clientId: req.user.client.id,
+    packageId,
+    totalPoints: result.totalPoints,
+    amount: result.package.price
   });
 
   res.status(200).json({
     success: true,
+    message: 'PaymentIntent para puntos creado',
     data: {
-      clientSecret: paymentIntent.client_secret,
-      paymentId: payment.id,
+      clientSecret: result.paymentIntent.client_secret,
+      paymentId: result.payment.id,
       package: {
-        name: pointsPackage,
-        basePoints: selectedPackage.points,
-        bonusPoints: selectedPackage.bonus,
-        totalPoints,
-        price: selectedPackage.price
+        id: result.package.id,
+        name: result.package.name,
+        basePoints: result.package.points,
+        bonusPoints: result.package.bonus,
+        totalPoints: result.totalPoints,
+        price: result.package.price
       }
     },
     timestamp: new Date().toISOString()
@@ -771,95 +1060,108 @@ const confirmPointsPayment = catchAsync(async (req, res) => {
     throw new AppError('Pago no encontrado', 404, 'PAYMENT_NOT_FOUND');
   }
 
-  // Verificar estado en Stripe
-  const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripePaymentId);
+  // Procesar usando el servicio actualizado
+  const result = await paymentService.processStripePayment(payment.stripePaymentId);
 
-  if (paymentIntent.status !== 'succeeded') {
-    throw new AppError('El pago no ha sido completado', 400, 'PAYMENT_NOT_COMPLETED');
+  if (result.alreadyProcessed) {
+    return res.status(200).json({
+      success: true,
+      message: 'Compra ya procesada',
+      data: { alreadyProcessed: true },
+      timestamp: new Date().toISOString()
+    });
   }
 
-  const totalPoints = parseInt(payment.metadata.totalPoints);
-  const currentPoints = req.user.client.points || 0;
-
-  // ✅ CORREGIDO: Transacción para operaciones críticas
-  const result = await prisma.$transaction(async (tx) => {
-    // Actualizar puntos del cliente
-    const updatedClient = await tx.client.update({
-      where: { userId },
-      data: {
-        points: { increment: totalPoints },
-        totalPointsPurchased: { increment: totalPoints }
-      }
-    });
-
-    // Crear transacción de puntos
-    await tx.pointTransaction.create({
-      data: {
-        clientId: req.user.client.id,
-        amount: totalPoints,
-        type: 'PURCHASE',
-        description: `Compra de puntos - ${payment.metadata.pointsPackage}`,
-        cost: payment.amount,
-        paymentId: payment.id,
-        balanceBefore: currentPoints,
-        balanceAfter: currentPoints + totalPoints
-      }
-    });
-
-    // Actualizar pago
-    await tx.payment.update({
-      where: { id: paymentId },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        processorFee: paymentIntent.application_fee_amount ? 
-          paymentIntent.application_fee_amount / 100 : null,
-        netAmount: (paymentIntent.amount - (paymentIntent.application_fee_amount || 0)) / 100
-      }
-    });
-
-    return updatedClient;
-  });
-
-  // Crear notificación
-  try {
-    await prisma.notification.create({
-      data: {
-        userId,
-        type: 'PAYMENT_SUCCESS',
-        title: 'Puntos agregados',
-        message: `Se han agregado ${totalPoints} puntos a tu cuenta`,
-        data: {
-          paymentId: payment.id,
-          pointsAdded: totalPoints,
-          newBalance: currentPoints + totalPoints,
-          package: payment.metadata.pointsPackage
-        }
-      }
-    });
-  } catch (error) {
-    logger.warn('Failed to create points notification:', error);
-  }
-
-  logger.info('Points payment confirmed', {
-    paymentId,
+  logger.info('Points payment confirmed via payment controller', {
     userId,
-    pointsAdded: totalPoints,
-    newBalance: currentPoints + totalPoints,
-    amount: payment.amount
+    paymentId,
+    processingResult: result.processingResult
   });
 
   res.status(200).json({
     success: true,
-    message: 'Puntos agregados exitosamente',
-    data: {
-      pointsAdded: totalPoints,
-      newBalance: currentPoints + totalPoints,
-      transaction: {
-        id: payment.id,
-        amount: payment.amount,
-        package: payment.metadata.pointsPackage
+    message: 'Compra de puntos confirmada exitosamente',
+    data: result.processingResult,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Obtener historial de compras de puntos
+const getPointsPurchaseHistory = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { page = 1, limit = 20, status } = req.query;
+
+  // Verificar que el usuario es cliente
+  if (req.user.userType !== 'CLIENT') {
+    throw new AppError('Solo clientes pueden ver historial de compras de puntos', 403, 'CLIENT_ONLY');
+  }
+
+  if (!req.user.client) {
+    throw new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING');
+  }
+
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+  const offset = (pageNum - 1) * limitNum;
+
+  const whereClause = {
+    clientId: req.user.client.id,
+    type: 'POINTS'
+  };
+
+  if (status) {
+    whereClause.status = status.toUpperCase();
+  }
+
+  const [purchases, totalCount] = await Promise.all([
+    prisma.payment.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limitNum,
+      select: {
+        id: true,
+        amount: true,
+        currency: true,
+        status: true,
+        description: true,
+        metadata: true,
+        createdAt: true,
+        completedAt: true,
+        failureReason: true
       }
+    }),
+    prisma.payment.count({ where: whereClause })
+  ]);
+
+  const pagination = {
+    page: pageNum,
+    limit: limitNum,
+    total: totalCount,
+    pages: Math.ceil(totalCount / limitNum),
+    hasNext: pageNum * limitNum < totalCount,
+    hasPrev: pageNum > 1
+  };
+
+  res.status(200).json({
+    success: true,
+    data: {
+      purchases: purchases.map(purchase => ({
+        id: purchase.id,
+        amount: purchase.amount,
+        currency: purchase.currency,
+        status: purchase.status,
+        description: purchase.description,
+        packageName: purchase.metadata?.packageName,
+        totalPoints: purchase.metadata?.totalPoints,
+        basePoints: purchase.metadata?.basePoints,
+        bonusPoints: purchase.metadata?.bonusPoints,
+        createdAt: purchase.createdAt,
+        completedAt: purchase.completedAt,
+        failureReason: purchase.failureReason
+      })),
+      pagination,
+      filters: { status }
     },
     timestamp: new Date().toISOString()
   });
@@ -868,7 +1170,7 @@ const confirmPointsPayment = catchAsync(async (req, res) => {
 // Crear intención de pago para premium (clientes)
 const createPremiumPaymentIntent = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { tier, duration } = req.body; // tier: 'PREMIUM' | 'VIP', duration: 1, 3, 6, 12 (meses)
+  const { tier, duration } = req.body;
 
   // Verificar que el usuario es cliente
   if (req.user.userType !== 'CLIENT') {
@@ -879,7 +1181,7 @@ const createPremiumPaymentIntent = catchAsync(async (req, res) => {
     throw new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING');
   }
 
-  // ✅ CORREGIDO: Validación de inputs
+  // ✅ Validación de inputs
   if (!tier || !duration) {
     throw new AppError('Tier y duración son requeridos', 400, 'MISSING_REQUIRED_FIELDS');
   }
@@ -915,46 +1217,7 @@ const createPremiumPaymentIntent = catchAsync(async (req, res) => {
     throw new AppError('Plan premium no válido', 400, 'INVALID_PREMIUM_PLAN');
   }
 
-  // Verificar si ya es premium del mismo tier o superior
-  if (req.user.client.isPremium && req.user.client.premiumTier === tier) {
-    // Calcular extensión en lugar de nueva suscripción
-    const currentExpiry = req.user.client.premiumUntil || new Date();
-    const newExpiry = new Date(Math.max(currentExpiry.getTime(), Date.now()) + durationNum * 30 * 24 * 60 * 60 * 1000);
-    
-    // Crear PaymentIntent para extensión
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(price * 100),
-      currency: 'usd',
-      metadata: {
-        type: 'premium_extension',
-        userId,
-        tier,
-        duration: duration.toString(),
-        currentExpiry: currentExpiry.toISOString(),
-        newExpiry: newExpiry.toISOString()
-      },
-      description: `Extensión ${tier} por ${duration} mes(es)`,
-      automatic_payment_methods: {
-        enabled: true
-      }
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        clientSecret: paymentIntent.client_secret,
-        type: 'extension',
-        tier,
-        duration: durationNum,
-        price,
-        currentExpiry,
-        newExpiry
-      },
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  // Crear PaymentIntent para nueva suscripción/upgrade
+  // Crear PaymentIntent
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(price * 100),
     currency: 'usd',
@@ -962,7 +1225,8 @@ const createPremiumPaymentIntent = catchAsync(async (req, res) => {
       type: 'premium',
       userId,
       tier,
-      duration: duration.toString()
+      duration: duration.toString(),
+      userType: req.user.userType
     },
     description: `Suscripción ${tier} por ${duration} mes(es)`,
     automatic_payment_methods: {
@@ -983,7 +1247,9 @@ const createPremiumPaymentIntent = catchAsync(async (req, res) => {
       metadata: {
         tier,
         duration: durationNum,
-        upgradeFrom: req.user.client.premiumTier
+        upgradeFrom: req.user.client.premiumTier,
+        userId,
+        userType: req.user.userType
       }
     }
   });
@@ -1075,7 +1341,7 @@ const confirmPremiumPayment = catchAsync(async (req, res) => {
     }
   };
 
-  // ✅ CORREGIDO: Transacción para operaciones críticas
+  // ✅ TRANSACCIÓN para operaciones críticas
   const result = await prisma.$transaction(async (tx) => {
     // Actualizar cliente
     const updatedClient = await tx.client.update({
@@ -1155,25 +1421,31 @@ const getPaymentHistory = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { page = 1, limit = 20, type, status } = req.query;
 
-  // ✅ CORREGIDO: Validación de paginación consistente
+  // ✅ Validación de paginación
   const pageNum = Math.max(1, parseInt(page) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
   const offset = (pageNum - 1) * limitNum;
 
-  // Solo clientes tienen historial de pagos directo
-  if (req.user.userType !== 'CLIENT') {
-    throw new AppError('Solo clientes pueden ver historial de pagos', 403, 'CLIENT_ONLY');
+  // Construir whereClause según tipo de usuario
+  let whereClause = {};
+
+  if (req.user.userType === 'CLIENT' && req.user.client) {
+    whereClause.clientId = req.user.client.id;
+  } else if (req.user.userType === 'ESCORT' && req.user.escort) {
+    whereClause.escortId = req.user.escort.id;
+  } else if (req.user.userType === 'AGENCY' && req.user.agency) {
+    whereClause.agencyId = req.user.agency.id;
+  } else {
+    throw new AppError('Tipo de usuario no válido para historial de pagos', 403, 'INVALID_USER_TYPE');
   }
 
-  if (!req.user.client) {
-    throw new AppError('Datos de cliente no encontrados', 500, 'CLIENT_DATA_MISSING');
+  // Agregar filtros opcionales
+  if (type) {
+    whereClause.type = type.toUpperCase();
   }
-
-  const whereClause = {
-    clientId: req.user.client.id,
-    ...(type && { type: type.toUpperCase() }),
-    ...(status && { status: status.toUpperCase() })
-  };
+  if (status) {
+    whereClause.status = status.toUpperCase();
+  }
 
   const [payments, totalCount] = await Promise.all([
     prisma.payment.findMany({
@@ -1203,6 +1475,34 @@ const getPaymentHistory = catchAsync(async (req, res) => {
     },
     timestamp: new Date().toISOString()
   });
+});
+
+// Webhook específico para puntos
+const handlePointsWebhook = catchAsync(async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    logger.error('Points webhook signature verification failed:', err);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Usar el servicio actualizado para manejar webhooks de puntos
+  try {
+    await paymentService.handlePointsWebhook(event);
+    
+    logger.info('Points webhook processed successfully', {
+      eventType: event.type,
+      eventId: event.id
+    });
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    logger.error('Error processing points webhook:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
 });
 
 // Webhook de Stripe para procesar eventos
@@ -1288,15 +1588,21 @@ const handlePaymentIntentFailed = async (paymentIntent) => {
 
 module.exports = {
   getBoostPricing,
-  getVerificationPricing, // ✅ NUEVO
+  getVerificationPricing,
+  createAdditionalPostPaymentIntent,
+  confirmAdditionalPostPayment,
   createBoostPaymentIntent,
-  createVerificationPaymentIntent, // ✅ NUEVO
+  createVerificationPaymentIntent,
   confirmBoostPayment,
-  confirmVerificationPayment, // ✅ NUEVO
-  createPointsPaymentIntent,
-  confirmPointsPayment,
+  confirmVerificationPayment,
   createPremiumPaymentIntent,
   confirmPremiumPayment,
   getPaymentHistory,
-  handleStripeWebhook
+  handleStripeWebhook,
+  
+  // ✅ NUEVAS FUNCIONES PARA PUNTOS
+  createPointsPaymentIntent,
+  confirmPointsPayment,
+  getPointsPurchaseHistory,
+  handlePointsWebhook
 };

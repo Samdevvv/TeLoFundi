@@ -4,9 +4,12 @@ const router = express.Router();
 // ✅ MIDDLEWARE INTEGRADO: Todo desde auth.js
 const { authenticate, requireAdmin, logAdminActivity } = require('../middleware/auth');
 
-// Controllers - TODOS COINCIDEN CON EL CONTROLADOR
+// ✅ Controllers - TODOS COINCIDEN CON EL CONTROLADOR (AGREGADAS LAS 3 FUNCIONES FALTANTES)
 const {
   getAppMetrics,
+  getPendingAgencies,    // ✅ AGREGADA
+  approveAgency,         // ✅ AGREGADA
+  rejectAgency,          // ✅ AGREGADA
   banUser,
   unbanUser,
   getBannedUsers,
@@ -518,6 +521,202 @@ router.get('/reports', logAdminActivity('view_reports'), getPendingReports);
  *         description: Reporte no encontrado
  */
 router.put('/reports/:reportId/resolve', logAdminActivity('resolve_report'), resolveReport);
+
+// ✅ NUEVAS RUTAS AGREGADAS - GESTIÓN DE AGENCIAS
+
+/**
+ * @swagger
+ * /api/admin/agencies/pending:
+ *   get:
+ *     summary: Obtener agencias pendientes de aprobación
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Buscar por nombre, email o empresa
+ *     responses:
+ *       200:
+ *         description: Lista de agencias pendientes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     agencies:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           requestId:
+ *                             type: string
+ *                           userId:
+ *                             type: string
+ *                           fullName:
+ *                             type: string
+ *                           documentNumber:
+ *                             type: string
+ *                           businessPhone:
+ *                             type: string
+ *                           businessEmail:
+ *                             type: string
+ *                           documentFrontImage:
+ *                             type: string
+ *                           documentBackImage:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                           submittedAt:
+ *                             type: string
+ *                             format: date-time
+ *                           userData:
+ *                             type: object
+ *                     pagination:
+ *                       $ref: '#/components/schemas/Pagination'
+ *       403:
+ *         description: Acceso de administrador requerido
+ */
+router.get('/agencies/pending', logAdminActivity('view_pending_agencies'), getPendingAgencies);
+
+/**
+ * @swagger
+ * /api/admin/agencies/{agencyId}/approve:
+ *   post:
+ *     summary: Aprobar agencia pendiente
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: agencyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la solicitud de agencia a aprobar
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               notes:
+ *                 type: string
+ *                 description: Notas adicionales sobre la aprobación
+ *     responses:
+ *       200:
+ *         description: Agencia aprobada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: string
+ *                     userId:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
+ *                     approvedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     approvedBy:
+ *                       type: string
+ *       400:
+ *         description: Solicitud ya fue procesada
+ *       404:
+ *         description: Solicitud de agencia no encontrada
+ */
+router.post('/agencies/:agencyId/approve', logAdminActivity('approve_agency'), approveAgency);
+
+/**
+ * @swagger
+ * /api/admin/agencies/{agencyId}/reject:
+ *   post:
+ *     summary: Rechazar agencia pendiente
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: agencyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la solicitud de agencia a rechazar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Motivo del rechazo (obligatorio)
+ *               notes:
+ *                 type: string
+ *                 description: Notas adicionales sobre el rechazo
+ *     responses:
+ *       200:
+ *         description: Agencia rechazada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: string
+ *                     userId:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
+ *                     rejectedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     rejectedBy:
+ *                       type: string
+ *                     reason:
+ *                       type: string
+ *       400:
+ *         description: Razón del rechazo es obligatoria o solicitud ya fue procesada
+ *       404:
+ *         description: Solicitud de agencia no encontrada
+ */
+router.post('/agencies/:agencyId/reject', logAdminActivity('reject_agency'), rejectAgency);
 
 /**
  * @swagger

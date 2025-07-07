@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
-// ✅ CORREGIDO: Importar middleware de autenticación
+// ✅ CORREGIDO: Importar middleware de autenticación y validación
 const { authenticate } = require('../middleware/auth');
-const { validatePagination } = require('../middleware/validation');
+const { validatePagination, validateUser } = require('../middleware/validation');
 
 // Controllers
 const {
@@ -65,7 +65,7 @@ const {
  * @swagger
  * /api/favorites:
  *   get:
- *     summary: Obtener posts favoritos del usuario
+ *     summary: Obtener posts favoritos del usuario (Solo clientes)
  *     tags: [Favorites]
  *     security:
  *       - bearerAuth: []
@@ -85,9 +85,9 @@ const {
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: [createdAt, postCreatedAt]
+ *           enum: [createdAt, postCreatedAt, postPopularity, postViews, authorRating]
  *           default: createdAt
- *         description: Ordenar por fecha de favorito o fecha del post
+ *         description: Ordenar por fecha de favorito, fecha del post, popularidad, vistas o rating del autor
  *       - in: query
  *         name: sortOrder
  *         schema:
@@ -129,15 +129,17 @@ const {
  *                       type: object
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo clientes pueden ver favoritos
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.get('/', authenticate, validatePagination, getUserFavorites);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.get('/', authenticate, validateUser, validatePagination, getUserFavorites);
 
 /**
  * @swagger
  * /api/favorites/{postId}:
  *   post:
- *     summary: Agregar post a favoritos
+ *     summary: Agregar post a favoritos (Solo clientes)
  *     tags: [Favorites]
  *     security:
  *       - bearerAuth: []
@@ -176,22 +178,24 @@ router.get('/', authenticate, validatePagination, getUserFavorites);
  *                 data:
  *                   $ref: '#/components/schemas/Favorite'
  *       400:
- *         description: Post ya está en favoritos
+ *         description: Límite de favoritos alcanzado o post ya está en favoritos
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo clientes pueden agregar favoritos
  *       404:
  *         description: Post no encontrado
  *       409:
  *         description: Post ya está en favoritos
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.post('/:postId', authenticate, addToFavorites);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.post('/:postId', authenticate, validateUser, addToFavorites);
 
 /**
  * @swagger
  * /api/favorites/{postId}:
  *   delete:
- *     summary: Remover post de favoritos
+ *     summary: Remover post de favoritos (Solo clientes)
  *     tags: [Favorites]
  *     security:
  *       - bearerAuth: []
@@ -218,11 +222,13 @@ router.post('/:postId', authenticate, addToFavorites);
  *                   example: "Post removido de favoritos"
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo clientes pueden gestionar favoritos
  *       404:
  *         description: Post no encontrado en favoritos
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.delete('/:postId', authenticate, removeFromFavorites);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.delete('/:postId', authenticate, validateUser, removeFromFavorites);
 
 /**
  * @swagger
@@ -279,8 +285,8 @@ router.delete('/:postId', authenticate, removeFromFavorites);
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.get('/likes', authenticate, validatePagination, getUserLikes);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.get('/likes', authenticate, validateUser, validatePagination, getUserLikes);
 
 /**
  * @swagger
@@ -328,8 +334,8 @@ router.get('/likes', authenticate, validatePagination, getUserLikes);
  *       409:
  *         description: Ya has dado like a este post
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.post('/likes/:postId', authenticate, addLike);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.post('/likes/:postId', authenticate, validateUser, addLike);
 
 /**
  * @swagger
@@ -371,14 +377,14 @@ router.post('/likes/:postId', authenticate, addLike);
  *       404:
  *         description: Like no encontrado
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.delete('/likes/:postId', authenticate, removeLike);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.delete('/likes/:postId', authenticate, validateUser, removeLike);
 
 /**
  * @swagger
  * /api/favorites/stats:
  *   get:
- *     summary: Obtener estadísticas de favoritos y likes del usuario
+ *     summary: Obtener estadísticas de favoritos y likes del usuario (Solo clientes)
  *     tags: [Favorites]
  *     security:
  *       - bearerAuth: []
@@ -434,10 +440,30 @@ router.delete('/likes/:postId', authenticate, removeLike);
  *                           createdAt:
  *                             type: string
  *                             format: date-time
+ *                     limits:
+ *                       type: object
+ *                       properties:
+ *                         maxFavorites:
+ *                           type: integer
+ *                           example: 5
+ *                         currentFavorites:
+ *                           type: integer
+ *                           example: 3
+ *                         remainingFavorites:
+ *                           type: integer
+ *                           example: 2
+ *                         isPremium:
+ *                           type: boolean
+ *                           example: false
+ *                         isUnlimited:
+ *                           type: boolean
+ *                           example: false
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Solo clientes pueden ver estadísticas de favoritos
  */
-// ✅ CORREGIDO: Agregado middleware authenticate
-router.get('/stats', authenticate, getFavoritesStats);
+// ✅ CORREGIDO: Agregado validateUser middleware
+router.get('/stats', authenticate, validateUser, getFavoritesStats);
 
 module.exports = router;

@@ -1,807 +1,971 @@
+/**
+ * ====================================================================
+ * 👤 USER SERVICE - GESTIÓN DE USUARIOS CON TELOPOINTS
+ * ====================================================================
+ * Maneja usuarios, límites dinámicos y integración con sistema de puntos
+ */
+
 const { prisma } = require('../config/database');
 const logger = require('../utils/logger');
+const pointsService = require('./pointsService'); // ✅ INTEGRACIÓN
 
-// Buscar usuarios con filtros avanzados
-const searchUsersAdvanced = async (filters, pagination, currentUserId = null) => {
-  const {
-    query,
-    userType,
-    locationId,
-    isVerified,
-    ageMin,
-    ageMax,
-    services,
-    priceRange,
-    rating,
-    languages,
-    bodyType,
-    ethnicity,
-    isOnline
-  } = filters;
+// ============================================================================
+// CONFIGURACIONES DE LÍMITES
+// ============================================================================
 
-  const { page = 1, limit = 20, sortBy = 'relevance' } = pagination;
-  const skip = (page - 1) * limit;
-
-  // Construir filtros base
-  const where = {
-    isActive: true,
-    isBanned: false,
-    settings: {
-      showInSearch: true
-    }
-  };
-
-  // Excluir usuario actual
-  if (currentUserId) {
-    where.id = { not: currentUserId };
-  }
-
-  // Filtro de texto
-  if (query) {
-    where.OR = [
-      { username: { contains: query, mode: 'insensitive' } },
-      { firstName: { contains: query, mode: 'insensitive' } },
-      { lastName: { contains: query, mode: 'insensitive' } },
-      { bio: { contains: query, mode: 'insensitive' } }
-    ];
-  }
-
-  // Filtro por tipo de usuario
-  if (userType && ['ESCORT', 'AGENCY'].includes(userType)) {
-    where.userType = userType;
-  }
-
-  // Filtro por ubicación
-  if (locationId) {
-    where.locationId = locationId;
-  }
-
-  // Filtros específicos para escorts
-  if (userType === 'ESCORT') {
-    const escortFilters = {};
-
-    if (isVerified === 'true') {
-      escortFilters.isVerified = true;
-    }
-
-    if (ageMin || ageMax) {
-      escortFilters.age = {};
-      if (ageMin) escortFilters.age.gte = parseInt(ageMin);
-      if (ageMax) escortFilters.age.lte = parseInt(ageMax);
-    }
-
-    if (services && Array.isArray(services) && services.length > 0) {
-      escortFilters.services = {
-        hasSome: services
-      };
-    }
-
-    if (rating) {
-      escortFilters.rating = {
-        gte: parseFloat(rating)
-      };
-    }
-
-    if (languages && Array.isArray(languages) && languages.length > 0) {
-      escortFilters.languages = {
-        hasSome: languages
-      };
-    }
-
-    if (bodyType) {
-      escortFilters.bodyType = bodyType;
-    }
-
-    if (ethnicity) {
-      escortFilters.ethnicity = ethnicity;
-    }
-
-    if (Object.keys(escortFilters).length > 0) {
-      where.escort = escortFilters;
-    }
-  }
-
-  // Filtros específicos para agencias
-  if (userType === 'AGENCY') {
-    const agencyFilters = {};
-
-    if (isVerified === 'true') {
-      agencyFilters.isVerified = true;
-    }
-
-    if (Object.keys(agencyFilters).length > 0) {
-      where.agency = agencyFilters;
-    }
-  }
-
-  // Filtro de usuarios online (últimos 15 minutos)
-  if (isOnline === 'true') {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    where.lastActiveAt = {
-      gte: fifteenMinutesAgo
-    };
-  }
-
-  // Construir ordenamiento
-  let orderBy = {};
-  switch (sortBy) {
-    case 'newest':
-      orderBy = { createdAt: 'desc' };
-      break;
-    case 'oldest':
-      orderBy = { createdAt: 'asc' };
-      break;
-    case 'popular':
-      orderBy = [
-        { profileViews: 'desc' },
-        { reputation: { overallScore: 'desc' } }
-      ];
-      break;
-    case 'rating':
-      orderBy = [
-        { reputation: { overallScore: 'desc' } },
-        { profileViews: 'desc' }
-      ];
-      break;
-    case 'online':
-      orderBy = [
-        { lastActiveAt: 'desc' },
-        { reputation: { discoveryScore: 'desc' } }
-      ];
-      break;
-    case 'distance':
-      // En una implementación real, usarías coordenadas geográficas
-      orderBy = { createdAt: 'desc' };
-      break;
-    default:
-      orderBy = [
-        { reputation: { discoveryScore: 'desc' } },
-        { reputation: { overallScore: 'desc' } }
-      ];
-  }
-
-  try {
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        include: {
-          escort: {
-            select: {
-              isVerified: true,
-              rating: true,
-              totalRatings: true,
-              age: true,
-              height: true,
-              weight: true,
-              bodyType: true,
-              ethnicity: true,
-              hairColor: true,
-              eyeColor: true,
-              services: true,
-              languages: true,
-              rates: true,
-              availability: true
-            }
-          },
-          agency: {
-            select: {
-              isVerified: true,
-              totalEscorts: true,
-              activeEscorts: true,
-              verifiedEscorts: true
-            }
-          },
-          location: true,
-          reputation: {
-            select: {
-              overallScore: true,
-              discoveryScore: true,
-              trustScore: true
-            }
-          },
-          _count: {
-            select: {
-              posts: { where: { isActive: true } }
-            }
-          }
-        },
-        orderBy,
-        skip,
-        take: limit
-      }),
-      prisma.user.count({ where })
-    ]);
-
-    return {
-      users,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
-      }
-    };
-  } catch (error) {
-    logger.error('Error in advanced user search:', error);
-    throw error;
+const DEFAULT_LIMITS = {
+  BASIC: {
+    dailyMessageLimit: 5,
+    maxFavorites: 5,
+    canViewPhoneNumbers: false,
+    canSendImages: false,
+    canSendVoiceMessages: false,
+    canAccessPremiumProfiles: false,
+    prioritySupport: false,
+    canSeeOnlineStatus: false
+  },
+  PREMIUM: {
+    dailyMessageLimit: 50,
+    maxFavorites: 25,
+    canViewPhoneNumbers: true,
+    canSendImages: true,
+    canSendVoiceMessages: false,
+    canAccessPremiumProfiles: true,
+    prioritySupport: false,
+    canSeeOnlineStatus: true
+  },
+  VIP: {
+    dailyMessageLimit: -1, // Ilimitado
+    maxFavorites: 100,
+    canViewPhoneNumbers: true,
+    canSendImages: true,
+    canSendVoiceMessages: true,
+    canAccessPremiumProfiles: true,
+    prioritySupport: true,
+    canSeeOnlineStatus: true
   }
 };
 
-// Obtener usuarios recomendados basados en el algoritmo
-const getRecommendedUsers = async (userId, userType, limit = 20) => {
+// ============================================================================
+// FUNCIONES PRINCIPALES DE USUARIOS
+// ============================================================================
+
+/**
+ * Obtener perfil completo del usuario incluyendo sistema de puntos
+ */
+const getUserProfile = async (userId, includePrivate = false) => {
   try {
-    // Obtener interacciones del usuario para personalizar recomendaciones
-    const userInteractions = await prisma.userInteraction.findMany({
-      where: { userId },
-      select: {
-        targetUserId: true,
-        type: true,
-        weight: true
-      },
-      take: 100,
-      orderBy: { createdAt: 'desc' }
-    });
-
-    // Obtener IDs de usuarios con los que ya interactuó
-    const interactedUserIds = [...new Set(userInteractions.map(i => i.targetUserId))];
-
-    // Filtros base
-    const where = {
-      isActive: true,
-      isBanned: false,
-      id: { 
-        not: userId,
-        notIn: interactedUserIds // Excluir usuarios con los que ya interactuó
-      },
-      settings: {
-        showInDiscovery: true
-      }
-    };
-
-    // Filtrar por tipo de usuario según el contexto
-    if (userType === 'CLIENT') {
-      where.userType = { in: ['ESCORT', 'AGENCY'] };
-    } else if (userType === 'ESCORT') {
-      where.userType = { in: ['CLIENT', 'AGENCY'] };
-    } else if (userType === 'AGENCY') {
-      where.userType = { in: ['ESCORT', 'CLIENT'] };
-    }
-
-    const users = await prisma.user.findMany({
-      where,
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
       include: {
         escort: {
-          select: {
-            isVerified: true,
-            rating: true,
-            totalRatings: true,
-            services: true
+          include: {
+            agencyMemberships: {
+              include: {
+                agency: {
+                  select: {
+                    id: true,
+                    user: {
+                      select: {
+                        username: true,
+                        firstName: true,
+                        lastName: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         agency: {
-          select: {
-            isVerified: true,
-            totalEscorts: true,
-            activeEscorts: true
-          }
-        },
-        location: true,
-        reputation: {
-          select: {
-            overallScore: true,
-            discoveryScore: true,
-            trustScore: true
-          }
-        },
-        _count: {
-          select: {
-            posts: { where: { isActive: true } }
-          }
-        }
-      },
-      orderBy: [
-        { reputation: { discoveryScore: 'desc' } },
-        { reputation: { overallScore: 'desc' } },
-        { profileViews: 'desc' }
-      ],
-      take: limit
-    });
-
-    return users;
-  } catch (error) {
-    logger.error('Error getting recommended users:', error);
-    throw error;
-  }
-};
-
-// Actualizar score de descubrimiento de usuarios
-const updateDiscoveryScores = async () => {
-  try {
-    // Obtener todos los usuarios activos
-    const users = await prisma.user.findMany({
-      where: {
-        isActive: true,
-        isBanned: false
-      },
-      include: {
-        reputation: true,
-        escort: true,
-        agency: true,
-        _count: {
-          select: {
-            posts: { where: { isActive: true } },
-            likes: true,
-            favorites: true
-          }
-        }
-      }
-    });
-
-    const updatePromises = users.map(async (user) => {
-      const now = new Date();
-      const daysSinceCreated = Math.floor((now - user.createdAt) / (1000 * 60 * 60 * 24));
-      const daysSinceLastActive = user.lastActiveAt 
-        ? Math.floor((now - user.lastActiveAt) / (1000 * 60 * 60 * 24))
-        : 30;
-
-      let discoveryScore = 50; // Base score
-
-      // Factor de actividad reciente (30% del score)
-      if (daysSinceLastActive === 0) discoveryScore += 15;
-      else if (daysSinceLastActive <= 1) discoveryScore += 12;
-      else if (daysSinceLastActive <= 3) discoveryScore += 8;
-      else if (daysSinceLastActive <= 7) discoveryScore += 4;
-      else if (daysSinceLastActive <= 14) discoveryScore += 2;
-      else if (daysSinceLastActive > 30) discoveryScore -= 10;
-
-      // Factor de completitud del perfil (20% del score)
-      const profileCompleteness = user.reputation?.profileCompleteness || 0;
-      discoveryScore += (profileCompleteness / 100) * 10;
-
-      // Factor de verificación (15% del score)
-      if (user.userType === 'ESCORT' && user.escort?.isVerified) discoveryScore += 8;
-      if (user.userType === 'AGENCY' && user.agency?.isVerified) discoveryScore += 8;
-
-      // Factor de engagement (20% del score)
-      const postsCount = user._count.posts;
-      const likesCount = user._count.likes;
-      const favoritesCount = user._count.favorites;
-      
-      if (postsCount > 0) discoveryScore += 3;
-      if (postsCount >= 3) discoveryScore += 2;
-      if (likesCount > 10) discoveryScore += 3;
-      if (favoritesCount > 5) discoveryScore += 2;
-
-      // Factor de novedad (10% del score)
-      if (daysSinceCreated <= 7) discoveryScore += 5; // Boost para nuevos usuarios
-      if (daysSinceCreated <= 30) discoveryScore += 3;
-
-      // Factor de reputación (5% del score)
-      const overallScore = user.reputation?.overallScore || 0;
-      discoveryScore += (overallScore / 100) * 2;
-
-      // Normalizar score entre 0 y 100
-      discoveryScore = Math.max(0, Math.min(100, discoveryScore));
-
-      return prisma.userReputation.update({
-        where: { userId: user.id },
-        data: {
-          discoveryScore,
-          lastScoreUpdate: now
-        }
-      });
-    });
-
-    await Promise.all(updatePromises);
-    logger.info('Discovery scores updated for all users');
-  } catch (error) {
-    logger.error('Error updating discovery scores:', error);
-    throw error;
-  }
-};
-
-// Actualizar score de trending de usuarios
-const updateTrendingScores = async () => {
-  try {
-    const now = new Date();
-    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    // Obtener interacciones recientes para cada usuario
-    const recentInteractions = await prisma.userInteraction.groupBy({
-      by: ['targetUserId'],
-      where: {
-        createdAt: {
-          gte: last7Days
-        },
-        targetUserId: { not: null }
-      },
-      _count: {
-        id: true
-      },
-      _sum: {
-        weight: true
-      }
-    });
-
-    const updatePromises = recentInteractions.map(async (interaction) => {
-      const userId = interaction.targetUserId;
-      if (!userId) return;
-
-      // Obtener interacciones específicas de las últimas 24 horas
-      const recent24hInteractions = await prisma.userInteraction.count({
-        where: {
-          targetUserId: userId,
-          createdAt: {
-            gte: last24Hours
-          }
-        }
-      });
-
-      let trendingScore = 0;
-
-      // Factor de interacciones recientes (60% del score)
-      const totalInteractions = interaction._count.id || 0;
-      const interactionWeight = interaction._sum.weight || 0;
-      
-      trendingScore += Math.min(30, totalInteractions * 2); // Máximo 30 puntos
-      trendingScore += Math.min(20, interactionWeight); // Máximo 20 puntos
-
-      // Factor de velocidad de crecimiento (40% del score)
-      trendingScore += Math.min(20, recent24hInteractions * 5); // Máximo 20 puntos
-
-      // Bonus por actividad muy reciente
-      if (recent24hInteractions > 5) trendingScore += 10;
-
-      // Normalizar score entre 0 y 100
-      trendingScore = Math.max(0, Math.min(100, trendingScore));
-
-      return prisma.userReputation.update({
-        where: { userId },
-        data: {
-          trendingScore,
-          lastScoreUpdate: now
-        }
-      });
-    });
-
-    await Promise.all(updatePromises);
-    logger.info('Trending scores updated for active users');
-  } catch (error) {
-    logger.error('Error updating trending scores:', error);
-    throw error;
-  }
-};
-
-// Obtener estadísticas de usuario
-const getUserStats = async (userId) => {
-  try {
-    const stats = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        profileViews: true,
-        createdAt: true,
-        lastActiveAt: true,
-        _count: {
-          select: {
-            posts: { where: { isActive: true } },
-            likes: true,
-            favorites: true,
-            sentMessages: true,
-            receivedMessages: true,
-            interactions: true,
-            receivedInteractions: true
-          }
-        },
-        reputation: {
-          select: {
-            overallScore: true,
-            responseRate: true,
-            profileCompleteness: true,
-            trustScore: true,
-            discoveryScore: true,
-            trendingScore: true,
-            totalViews: true,
-            totalLikes: true,
-            totalMessages: true,
-            totalFavorites: true
-          }
-        }
-      }
-    });
-
-    if (!stats) {
-      throw new Error('Usuario no encontrado');
-    }
-
-    // Calcular estadísticas adicionales
-    const daysSinceJoined = Math.floor((new Date() - stats.createdAt) / (1000 * 60 * 60 * 24));
-    const daysSinceLastActive = stats.lastActiveAt 
-      ? Math.floor((new Date() - stats.lastActiveAt) / (1000 * 60 * 60 * 24))
-      : null;
-
-    return {
-      ...stats,
-      derived: {
-        daysSinceJoined,
-        daysSinceLastActive,
-        averagePostsPerMonth: daysSinceJoined > 0 
-          ? Math.round((stats._count.posts / daysSinceJoined) * 30 * 100) / 100
-          : 0,
-        engagementRate: stats._count.posts > 0 
-          ? Math.round(((stats._count.likes + stats._count.favorites) / stats._count.posts) * 100) / 100
-          : 0
-      }
-    };
-  } catch (error) {
-    logger.error('Error getting user stats:', error);
-    throw error;
-  }
-};
-
-// Bloquear/desbloquear usuario
-const toggleUserBlock = async (blockerId, blockedId, reason = null) => {
-  try {
-    if (blockerId === blockedId) {
-      throw new Error('No puedes bloquearte a ti mismo');
-    }
-
-    // Verificar si ya existe el bloqueo
-    const existingBlock = await prisma.userBlock.findUnique({
-      where: {
-        blockerId_blockedId: {
-          blockerId,
-          blockedId
-        }
-      }
-    });
-
-    if (existingBlock) {
-      // Desbloquear
-      await prisma.userBlock.delete({
-        where: { id: existingBlock.id }
-      });
-
-      logger.info('User unblocked', { blockerId, blockedId });
-      return { action: 'unblocked', isBlocked: false };
-    } else {
-      // Bloquear
-      await prisma.userBlock.create({
-        data: {
-          blockerId,
-          blockedId,
-          reason
-        }
-      });
-
-      logger.info('User blocked', { blockerId, blockedId, reason });
-      return { action: 'blocked', isBlocked: true };
-    }
-  } catch (error) {
-    logger.error('Error toggling user block:', error);
-    throw error;
-  }
-};
-
-// Obtener usuarios bloqueados
-const getBlockedUsers = async (userId, pagination = {}) => {
-  const { page = 1, limit = 20 } = pagination;
-  const skip = (page - 1) * limit;
-
-  try {
-    const [blocks, total] = await Promise.all([
-      prisma.userBlock.findMany({
-        where: { blockerId: userId },
-        include: {
-          blocked: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              avatar: true,
-              userType: true
+          include: {
+            memberships: {
+              include: {
+                escort: {
+                  select: {
+                    id: true,
+                    isVerified: true,
+                    user: {
+                      select: {
+                        username: true,
+                        firstName: true,
+                        lastName: true
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
-      }),
-      prisma.userBlock.count({ where: { blockerId: userId } })
-    ]);
-
-    return {
-      blocks: blocks.map(block => ({
-        id: block.id,
-        reason: block.reason,
-        createdAt: block.createdAt,
-        user: block.blocked
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
-      }
-    };
-  } catch (error) {
-    logger.error('Error getting blocked users:', error);
-    throw error;
-  }
-};
-
-// Verificar si un usuario está bloqueado
-const isUserBlocked = async (blockerId, blockedId) => {
-  try {
-    const block = await prisma.userBlock.findUnique({
-      where: {
-        blockerId_blockedId: {
-          blockerId,
-          blockedId
+        client: true, // ✅ INCLUIR DATOS DE CLIENTE
+        location: true,
+        reputation: true,
+        settings: true,
+        _count: {
+          select: {
+            posts: { where: { isActive: true } },
+            favorites: true,
+            likes: true
+          }
         }
       }
     });
 
-    return !!block;
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    // ✅ NUEVO: Obtener datos de puntos si es cliente
+    let pointsData = null;
+    let limitsData = null;
+    
+    if (user.userType === 'CLIENT' && user.client) {
+      try {
+        // Obtener datos de puntos
+        pointsData = await pointsService.getClientPoints(user.client.id);
+        
+        // Obtener límites actuales
+        limitsData = await getClientLimits(user.client.id);
+      } catch (error) {
+        logger.warn('Error getting points data for profile', { userId, error: error.message });
+      }
+    }
+
+    // Filtrar información privada si no está autorizado
+    const profile = {
+      id: user.id,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar,
+      bio: user.bio,
+      userType: user.userType,
+      isActive: user.isActive,
+      accountStatus: user.accountStatus,
+      profileViews: user.profileViews,
+      createdAt: user.createdAt,
+      lastActiveAt: user.lastActiveAt,
+      location: user.location,
+      reputation: user.reputation,
+      counts: user._count,
+      
+      // ✅ NUEVO: Datos específicos del cliente con puntos
+      ...(user.userType === 'CLIENT' && {
+        client: {
+          ...user.client,
+          points: pointsData,
+          limits: limitsData
+        }
+      }),
+      
+      // Datos específicos del escort
+      ...(user.userType === 'ESCORT' && {
+        escort: {
+          ...user.escort,
+          agencyMemberships: user.escort.agencyMemberships
+        }
+      }),
+      
+      // Datos específicos de la agencia
+      ...(user.userType === 'AGENCY' && {
+        agency: {
+          ...user.agency,
+          members: user.agency.memberships
+        }
+      })
+    };
+
+    // Incluir información privada si está autorizado
+    if (includePrivate) {
+      profile.email = user.email;
+      profile.phone = user.phone;
+      profile.settings = user.settings;
+      profile.emailVerified = user.emailVerified;
+      profile.lastLoginIP = user.lastLoginIP;
+    }
+
+    return profile;
   } catch (error) {
-    logger.error('Error checking if user is blocked:', error);
-    return false;
+    logger.error('Error getting user profile:', error);
+    throw error;
   }
 };
 
-// Actualizar última actividad del usuario
-const updateUserActivity = async (userId, activityData = {}) => {
+/**
+ * Actualizar límites dinámicos del cliente
+ */
+const updateClientLimits = async (clientId, newLimits) => {
   try {
-    const updateData = {
-      lastActiveAt: new Date()
-    };
+    const validFields = [
+      'dailyMessageLimit',
+      'maxFavorites',
+      'canViewPhoneNumbers',
+      'canSendImages',
+      'canSendVoiceMessages',
+      'canAccessPremiumProfiles',
+      'prioritySupport',
+      'canSeeOnlineStatus'
+    ];
 
-    // Actualizar IP si se proporciona
-    if (activityData.ip) {
-      updateData.lastLoginIP = activityData.ip;
+    // Filtrar solo campos válidos
+    const updateData = {};
+    Object.keys(newLimits).forEach(key => {
+      if (validFields.includes(key)) {
+        updateData[key] = newLimits[key];
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      throw new Error('No hay campos válidos para actualizar');
     }
 
-    await prisma.user.update({
-      where: { id: userId },
+    const updatedClient = await prisma.client.update({
+      where: { id: clientId },
       data: updateData
     });
 
-    // Opcional: registrar interacción de actividad
-    if (activityData.source) {
-      await prisma.userInteraction.create({
-        data: {
-          userId,
-          type: 'VIEW',
-          weight: 0.1, // Peso muy bajo para actividad general
-          source: activityData.source,
-          deviceType: activityData.deviceType,
-          sessionId: activityData.sessionId
-        }
-      }).catch(() => {}); // No fallar por error en tracking
-    }
+    logger.info('Client limits updated', {
+      clientId,
+      updatedFields: Object.keys(updateData),
+      newLimits: updateData
+    });
 
+    return updatedClient;
   } catch (error) {
-    logger.error('Error updating user activity:', error);
-    // No lanzar error ya que esto es tracking secundario
+    logger.error('Error updating client limits:', error);
+    throw error;
   }
 };
 
-// Limpiar datos antiguos de usuarios
-const cleanupUserData = async () => {
+/**
+ * Obtener límites actuales del cliente
+ */
+const getClientLimits = async (clientId) => {
   try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: {
+        dailyMessageLimit: true,
+        messagesUsedToday: true,
+        maxFavorites: true,
+        currentFavorites: true,
+        canViewPhoneNumbers: true,
+        canSendImages: true,
+        canSendVoiceMessages: true,
+        canAccessPremiumProfiles: true,
+        prioritySupport: true,
+        canSeeOnlineStatus: true,
+        isPremium: true,
+        premiumTier: true,
+        premiumUntil: true,
+        lastMessageReset: true
+      }
+    });
+
+    if (!client) {
+      throw new Error('Cliente no encontrado');
+    }
+
+    // Verificar si necesita reset diario
+    const now = new Date();
+    const lastReset = client.lastMessageReset;
+    const needsReset = !lastReset || 
+      (now.getDate() !== lastReset.getDate() || 
+       now.getMonth() !== lastReset.getMonth() || 
+       now.getFullYear() !== lastReset.getFullYear());
+
+    // Reset automático si es necesario
+    if (needsReset && client.messagesUsedToday > 0) {
+      await resetDailyLimits(clientId);
+      client.messagesUsedToday = 0;
+    }
+
+    const messagesRemaining = client.dailyMessageLimit === -1 
+      ? -1 // Ilimitado
+      : Math.max(0, client.dailyMessageLimit - client.messagesUsedToday);
+
+    const favoritesRemaining = Math.max(0, client.maxFavorites - client.currentFavorites);
+
+    return {
+      messages: {
+        limit: client.dailyMessageLimit,
+        used: client.messagesUsedToday,
+        remaining: messagesRemaining,
+        unlimited: client.dailyMessageLimit === -1
+      },
+      favorites: {
+        limit: client.maxFavorites,
+        used: client.currentFavorites,
+        remaining: favoritesRemaining
+      },
+      permissions: {
+        canViewPhoneNumbers: client.canViewPhoneNumbers,
+        canSendImages: client.canSendImages,
+        canSendVoiceMessages: client.canSendVoiceMessages,
+        canAccessPremiumProfiles: client.canAccessPremiumProfiles,
+        prioritySupport: client.prioritySupport,
+        canSeeOnlineStatus: client.canSeeOnlineStatus
+      },
+      premium: {
+        isActive: client.isPremium,
+        tier: client.premiumTier,
+        expiresAt: client.premiumUntil
+      },
+      lastReset: client.lastMessageReset,
+      needsReset
+    };
+  } catch (error) {
+    logger.error('Error getting client limits:', error);
+    throw error;
+  }
+};
+
+/**
+ * Resetear límites diarios
+ */
+const resetDailyLimits = async (clientId) => {
+  try {
+    const updatedClient = await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        messagesUsedToday: 0,
+        lastMessageReset: new Date()
+      }
+    });
+
+    logger.info('Daily limits reset', { clientId });
+    return updatedClient;
+  } catch (error) {
+    logger.error('Error resetting daily limits:', error);
+    throw error;
+  }
+};
+
+/**
+ * Verificar y actualizar expiración de premium
+ */
+const checkPremiumExpiration = async (clientId) => {
+  try {
+    // Usar la función del pointsService que ya maneja esto
+    return await pointsService.checkPremiumExpiration(clientId);
+  } catch (error) {
+    logger.error('Error checking premium expiration:', error);
+    throw error;
+  }
+};
+
+/**
+ * Aplicar beneficios premium a un cliente
+ */
+const applyPremiumBenefits = async (clientId, tier, duration = null) => {
+  try {
+    if (!['PREMIUM', 'VIP'].includes(tier)) {
+      throw new Error('Tier premium inválido');
+    }
+
+    const benefits = DEFAULT_LIMITS[tier];
+    let updateData = { ...benefits };
+
+    // Si se especifica duración, calcular fecha de expiración
+    if (duration) {
+      const expirationDate = new Date(Date.now() + duration * 60 * 60 * 1000);
+      updateData.isPremium = true;
+      updateData.premiumTier = tier;
+      updateData.premiumUntil = expirationDate;
+    }
+
+    const updatedClient = await prisma.client.update({
+      where: { id: clientId },
+      data: updateData
+    });
+
+    logger.info('Premium benefits applied', {
+      clientId,
+      tier,
+      duration,
+      benefits: Object.keys(benefits)
+    });
+
+    return updatedClient;
+  } catch (error) {
+    logger.error('Error applying premium benefits:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remover beneficios premium (revertir a BASIC)
+ */
+const removePremiumBenefits = async (clientId) => {
+  try {
+    const basicBenefits = DEFAULT_LIMITS.BASIC;
+    
+    const updatedClient = await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        ...basicBenefits,
+        isPremium: false,
+        premiumTier: 'BASIC',
+        premiumUntil: null
+      }
+    });
+
+    logger.info('Premium benefits removed, reverted to BASIC', { clientId });
+    return updatedClient;
+  } catch (error) {
+    logger.error('Error removing premium benefits:', error);
+    throw error;
+  }
+};
+
+/**
+ * Incrementar uso de mensaje diario
+ */
+const incrementMessageUsage = async (clientId) => {
+  try {
+    // Verificar límites actuales
+    const limits = await getClientLimits(clientId);
+    
+    if (limits.messages.unlimited) {
+      // Usuario con mensajes ilimitados, no incrementar contador
+      return { success: true, unlimited: true };
+    }
+
+    if (limits.messages.remaining <= 0) {
+      throw new Error('Límite diario de mensajes alcanzado');
+    }
+
+    const updatedClient = await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        messagesUsedToday: { increment: 1 }
+      }
+    });
+
+    logger.info('Message usage incremented', {
+      clientId,
+      newUsage: updatedClient.messagesUsedToday,
+      limit: limits.messages.limit
+    });
+
+    return {
+      success: true,
+      unlimited: false,
+      newUsage: updatedClient.messagesUsedToday,
+      remaining: limits.messages.limit - updatedClient.messagesUsedToday
+    };
+  } catch (error) {
+    logger.error('Error incrementing message usage:', error);
+    throw error;
+  }
+};
+
+/**
+ * Verificar si el usuario puede realizar una acción
+ */
+const canUserPerformAction = async (userId, action) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        client: true
+      }
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    // Verificaciones básicas
+    if (!user.isActive) {
+      return { allowed: false, reason: 'Cuenta inactiva' };
+    }
+
+    if (user.isBanned) {
+      return { allowed: false, reason: 'Usuario baneado' };
+    }
+
+    // Si no es cliente, permitir la mayoría de acciones
+    if (user.userType !== 'CLIENT' || !user.client) {
+      return { allowed: true };
+    }
+
+    const limits = await getClientLimits(user.client.id);
+
+    switch (action) {
+      case 'send_message':
+        if (limits.messages.unlimited || limits.messages.remaining > 0) {
+          return { allowed: true };
+        }
+        return { 
+          allowed: false, 
+          reason: 'Límite diario de mensajes alcanzado',
+          canUpgrade: true,
+          upgradeOptions: ['PREMIUM', 'VIP']
+        };
+
+      case 'send_image':
+        if (limits.permissions.canSendImages) {
+          return { allowed: true };
+        }
+        return { 
+          allowed: false, 
+          reason: 'Función disponible solo para usuarios Premium',
+          canUpgrade: true,
+          upgradeOptions: ['PREMIUM', 'VIP']
+        };
+
+      case 'send_voice':
+        if (limits.permissions.canSendVoiceMessages) {
+          return { allowed: true };
+        }
+        return { 
+          allowed: false, 
+          reason: 'Función disponible solo para usuarios VIP',
+          canUpgrade: true,
+          upgradeOptions: ['VIP']
+        };
+
+      case 'view_phone':
+        if (limits.permissions.canViewPhoneNumbers) {
+          return { allowed: true };
+        }
+        return { 
+          allowed: false, 
+          reason: 'Acceso a teléfonos disponible solo para usuarios Premium',
+          canUpgrade: true,
+          upgradeOptions: ['PREMIUM', 'VIP'],
+          canUsePoints: true,
+          pointsCost: pointsService.POINTS_CONFIG.ACTIONS.PHONE_ACCESS
+        };
+
+      case 'add_favorite':
+        if (limits.favorites.remaining > 0) {
+          return { allowed: true };
+        }
+        return { 
+          allowed: false, 
+          reason: 'Límite de favoritos alcanzado',
+          canUpgrade: true,
+          upgradeOptions: ['PREMIUM', 'VIP'],
+          canUsePoints: true,
+          pointsCost: pointsService.POINTS_CONFIG.ACTIONS.EXTRA_FAVORITE
+        };
+
+      case 'access_premium_profile':
+        if (limits.permissions.canAccessPremiumProfiles) {
+          return { allowed: true };
+        }
+        return { 
+          allowed: false, 
+          reason: 'Acceso a perfiles premium disponible solo para usuarios Premium',
+          canUpgrade: true,
+          upgradeOptions: ['PREMIUM', 'VIP']
+        };
+
+      default:
+        return { allowed: true };
+    }
+  } catch (error) {
+    logger.error('Error checking user action permission:', error);
+    throw error;
+  }
+};
+
+/**
+ * Procesar uso de puntos para acción específica
+ */
+const usePointsForAction = async (userId, action, targetData = {}) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { client: true }
+    });
+
+    if (!user || user.userType !== 'CLIENT' || !user.client) {
+      throw new Error('Solo los clientes pueden usar puntos');
+    }
+
+    const clientId = user.client.id;
+    let pointsCost, description, actionType;
+
+    switch (action) {
+      case 'phone_access':
+        pointsCost = pointsService.POINTS_CONFIG.ACTIONS.PHONE_ACCESS;
+        actionType = 'PHONE_ACCESS';
+        description = `Acceso a número de teléfono - ${targetData.username || 'Usuario'}`;
+        break;
+
+      case 'image_message':
+        pointsCost = pointsService.POINTS_CONFIG.ACTIONS.IMAGE_MESSAGE;
+        actionType = 'IMAGE_MESSAGE';
+        description = 'Envío de mensaje con imagen';
+        break;
+
+      case 'extra_favorite':
+        pointsCost = pointsService.POINTS_CONFIG.ACTIONS.EXTRA_FAVORITE;
+        actionType = 'EXTRA_FAVORITE';
+        description = 'Favorito adicional permanente';
+        
+        // Incrementar límite de favoritos
+        await prisma.client.update({
+          where: { id: clientId },
+          data: {
+            maxFavorites: { increment: 1 }
+          }
+        });
+        break;
+
+      case 'profile_boost':
+        pointsCost = pointsService.POINTS_CONFIG.ACTIONS.PROFILE_BOOST;
+        actionType = 'PROFILE_BOOST';
+        description = 'Boost de perfil por 12 horas';
+        
+        // Aquí podrías implementar la lógica del boost
+        // Por ahora solo registramos la transacción
+        break;
+
+      case 'chat_priority':
+        pointsCost = pointsService.POINTS_CONFIG.ACTIONS.CHAT_PRIORITY;
+        actionType = 'CHAT_PRIORITY';
+        description = 'Prioridad en chat por 48 horas';
+        
+        // Implementar lógica de prioridad en chat
+        break;
+
+      default:
+        throw new Error('Acción no válida');
+    }
+
+    // Gastar puntos
+    const result = await pointsService.spendPoints(
+      clientId,
+      pointsCost,
+      actionType,
+      description,
+      {
+        action,
+        targetData,
+        userId,
+        source: 'action_use'
+      }
+    );
+
+    logger.info('Points used for action', {
+      userId,
+      clientId,
+      action,
+      pointsCost,
+      newBalance: result.newBalance
+    });
+
+    return {
+      success: true,
+      action,
+      pointsSpent: pointsCost,
+      newBalance: result.newBalance,
+      description
+    };
+  } catch (error) {
+    logger.error('Error using points for action:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas del usuario
+ */
+const getUserStatistics = async (userId) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        client: true,
+        escort: true,
+        agency: true,
+        reputation: true,
+        _count: {
+          select: {
+            posts: { where: { isActive: true } },
+            favorites: true,
+            likes: true,
+            sentMessages: true,
+            receivedMessages: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const baseStats = {
+      userId: user.id,
+      userType: user.userType,
+      joinDate: user.createdAt,
+      lastActive: user.lastActiveAt,
+      profileViews: user.profileViews,
+      reputation: user.reputation,
+      activity: {
+        postsCreated: user._count.posts,
+        messagesSent: user._count.sentMessages,
+        messagesReceived: user._count.receivedMessages,
+        likesGiven: user._count.likes,
+        favoritesAdded: user._count.favorites
+      }
+    };
+
+    // Estadísticas específicas por tipo de usuario
+    if (user.userType === 'CLIENT' && user.client) {
+      try {
+        const pointsData = await pointsService.getClientPoints(user.client.id);
+        const limits = await getClientLimits(user.client.id);
+        
+        baseStats.client = {
+          points: pointsData,
+          limits,
+          premiumHistory: await getPremiumHistory(user.client.id),
+          pointsHistory: await getPointsUsageStats(user.client.id)
+        };
+      } catch (error) {
+        logger.warn('Error getting client stats', { userId, error: error.message });
+      }
+    }
+
+    if (user.userType === 'ESCORT' && user.escort) {
+      baseStats.escort = {
+        isVerified: user.escort.isVerified,
+        rating: user.escort.rating,
+        totalRatings: user.escort.totalRatings,
+        currentPosts: user.escort.currentPosts,
+        maxPosts: user.escort.maxPosts,
+        totalBookings: user.escort.totalBookings,
+        completedBookings: user.escort.completedBookings
+      };
+    }
+
+    if (user.userType === 'AGENCY' && user.agency) {
+      baseStats.agency = {
+        isVerified: user.agency.isVerified,
+        totalEscorts: user.agency.totalEscorts,
+        verifiedEscorts: user.agency.verifiedEscorts,
+        activeEscorts: user.agency.activeEscorts,
+        totalVerifications: user.agency.totalVerifications
+      };
+    }
+
+    return baseStats;
+  } catch (error) {
+    logger.error('Error getting user statistics:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener historial de premium del cliente
+ */
+const getPremiumHistory = async (clientId) => {
+  try {
+    const history = await prisma.premiumActivation.findMany({
+      where: { clientId },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    return history.map(activation => ({
+      id: activation.id,
+      tier: activation.tier,
+      duration: activation.duration,
+      pointsCost: activation.pointsCost,
+      activatedAt: activation.activatedAt,
+      expiresAt: activation.expiresAt,
+      isActive: activation.isActive,
+      activatedBy: activation.activatedBy
+    }));
+  } catch (error) {
+    logger.error('Error getting premium history:', error);
+    return [];
+  }
+};
+
+/**
+ * Obtener estadísticas de uso de puntos
+ */
+const getPointsUsageStats = async (clientId) => {
+  try {
+    const [totalStats, recentTransactions] = await Promise.all([
+      prisma.pointTransaction.groupBy({
+        by: ['type'],
+        where: { clientId },
+        _sum: { amount: true },
+        _count: true
+      }),
+      prisma.pointTransaction.findMany({
+        where: { clientId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          type: true,
+          amount: true,
+          description: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    const byType = totalStats.reduce((acc, stat) => {
+      acc[stat.type] = {
+        total: stat._sum.amount || 0,
+        count: stat._count
+      };
+      return acc;
+    }, {});
+
+    return {
+      byType,
+      recentTransactions
+    };
+  } catch (error) {
+    logger.error('Error getting points usage stats:', error);
+    return { byType: {}, recentTransactions: [] };
+  }
+};
+
+/**
+ * Limpiar usuarios inactivos y datos antiguos
+ */
+const cleanupInactiveUsers = async () => {
+  try {
     const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
 
-    // Limpiar historial de búsquedas antiguo
-    await prisma.searchHistory.deleteMany({
+    // Marcar como inactivos usuarios que no han estado activos en 1 año
+    const inactiveCount = await prisma.user.updateMany({
       where: {
-        createdAt: {
-          lt: thirtyDaysAgo
-        }
-      }
-    });
-
-    // Limpiar interacciones muy antiguas (mantener solo del último año)
-    await prisma.userInteraction.deleteMany({
-      where: {
-        createdAt: {
+        lastActiveAt: {
           lt: oneYearAgo
-        }
+        },
+        isActive: true,
+        userType: { not: 'ADMIN' } // No desactivar admins automáticamente
+      },
+      data: {
+        isActive: false
       }
     });
 
-    // Limpiar device tokens inactivos
-    await prisma.deviceToken.deleteMany({
+    // Limpiar premium expirado hace más de 6 meses
+    await prisma.premiumActivation.deleteMany({
       where: {
         isActive: false,
-        lastUsedAt: {
-          lt: thirtyDaysAgo
+        expiresAt: {
+          lt: sixMonthsAgo
         }
       }
     });
 
-    logger.info('User data cleanup completed');
+    logger.info('Inactive users cleanup completed', {
+      inactiveUsersMarked: inactiveCount.count
+    });
+
+    return {
+      inactiveUsersMarked: inactiveCount.count
+    };
   } catch (error) {
-    logger.error('Error cleaning up user data:', error);
+    logger.error('Error cleaning up inactive users:', error);
     throw error;
   }
 };
 
-// Obtener configuraciones de usuario
-const getUserSettings = async (userId) => {
+/**
+ * Obtener usuarios que necesitan reset diario
+ */
+const getUsersNeedingDailyReset = async () => {
   try {
-    const settings = await prisma.userSettings.findUnique({
-      where: { userId }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const users = await prisma.client.findMany({
+      where: {
+        OR: [
+          { lastMessageReset: { lt: today } },
+          { lastMessageReset: null }
+        ],
+        messagesUsedToday: { gt: 0 }
+      },
+      select: {
+        id: true,
+        userId: true,
+        messagesUsedToday: true,
+        lastMessageReset: true,
+        user: {
+          select: {
+            username: true,
+            isActive: true
+          }
+        }
+      }
     });
 
-    if (!settings) {
-      // Crear configuraciones por defecto si no existen
-      return await prisma.userSettings.create({
-        data: {
-          userId,
-          emailNotifications: true,
-          pushNotifications: true,
-          messageNotifications: true,
-          likeNotifications: true,
-          boostNotifications: true,
-          showOnline: true,
-          showLastSeen: true,
-          allowDirectMessages: true,
-          showPhoneNumber: false,
-          showInDiscovery: true,
-          showInTrending: true,
-          showInSearch: true,
-          contentFilter: 'MODERATE'
-        }
-      });
+    return users.filter(user => user.user.isActive);
+  } catch (error) {
+    logger.error('Error getting users needing daily reset:', error);
+    return [];
+  }
+};
+
+/**
+ * Aplicar reset diario masivo
+ */
+const performDailyReset = async () => {
+  try {
+    const usersToReset = await getUsersNeedingDailyReset();
+    
+    if (usersToReset.length === 0) {
+      logger.info('No users need daily reset');
+      return { resetCount: 0 };
     }
 
-    return settings;
-  } catch (error) {
-    logger.error('Error getting user settings:', error);
-    throw error;
-  }
-};
+    const resetPromises = usersToReset.map(user => 
+      resetDailyLimits(user.id)
+    );
 
-// Actualizar configuraciones de usuario
-const updateUserSettings = async (userId, settings) => {
-  try {
-    const updatedSettings = await prisma.userSettings.upsert({
-      where: { userId },
-      update: {
-        ...settings,
-        updatedAt: new Date()
-      },
-      create: {
-        userId,
-        ...settings
-      }
+    await Promise.all(resetPromises);
+
+    logger.info('Daily reset completed', {
+      resetCount: usersToReset.length,
+      resetUsers: usersToReset.map(u => u.user.username)
     });
 
-    logger.info('User settings updated', { userId, settingsUpdated: Object.keys(settings) });
-    return updatedSettings;
+    return { resetCount: usersToReset.length };
   } catch (error) {
-    logger.error('Error updating user settings:', error);
+    logger.error('Error performing daily reset:', error);
     throw error;
   }
 };
 
+// ============================================================================
+// EXPORTAR MÓDULO
+// ============================================================================
+
 module.exports = {
-  searchUsersAdvanced,
-  getRecommendedUsers,
-  updateDiscoveryScores,
-  updateTrendingScores,
-  getUserStats,
-  toggleUserBlock,
-  getBlockedUsers,
-  isUserBlocked,
-  updateUserActivity,
-  cleanupUserData,
-  getUserSettings,
-  updateUserSettings
+  getUserProfile,
+  updateClientLimits,
+  getClientLimits,
+  resetDailyLimits,
+  checkPremiumExpiration,
+  applyPremiumBenefits,
+  removePremiumBenefits,
+  incrementMessageUsage,
+  canUserPerformAction,
+  usePointsForAction,
+  getUserStatistics,
+  getPremiumHistory,
+  getPointsUsageStats,
+  cleanupInactiveUsers,
+  getUsersNeedingDailyReset,
+  performDailyReset,
+  DEFAULT_LIMITS
 };

@@ -10,6 +10,7 @@ const agencyRoutes = require('./agency');
 const adminRoutes = require('./admin');
 const favoritesRoutes = require('./favorites');
 const paymentRoutes = require('./payments');
+const pointsRoutes = require('./points'); // ✅ NUEVO: Sistema TeloPoints
 
 // Importar middlewares
 const { authenticate, requireAdmin } = require('../middleware/auth');
@@ -153,6 +154,10 @@ router.get('/metrics', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// ============================================================================
+// RUTAS DE LA API
+// ============================================================================
+
 // ✅ RUTAS PÚBLICAS (sin autenticación)
 router.use('/auth', authRoutes);
 
@@ -163,6 +168,7 @@ router.use('/chat', authenticate, chatRoutes); // Todas requieren auth
 router.use('/agency', agencyRoutes); // Ya maneja auth internamente (/search es pública)
 router.use('/favorites', authenticate, favoritesRoutes); // Todas requieren auth
 router.use('/payments', authenticate, paymentRoutes); // Todas requieren auth
+router.use('/points', authenticate, pointsRoutes); // ✅ NUEVO: Sistema TeloPoints
 
 // ✅ RUTAS DE ADMINISTRACIÓN (requieren rol admin)
 router.use('/admin', authenticate, requireAdmin, adminRoutes);
@@ -174,19 +180,58 @@ router.use('*', (req, res) => {
     message: `Endpoint ${req.originalUrl} no encontrado`,
     errorCode: 'ENDPOINT_NOT_FOUND',
     availableRoutes: [
+      // Sistema
       'GET /api/status - Sistema: Estado de salud',
       'GET /api/metrics - Sistema: Métricas (Admin)',
+      
+      // Autenticación
       'POST /api/auth/login - Auth: Iniciar sesión',
       'POST /api/auth/register - Auth: Registrarse',
       'GET /api/auth/google - Auth: OAuth Google',
+      
+      // Usuarios
       'GET /api/users/profile - Usuarios: Mi perfil',
+      'PUT /api/users/profile - Usuarios: Actualizar perfil',
+      'GET /api/users/search - Usuarios: Buscar usuarios',
+      
+      // Posts
       'GET /api/posts/feed - Posts: Feed principal',
       'GET /api/posts/trending - Posts: Trending (público)',
+      'POST /api/posts - Posts: Crear post',
+      
+      // Chat
       'GET /api/chat - Chat: Mis chats',
+      'POST /api/chat - Chat: Crear chat',
+      
+      // Agencias
       'GET /api/agency/search - Agencias: Buscar (público)',
+      'POST /api/agency/register - Agencias: Registrar',
+      
+      // Favoritos
       'GET /api/favorites - Favoritos: Mis favoritos',
+      'POST /api/favorites/:postId - Favoritos: Agregar/quitar',
+      
+      // Pagos
       'GET /api/payments/boost/pricing - Pagos: Precios boost',
-      'GET /api/admin/metrics - Admin: Métricas de app'
+      'POST /api/payments/boost/intent - Pagos: Crear boost',
+      'GET /api/payments/history - Pagos: Historial',
+      
+      // ✅ NUEVO: Sistema TeloPoints
+      'GET /api/points/balance - Puntos: Mi balance',
+      'GET /api/points/history - Puntos: Historial de puntos',
+      'GET /api/points/packages - Puntos: Paquetes disponibles',
+      'POST /api/points/daily-login - Puntos: Reclamar diarios',
+      'POST /api/points/spend - Puntos: Usar puntos',
+      'POST /api/points/purchase - Puntos: Comprar puntos',
+      'POST /api/points/premium - Puntos: Activar premium',
+      'GET /api/points/actions - Puntos: Acciones disponibles',
+      'GET /api/points/streak - Puntos: Info de racha',
+      'GET /api/points/config - Puntos: Configuración del sistema',
+      
+      // Administración
+      'GET /api/admin/metrics - Admin: Métricas de app',
+      'POST /api/points/admin/adjust - Admin: Ajustar puntos',
+      'GET /api/points/admin/stats - Admin: Estadísticas de puntos'
     ],
     documentation: '/api-docs',
     timestamp: new Date().toISOString()

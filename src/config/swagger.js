@@ -1,6 +1,8 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -19,10 +21,10 @@ const options = {
     },
     servers: [
       {
-        url: process.env.NODE_ENV === 'production' 
-          ? 'https://api.telofundi.com' 
-          : `http://localhost:${process.env.PORT || 3000}`,
-        description: process.env.NODE_ENV === 'production' ? 'Servidor de Producción' : 'Servidor de Desarrollo'
+        url: isProduction 
+          ? 'https://telofundi.com/api' 
+          : `http://localhost:${process.env.PORT || 3000}/api`,
+        description: isProduction ? 'Servidor de Producción' : 'Servidor de Desarrollo'
       }
     ],
     components: {
@@ -218,12 +220,13 @@ const options = {
 const specs = swaggerJsdoc(options);
 
 const setupSwagger = (app) => {
-  // Configuración personalizada de Swagger UI
+  // ✅ CONFIGURACIÓN CONDICIONAL PARA PRODUCCIÓN
   const swaggerUiOptions = {
     customCss: `
       .swagger-ui .topbar { display: none }
       .swagger-ui .info { margin: 20px 0 }
       .swagger-ui .info .title { color: #3b82f6 }
+      ${isProduction ? '.swagger-ui .scheme-container { display: none }' : ''}
     `,
     customSiteTitle: 'TeLoFundi API Documentation',
     customfavIcon: '/favicon.ico',
@@ -231,9 +234,22 @@ const setupSwagger = (app) => {
       persistAuthorization: true,
       displayRequestDuration: true,
       filter: true,
-      tryItOutEnabled: true
+      tryItOutEnabled: !isProduction // ✅ Deshabilitar "Try it out" en producción
     }
   };
+
+  // ✅ MIDDLEWARE CONDICIONAL PARA PRODUCCIÓN
+  if (isProduction) {
+    // En producción, solo documentación de lectura
+    app.use('/api-docs', (req, res, next) => {
+      // Opcional: Agregar autenticación básica en producción
+      // const auth = req.headers.authorization;
+      // if (!auth || !isValidApiDocAuth(auth)) {
+      //   return res.status(401).json({ message: 'Unauthorized' });
+      // }
+      next();
+    });
+  }
 
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, swaggerUiOptions));
   
@@ -242,6 +258,8 @@ const setupSwagger = (app) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(specs);
   });
+
+  console.log(`📚 Swagger Documentation available at: ${isProduction ? 'https://telofundi.com' : 'http://localhost:' + (process.env.PORT || 3000)}/api-docs`);
 };
 
 module.exports = { setupSwagger, specs };

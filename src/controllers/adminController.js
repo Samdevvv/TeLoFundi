@@ -326,6 +326,346 @@ const getAppMetrics = catchAsync(async (req, res) => {
   }
 });
 
+// ✅ FUNCIÓN CORREGIDA: Obtener agencias pendientes de verificación - SIN businessLicense
+const getPendingAgencies = catchAsync(async (req, res) => {
+  const { page = 1, limit = 20, search } = req.query;
+
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  // ✅ CORRECCIÓN: Buscar en AgencyRegistrationRequest, NO en Agency
+  const whereClause = {
+    status: 'PENDING', // ✅ Usar el campo correcto del modelo correcto
+    ...(search && {
+      OR: [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { businessEmail: { contains: search, mode: 'insensitive' } },
+        { user: { 
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
+            { username: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } }
+          ]
+        }}
+      ]
+    })
+  };
+
+  // ✅ BUSCAR EN AgencyRegistrationRequest en lugar de User
+  const [agencies, totalCount] = await Promise.all([
+    prisma.agencyRegistrationRequest.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            bio: true,
+            website: true,
+            avatar: true,
+            isActive: true,
+            createdAt: true,
+            lastLogin: true,
+            location: {
+              select: {
+                country: true,
+                city: true,
+                state: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { submittedAt: 'desc' },
+      skip: offset,
+      take: parseInt(limit)
+    }),
+    prisma.agencyRegistrationRequest.count({ where: whereClause })
+  ]);
+
+  const pagination = {
+    page: parseInt(page),
+    limit: parseInt(limit),
+    total: totalCount,
+    pages: Math.ceil(totalCount / parseInt(limit)),
+    hasNext: parseInt(page) * parseInt(limit) < totalCount,
+    hasPrev: parseInt(page) > 1
+  };
+
+  // ✅ FORMATEAR RESPUESTA CON DATOS CORRECTOS - SIN businessLicense
+  const formattedAgencies = agencies.map(request => ({
+    requestId: request.id,
+    userId: request.userId,
+    
+    // Datos del formulario de registro - SIN businessLicense
+    fullName: request.fullName,
+    documentNumber: request.documentNumber,
+    businessPhone: request.businessPhone,
+    businessEmail: request.businessEmail,
+    documentFrontImage: request.documentFrontImage,
+    documentBackImage: request.documentBackImage,
+    
+    // Estado de la solicitud
+    status: request.status,
+    submittedAt: request.submittedAt,
+    reviewNotes: request.reviewNotes,
+    rejectionReason: request.rejectionReason,
+    
+    // Datos del usuario asociado
+    userData: {
+      id: request.user.id,
+      email: request.user.email,
+      username: request.user.username,
+      firstName: request.user.firstName,
+      lastName: request.user.lastName,
+      phone: request.user.phone,
+      bio: request.user.bio,
+      website: request.user.website,
+      avatar: request.user.avatar,
+      isActive: request.user.isActive,
+      createdAt: request.user.createdAt,
+      lastLogin: request.user.lastLogin,
+      location: request.user.location
+    }
+  }));
+
+  res.status(200).json({
+    success: true,
+    data: {
+      agencies: formattedAgencies,
+      pagination,
+      filters: { search }
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ FUNCIÓN CORREGIDA: Aprobar agencia - CON companyName requerido
+const approveAgency = catchAsync(async (req, res) => {
+  const adminUserId = req.user.id;
+  const { agencyId } = req.params; // ✅ NOTA: Este debe ser requestId, no userId
+  const { notes } = req.body;
+
+  // ✅ BUSCAR en AgencyRegistrationRequest usando el ID de la solicitud
+  const agencyRequest = await prisma.agencyRegistrationRequest.findUnique({
+    where: { id: agencyId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          userType: true,
+          username: true
+        }
+      }
+    }
+  });
+
+  if (!agencyRequest) {
+    throw new AppError('Solicitud de agencia no encontrada', 404, 'AGENCY_REQUEST_NOT_FOUND');
+  }
+
+  if (agencyRequest.status !== 'PENDING') {
+    throw new AppError('Esta solicitud ya fue procesada', 400, 'REQUEST_ALREADY_PROCESSED');
+  }
+
+  // ✅ GENERAR companyName usando datos disponibles
+  const companyName = `${agencyRequest.fullName} Agency` || 
+                     `${agencyRequest.user.firstName} ${agencyRequest.user.lastName} Agency` ||
+                     `${agencyRequest.user.username} Agency` ||
+                     'Agencia de Escorts';
+
+  // ✅ TRANSACCIÓN: Aprobar solicitud Y crear/actualizar registro Agency
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Actualizar la solicitud a APPROVED
+    const updatedRequest = await tx.agencyRegistrationRequest.update({
+      where: { id: agencyId },
+      data: {
+        status: 'APPROVED',
+        reviewedAt: new Date(),
+        reviewedBy: adminUserId,
+        reviewNotes: notes || null
+      }
+    });
+
+    // 2. Crear o actualizar el registro Agency - SOLO campos mínimos seguros
+    const agencyData = await tx.agency.upsert({
+      where: { userId: agencyRequest.userId },
+      create: {
+        userId: agencyRequest.userId,
+        companyName: companyName, // ✅ CAMPO REQUERIDO
+        contactPerson: agencyRequest.fullName, // ✅ CAMPO REQUERIDO
+        address: agencyRequest.user.location ? 
+          `${agencyRequest.user.location.city}, ${agencyRequest.user.location.country}` : 
+          'Dirección no especificada', // ✅ CAMPO REQUERIDO
+        isVerified: true,
+        verifiedAt: new Date(),
+        totalEscorts: 0
+      },
+      update: {
+        isVerified: true,
+        verifiedAt: new Date(),
+        companyName: companyName,
+        contactPerson: agencyRequest.fullName,
+        address: agencyRequest.user.location ? 
+          `${agencyRequest.user.location.city}, ${agencyRequest.user.location.country}` : 
+          'Dirección no especificada'
+      }
+    });
+
+    // 3. Actualizar el status del usuario para permitir acceso
+    await tx.user.update({
+      where: { id: agencyRequest.userId },
+      data: {
+        accountStatus: 'ACTIVE', // ✅ Cambiar de PENDING_APPROVAL a ACTIVE
+        canLogin: true // ✅ Permitir login
+      }
+    });
+
+    return { updatedRequest, agencyData };
+  });
+
+  // Crear notificación para la agencia
+  await prisma.notification.create({
+    data: {
+      userId: agencyRequest.userId,
+      type: 'AGENCY_APPROVED',
+      title: '¡Agencia aprobada!',
+      message: 'Tu solicitud de agencia ha sido aprobada. Ya puedes acceder a todas las funcionalidades.',
+      priority: 'HIGH',
+      data: {
+        approvedBy: adminUserId,
+        approvedAt: new Date().toISOString(),
+        notes: notes || null,
+        companyName: companyName
+      }
+    }
+  });
+
+  // Actualizar estadísticas del admin
+  await prisma.admin.update({
+    where: { userId: adminUserId },
+    data: { 
+      totalAgencyApprovals: { increment: 1 }
+    }
+  });
+
+  logger.logSecurity('agency_approved', 'medium', {
+    requestId: agencyId,
+    userId: agencyRequest.userId,
+    fullName: agencyRequest.fullName,
+    companyName: companyName,
+    approvedBy: adminUserId,
+    notes: notes || null
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `Solicitud de agencia de ${agencyRequest.fullName} aprobada exitosamente`,
+    data: {
+      requestId: agencyId,
+      userId: agencyRequest.userId,
+      fullName: agencyRequest.fullName,
+      companyName: companyName,
+      approvedAt: new Date().toISOString(),
+      approvedBy: adminUserId
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ FUNCIÓN CORREGIDA: Rechazar agencia - SIN businessLicense
+const rejectAgency = catchAsync(async (req, res) => {
+  const adminUserId = req.user.id;
+  const { agencyId } = req.params; // requestId
+  const { reason, notes } = req.body;
+
+  if (!reason?.trim()) {
+    throw new AppError('Razón del rechazo es obligatoria', 400, 'REJECTION_REASON_REQUIRED');
+  }
+
+  // Buscar solicitud de agencia
+  const agencyRequest = await prisma.agencyRegistrationRequest.findUnique({
+    where: { id: agencyId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true
+        }
+      }
+    }
+  });
+
+  if (!agencyRequest) {
+    throw new AppError('Solicitud de agencia no encontrada', 404, 'AGENCY_REQUEST_NOT_FOUND');
+  }
+
+  if (agencyRequest.status !== 'PENDING') {
+    throw new AppError('Esta solicitud ya fue procesada', 400, 'REQUEST_ALREADY_PROCESSED');
+  }
+
+  // Rechazar solicitud
+  await prisma.agencyRegistrationRequest.update({
+    where: { id: agencyId },
+    data: {
+      status: 'REJECTED',
+      reviewedAt: new Date(),
+      reviewedBy: adminUserId,
+      rejectionReason: reason,
+      reviewNotes: notes || null
+    }
+  });
+
+  // Crear notificación para el usuario
+  await prisma.notification.create({
+    data: {
+      userId: agencyRequest.userId,
+      type: 'AGENCY_REJECTED',
+      title: 'Solicitud de agencia rechazada',
+      message: `Tu solicitud de agencia fue rechazada. Razón: ${reason}`,
+      priority: 'HIGH',
+      data: {
+        rejectedBy: adminUserId,
+        rejectedAt: new Date().toISOString(),
+        reason,
+        notes: notes || null
+      }
+    }
+  });
+
+  logger.logSecurity('agency_rejected', 'medium', {
+    requestId: agencyId,
+    userId: agencyRequest.userId,
+    fullName: agencyRequest.fullName,
+    rejectedBy: adminUserId,
+    reason,
+    notes: notes || null
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `Solicitud de agencia de ${agencyRequest.fullName} rechazada`,
+    data: {
+      requestId: agencyId,
+      userId: agencyRequest.userId,
+      fullName: agencyRequest.fullName,
+      rejectedAt: new Date().toISOString(),
+      rejectedBy: adminUserId,
+      reason
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Banear usuario
 const banUser = catchAsync(async (req, res) => {
   const adminUserId = req.user.id;
@@ -1171,6 +1511,9 @@ const updateAppSettings = catchAsync(async (req, res) => {
 
 module.exports = {
   getAppMetrics,
+  getPendingAgencies,    // ✅ EXPORTADA Y CORREGIDA
+  approveAgency,         // ✅ EXPORTADA Y CORREGIDA CON companyName
+  rejectAgency,          // ✅ EXPORTADA Y CORREGIDA
   banUser,
   unbanUser,
   getBannedUsers,
